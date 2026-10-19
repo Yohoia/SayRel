@@ -1,0 +1,113 @@
+{
+  "name": "offkey",
+  "version": "1.0.0",
+  "description": "Offkey \u2014 voice-first writing assistant for the desktop",
+  "author": "Offkey",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "out/main/index.js",
+  "engines": {
+    "npm": ">=10",
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit",
+    "rebuild": "electron-rebuild -f -w better-sqlite3,koffi",
+    "native": "bash scripts/build-native.sh",
+    "icons": "tsx scripts/gen-icons.ts",
+    "dist:mac": "electron-vite build && electron-builder --mac",
+    "verify:voice": "node scripts/diagnostics/fn-shift-chain.cjs && node scripts/diagnostics/renderer-session.cjs && node scripts/diagnostics/audio-tail.cjs && node scripts/diagnostics/worklet-drain.cjs && python3 scripts/diagnostics/native-hotkeys.py",
+    "verify:ui": "node scripts/ui-build.mjs && electron scripts/diagnostics/ui-offline.cjs",
+    "verify:settings": "node scripts/diagnostics/settings-controls.cjs"
+  },
+  "dependencies": {
+    "@floating-ui/react": "^0.27.16",
+    "@libsql/client": "^0.15.9",
+    "@sentry/electron": "^7.10.0",
+    "@tanstack/react-virtual": "^3.13.12",
+    "better-sqlite3": "^12.4.1",
+    "compare-versions": "^6.1.1",
+    "crypto-js": "^4.2.0",
+    "csv-parse": "^6.2.1",
+    "diff": "^8.0.2",
+    "drizzle-orm": "^0.44.2",
+    "echarts": "^6.0.0",
+    "echarts-for-react": "^3.0.5",
+    "electron-store": "^10.0.1",
+    "electron-updater": "^6.3.9",
+    "js-yaml": "^4.1.0",
+    "koffi": "^2.11.0",
+    "node-schedule": "^2.1.1",
+    "notistack": "^3.0.2",
+    "opusscript": "^0.1.1",
+    "plist": "^3.1.0",
+    "undici": "^7.16.0"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.1",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.4",
+    "@mui/material": "^7.3.4",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/crypto-js": "^4.2.2",
+    "@types/diff": "^8.0.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.10.0",
+    "@types/plist": "^3.0.5",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "33.4.11",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^3.1.0",
+    "i18next": "^25.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-i18next": "^15.4.1",
+    "react-router-dom": "^7.1.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.0",
+    "zustand": "^5.0.3"
+  },
+  "resolutions": {
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1"
+  },
+  "build": {
+    "appId": "com.offkey.app",
+    "productName": "Offkey",
+    "directories": {
+      "buildResources": "resources/build"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": ".",
+        "filter": [
+          "build/**/*",
+          "lib/**/*",
+          "locales/**/*"
+        ]
+      }
+    ],
+    "mac": {
+      "icon": "resources/build/icon.icns"
+    },
+    "win": {
+      "icon": "resources/build/icon.ico"
+    },
+    "linux": {
+      "icon": "resources/build/icon.png"
+    }
+  }
+}

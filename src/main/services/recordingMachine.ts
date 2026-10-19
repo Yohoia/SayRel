@@ -1,0 +1,295 @@
+import { EventEmitter } from 'node:events'
+import { randomUUID } from 'node:crypto'
+import { readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { paths } from '../lib/paths'
+import { createLogger } from '../lib/logger'
+import { AUDIO, HISTORY_STATUS, MODES, type Mode } from '../../shared/constants'
+import type { AudioContextSnapshot, VoiceFlowResult } from '../../shared/types'
+import type { Settings } from '../../shared/settings'
+import { broadcast, interactiveCardWindow } from '../windows'
+import { IPC } from '../../shared/ipc'
+import * as history from './history'
+import { listDictionary } from './dictionary'
+import { insertText } from './insertion'
+import { transcribe } from './transcription'
+import { createProviders } from './providers'
+import { runVoiceAction } from './voiceActions'
+import { settings } from '../lib/settings'
+import { captureAudioContext } from './contextCapture'
+
+const log = createLogger('recording-machine')
+export type RecorderPhase = 'idle' | 'long_pressing' | 'starting' | 'recording' | 'finishing' | 'error'
+export interface RecorderContext {
+  sessionId: string | null
+  recorderState: { isStartingMicrophone: boolean }
+  recorderTimeoutState: { remainingTime: number; timeUntilCountdown: number } | null
+  handsFree: boolean
+  mode: Mode
+  error: string | null
+}
+export interface RecordingMachineState { phase: RecorderPhase; context: RecorderContext }
+type MachineEvent = { type: 'PRESS' | 'RELEASE' | 'STARTED' | 'FINISH' | 'CANCEL' | 'RETRY' | 'TIMEOUT' | 'ERROR'; error?: string }
+type Session = {
+  id: string; startedAt: number; mode: Mode; frames: Float32Array[]
+  context: Promise<AudioContextSnapshot | null>; config: Settings; controller: AbortController
+  stopped: boolean; stoppedAt?: number; resolveStop?: () => void; stopTimer?: NodeJS.Timeout
+  historyRetry?: boolean
+  completion?: Promise<void>; historyWritten: boolean
+}
+
+/** Main owns session identity; renderer owns the microphone and acknowledges its drain. */
+export class RecordingMachine extends EventEmitter {
+  private state: RecordingMachineState = { phase: 'idle', context: {
+    sessionId: null, recorderState: { isStartingMicrophone: false }, recorderTimeoutState: null,
+    handsFree: false, mode: MODES.VOICE_TRANSCRIPT, error: null
+  } }
+  private session: Session | null = null
+  private disabled = false
+  private countdown: NodeJS.Timeout | null = null
+  private retryInput: { pcm: Float32Array; mode: Mode; durationMs: number; context: AudioContextSnapshot | null } | null = null
+
+  getState(): RecordingMachineState { return this.state }
+  isDisabled(): boolean { return this.disabled }
+  setDisabled(value: boolean): void {
+    this.disabled = value
+    if (value) this.cancel()
+    broadcast(IPC.RECORDING_MACHINE_DISABLED_CHANGED, value)
+  }
+  private transition(phase: RecorderPhase, patch: Partial<RecorderContext> = {}): void {
+    this.state = { phase, context: { ...this.state.context, ...patch } }
+    this.emit('state', this.state)
+    broadcast('recording-machine:state', this.state)
+  }
+  private active(session: Session): boolean { return this.session === session && !session.controller.signal.aborted }
+  private requireActive(session: Session): void {
+    if (!this.active(session)) throw new Error('Recording cancelled')
+  }
+  markStreaming(sessionId: string): void {
+    if (sessionId !== this.session?.id || this.state.phase !== 'starting') return
+    this.session.startedAt = Date.now()
+    this.transition('recording', { recorderState: { isStartingMicrophone: false } })
+  }
+  pushPcm(chunk: Float32Array, sessionId: string): void {
+    const session = this.session
+    if (!session || sessionId !== session.id || session.stopped) return
+    if (!['starting', 'recording', 'finishing'].includes(this.state.phase)) return
+    session.frames.push(chunk)
+  }
+  markStopped(sessionId: string): void {
+    if (!this.session || sessionId !== this.session.id) return
+    this.session.stopped = true
+    this.session.stoppedAt = Date.now()
+    this.session.resolveStop?.()
+  }
+  reportError(sessionId: string, message: string): void {
+    if (!this.session || sessionId !== this.session.id) return
+    this.fail(this.session, new Error(message))
+  }
+  switchMode(mode: Mode): void {
+    if (!this.session || !['starting', 'recording'].includes(this.state.phase)) return
+    this.session.mode = mode
+    this.transition(this.state.phase, { mode })
+  }
+  selectTranslationLanguage(language: string): boolean {
+    if (this.session && !['starting', 'recording'].includes(this.state.phase)) return false
+    if (!settings.get().translationTargetLanguages.includes(language)) return false
+    if (this.session) this.session.config.translationTargetLanguage = language
+    return true
+  }
+  setHandsFree(handsFree: boolean): void { this.transition(this.state.phase, { handsFree }) }
+  setLongPressing(): void {
+    if (!['starting', 'recording'].includes(this.state.phase)) return
+    this.cancel()
+    this.transition('long_pressing')
+  }
+  async dispatch(event: MachineEvent): Promise<void> {
+    switch (event.type) {
+      case 'PRESS': return this.start()
+      case 'RELEASE':
+        if (this.state.phase === 'long_pressing') return this.cancel()
+        if (['starting', 'recording'].includes(this.state.phase)) return this.finish()
+        return
+      case 'FINISH': case 'TIMEOUT': return this.finish()
+      case 'CANCEL': return this.cancel()
+      case 'RETRY': return this.retry()
+      case 'ERROR': if (this.session) this.reportError(this.session.id, event.error ?? '录音失败'); return
+      default: return
+    }
+  }
+  private newSession(mode: Mode): Session {
+    return { id: randomUUID(), startedAt: Date.now(), mode, frames: [],
+      context: Promise.resolve(null), config: structuredClone(settings.get()),
+      controller: new AbortController(), stopped: false, historyWritten: false }
+  }
+  async start(mode?: Mode): Promise<void> {
+    if (this.disabled || this.session || this.state.phase === 'long_pressing') return
+    const session = this.newSession(mode ?? settings.get().dictationMode)
+    this.session = session
+    this.retryInput = null
+    // Capture the target before any renderer can focus a window.
+    session.context = captureAudioContext().catch(err => { log.warn('context capture failed', err); return null })
+    this.transition('starting', { sessionId: session.id, mode: session.mode, error: null,
+      handsFree: false, recorderState: { isStartingMicrophone: true }, recorderTimeoutState: null })
+    this.countdown = setInterval(() => {
+      if (!this.active(session)) return
+      const remaining = Math.max(0, 300 - Math.floor((Date.now() - session.startedAt) / 1000))
+      this.transition(this.state.phase, { recorderTimeoutState: { remainingTime: remaining, timeUntilCountdown: Math.max(0, remaining - 30) } })
+      if (remaining === 0) void this.finish()
+    }, 1000)
+    this.emit('start', { sessionId: session.id, mode: session.mode })
+  }
+  finish(): Promise<void> {
+    const session = this.session
+    if (!session) return Promise.resolve()
+    if (session.completion) return session.completion
+    this.stopCountdown()
+    // Install the ACK waiter before publishing finishing: even immediate ACKs cannot be lost.
+    const drained = new Promise<void>((resolve, reject) => {
+      session.resolveStop = resolve
+      session.stopTimer = setTimeout(() => reject(new Error('麦克风停止超时，请检查权限后重试')), 15000)
+    })
+    this.transition('finishing', { recorderState: { isStartingMicrophone: false }, recorderTimeoutState: null })
+    session.completion = (async () => {
+      try {
+        await drained
+        clearTimeout(session.stopTimer)
+        this.requireActive(session)
+        const context = await session.context
+        this.requireActive(session)
+        const input = { pcm: mergeFrames(session.frames), mode: session.mode,
+          durationMs: (session.stoppedAt ?? Date.now()) - session.startedAt, context }
+        session.frames = []
+        if (!input.pcm.length) { this.cancel(); return }
+        this.retryInput = input
+        await this.complete(session, input)
+      } catch (err) { if (this.active(session)) this.fail(session, err) }
+      finally { clearTimeout(session.stopTimer) }
+    })()
+    return session.completion
+  }
+  private async complete(session: Session, input: { pcm: Float32Array; mode: Mode; durationMs: number; context: AudioContextSnapshot | null; audioPath?: string }): Promise<void> {
+    const result = await this.process(session, input)
+    this.requireActive(session)
+    this.session = null
+    this.retryInput = null
+    this.transition('idle', { sessionId: null, recorderState: { isStartingMicrophone: false }, handsFree: false, recorderTimeoutState: null })
+    this.emit('result', result)
+    if (result.delivery === 'card') {
+      interactiveCardWindow.setPayload({ id: result.id, mode: result.mode, title: result.transcript,
+        question: result.transcript, selectedText: input.context?.focusedInput?.selectedText ?? null,
+        answer: result.refined, createdAt: Date.now() })
+      interactiveCardWindow.createWindow()
+      interactiveCardWindow.show()
+    }
+    broadcast(IPC.PAGE_FLOATING_BAR_CLICK, 'done', result)
+    broadcast('history:changed')
+  }
+  cancel(): void {
+    const session = this.session
+    this.session = null
+    this.retryInput = null
+    this.stopCountdown()
+    if (session) {
+      session.controller.abort()
+      clearTimeout(session.stopTimer)
+      session.resolveStop?.()
+      if (session.historyWritten) history.upsertHistory({ id: session.id, status: HISTORY_STATUS.CANCELLED })
+      session.frames = []
+    }
+    this.transition('idle', { sessionId: null, recorderState: { isStartingMicrophone: false }, recorderTimeoutState: null, handsFree: false, error: null })
+    this.emit('cancel')
+  }
+  private fail(session: Session, err: unknown): void {
+    const message = err instanceof Error ? err.message : String(err)
+    log.error('voice flow failed', { message })
+    const retryInput = this.retryInput
+    this.cancel()
+    this.retryInput = retryInput
+    if (session.historyWritten) history.upsertHistory({ id: session.id, status: HISTORY_STATUS.FAILED, debugInfo: message })
+    this.transition('error', { error: message })
+    broadcast(IPC.PAGE_FLOATING_BAR_CLICK, 'error', message)
+    broadcast('history:changed')
+  }
+  async retry(): Promise<void> {
+    if (!this.retryInput) {
+      await this.start()
+      this.setHandsFree(true)
+      return
+    }
+    if (this.session || this.disabled) return
+    const session = this.newSession(this.retryInput.mode)
+    this.session = session
+    this.transition('finishing', { sessionId: session.id, mode: session.mode, error: null })
+    try { await this.complete(session, this.retryInput) }
+    catch (err) { if (this.active(session)) this.fail(session, err) }
+  }
+  async retryHistory(id: string): Promise<void> {
+    if (this.session || this.disabled) throw new Error('请等待当前录音处理完成')
+    const row = history.getHistory(id)
+    if (!row?.audioLocalPath) throw new Error('此条历史没有保存录音，无法重试')
+    const session = this.newSession(row.mode as Mode)
+    session.id = id
+    session.historyRetry = true
+    this.retryInput = null
+    this.session = session
+    this.transition('finishing', { sessionId: id, mode: session.mode, error: null })
+    let context: AudioContextSnapshot | null = null
+    try { context = row.audioContext ? JSON.parse(row.audioContext) : null } catch { /* older record */ }
+    try { await this.complete(session, { pcm: new Float32Array(), mode: session.mode, durationMs: row.duration ?? 0, context, audioPath: row.audioLocalPath }) }
+    catch (err) {
+      if (this.active(session)) this.fail(session, err)
+      throw err
+    }
+  }
+  private async process(session: Session, input: { pcm: Float32Array; mode: Mode; durationMs: number; context: AudioContextSnapshot | null; audioPath?: string }): Promise<VoiceFlowResult> {
+    const config = session.config
+    const dictionary = listDictionary().map(entry => entry.word)
+    this.requireActive(session)
+    if (config.historyEnabled || session.historyRetry) {
+      history.upsertHistory({ id: session.id, status: HISTORY_STATUS.PROCESSING, mode: input.mode,
+        duration: input.durationMs, audioContext: input.context ? JSON.stringify(input.context) : null,
+        micDevice: config.micDevice, appVersion: process.env.npm_package_version ?? '1.0.0' })
+      session.historyWritten = true
+    }
+    // Keep the existing live transcription and polishing implementations intact.
+    const { result, ogg } = input.audioPath
+      ? { result: await createProviders(config.provider).transcription.transcribe({ audioBuffer: await readFile(input.audioPath), audioPath: input.audioPath, mimeType: 'audio/ogg', durationMs: input.durationMs, language: config.transcriptionLanguage, dictionary, context: input.context, mode: input.mode }), ogg: Buffer.alloc(0) }
+      : await transcribe({ pcm: input.pcm, durationMs: input.durationMs, language: config.transcriptionLanguage, dictionary, context: input.context, mode: input.mode })
+    this.requireActive(session)
+    if (config.historyEnabled && config.saveAudio && ogg.length) {
+      const file = join(paths.recordings, `${session.id}.ogg`)
+      await writeFile(file, ogg)
+      this.requireActive(session)
+      history.upsertHistory({ id: session.id, audioLocalPath: file })
+    }
+    let refined = result.text
+    if (result.text && (input.mode === 'ask_anything' || input.mode === 'translation')) {
+      refined = await runVoiceAction({ transcript: result.text, mode: input.mode, context: input.context, config, signal: session.controller.signal })
+    } else if (result.text) {
+      try {
+        refined = (await createProviders(config.provider).refinement.refine({ transcript: result.text, mode: input.mode,
+          language: result.detectedLanguage, dictionary, context: input.context, instructions: config.customInstructions || undefined })).text
+      } catch (err) { log.warn('refinement failed, using raw transcript', err) }
+    }
+    this.requireActive(session)
+    let delivery: VoiceFlowResult['delivery'] = 'card'
+    if (input.mode !== 'ask_anything' && !session.historyRetry) {
+      const outcome = await insertText(refined, { addTrailingSpace: config.addTrailingSpace, isCancelled: () => !this.active(session) })
+      delivery = outcome.ok ? 'insert' : 'clipboard'
+    }
+    this.requireActive(session)
+    if (config.historyEnabled || session.historyRetry) history.upsertHistory({ id: session.id, status: HISTORY_STATUS.COMPLETED, refinedText: refined,
+      modeMeta: JSON.stringify({ transcript: result.text, aiResult: { text: refined, delivery } }) })
+    return { id: session.id, transcript: result.text, refined, delivery, mode: input.mode, durationMs: input.durationMs, detectedLanguage: result.detectedLanguage }
+  }
+  private stopCountdown(): void { if (this.countdown) clearInterval(this.countdown); this.countdown = null }
+}
+function mergeFrames(frames: Float32Array[]): Float32Array {
+  const out = new Float32Array(frames.reduce((sum, frame) => sum + frame.length, 0))
+  let offset = 0
+  for (const frame of frames) { out.set(frame, offset); offset += frame.length }
+  return out
+}
+export const recordingMachine = new RecordingMachine()
+export { AUDIO }
