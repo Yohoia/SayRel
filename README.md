@@ -1,10 +1,28 @@
 # OffKey
 
-基于 Electron、React、TypeScript 和 Swift 的 macOS 语音输入应用，支持口述、翻译、问答、历史记录和词典。
+OffKey 是一个面向 macOS 的语音输入与写作助手。你在当前聚焦的输入位置用 Fn 系列快捷键说话，OffKey 负责录音、调用你配置的模型服务，并把转写、润写、翻译或问答结果放回当前工作流。
 
-## 本地运行
+![OffKey 主界面，展示口述、翻译和问答三类快捷键入口](assets/readme/main-interface.png)
 
-需要 macOS、Node.js 22 或更新版本、npm 10 或更新版本，以及 Xcode Command Line Tools。
+## 它能做什么
+
+| 快捷键 | 动作 |
+| --- | --- |
+| `Fn` | 开始/结束口述，生成转写并用润写模型整理成可插入的文本 |
+| `Fn + Shift` | 口述内容并翻译到目标语言 |
+| `Fn + Space` | 提问并获得回答卡 |
+
+除快捷键输入外，OffKey 还提供：
+
+- **历史记录**：筛选、分页、下载录音、重试和查看回答。
+- **词典**：维护专有名词，减少重复口述纠错；支持 CSV 导入。
+- **服务商**：分别配置语音转写与文本润写模型，可验证连接、发现模型并设置默认项。
+
+> 界面截图来自离线验收 fixture；真实转写、翻译与问答需要你自己的可用模型服务配置。仓库不包含密钥或用户账户数据。
+
+## 快速开始
+
+需要 macOS、Node.js 22+、npm 10+ 和 Xcode Command Line Tools。
 
 ```bash
 npm ci
@@ -12,7 +30,25 @@ npm run native
 npm run dev
 ```
 
-首次运行需要授予麦克风和辅助功能权限。真实转写、翻译与问答需要可用的模型服务配置；仓库不包含密钥或用户账户数据。
+首次启动按引导授予麦克风和辅助功能权限，然后在侧栏打开「服务商」，分别配置转写与润写模型。默认快捷键可在设置中修改。
+
+![OffKey 服务商设置页，展示语音转写与文本润色两个配置分类](assets/readme/provider-settings.png)
+
+## 工作方式
+
+```text
+快捷键
+  ↓
+Swift 全局监听 + Electron 录音会话
+  ↓
+语音转写模型 → 文本润写模型
+  ↓
+插入当前输入位置 / 显示回答卡 / 写入历史记录
+```
+
+- **Electron + React + TypeScript**：主窗口、悬浮条、历史、词典、设置和服务商界面。
+- **Swift 原生助手**：处理全局键盘监听、输入插入、上下文读取和设备能力，生成 arm64/x86_64 动态库。
+- **本地 SQLite 存储**：保存历史、词典和应用设置；供应商凭据使用系统安全存储加密后保存在本机，不随仓库分发。
 
 ## 检查与构建
 
@@ -20,10 +56,12 @@ npm run dev
 npm run typecheck
 npm run verify:voice
 npm run verify:settings
+npm run verify:providers
+npm run verify:ui
 npm run build
 ```
 
-界面离线验收：`npm run verify:ui`。macOS 打包：`npm run dist:mac`。原生动态库由 `npm run native` 从 Swift 源码生成。
+macOS 打包使用 `npm run dist:mac`。这些检查不读取用户数据、不请求真实供应商、不发送真实键盘事件；`verify:ui` 会构建离线 fixture 并生成界面验收截图。
 
 ## 项目结构
 
@@ -39,4 +77,15 @@ scripts/       原生构建、回归检查和界面验收脚本
 docs/          实现记录、参考依据和已知差异
 ```
 
-依赖、生成文件、缓存、原版参考包、验收截图和本地凭据由 `.gitignore` 排除。项目的当前实现范围与未完成项见 [接续记录](docs/continuation-status.md) 和 [设置页对齐说明](docs/settings-parity.md)。
+## 当前边界
+
+- 项目仍在活跃开发中，尚未完成与原版 Typeless 的全量 1:1 复刻验收。
+- 翻译、问答和真实键盘→麦克风→供应商→目标输入框的端到端验收依赖系统权限与可用模型服务。
+- 历史主界面统计当前基于最近 200 条记录，不是完整的云端账户统计。
+- 原版订阅、计费、云端学习和完整课程不在当前实现范围内。
+
+详细状态见 [接续记录](docs/continuation-status.md)、[主界面对齐说明](docs/hub-ui-alignment.md) 和 [设置页对齐说明](docs/settings-parity.md)。
+
+## 许可证
+
+MIT
