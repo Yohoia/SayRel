@@ -30,9 +30,11 @@ npm run native
 npm run dev
 ```
 
-首次启动按引导授予麦克风和辅助功能权限，然后在侧栏打开「服务商」，分别配置转写与润写模型。默认快捷键可在设置中修改。
+首次启动按引导授予麦克风和辅助功能权限，然后在顶部导航打开「服务商」，分别配置转写与润写模型。默认快捷键可在设置中修改。
 
 ![OffKey 服务商设置页，展示语音转写与文本润色两个配置分类](assets/readme/provider-settings.png)
+
+界面统一使用灰白底、Hermes 蓝字、窄体展示标题和等宽快捷键。当前视觉规则见 [设计规范](DESIGN.md)，全应用截图见 [改版记录](docs/design-exploration/blueprint-system-20261021/README.md)。
 
 ## 工作方式
 

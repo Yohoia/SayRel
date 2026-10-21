@@ -31,15 +31,17 @@ offkey/
 │   │   ├── index.ts
 │   │   └── bridges/         # 按功能分类的桥接
 │   │
-│   ├── renderer/            # 渲染进程代码
+│   ├── renderer/            # 渲染进程代码，六个窗口 HTML 入口直接位于本目录
 │   │   ├── shared/          # 共享资源
 │   │   │   ├── components/  # 共享 React 组件
 │   │   │   │   ├── Modal.tsx
 │   │   │   │   ├── Toast.tsx
 │   │   │   │   ├── Icons.tsx
+│   │   │   │   ├── VoiceInstrument.tsx # 引导页线稿仪器
 │   │   │   │   └── ConfirmDialog.tsx
 │   │   │   ├── styles/      # 共享样式
 │   │   │   │   ├── base.css
+│   │   │   │   ├── home.css       # 首页与共享顶部导航
 │   │   │   │   ├── hub.css
 │   │   │   │   ├── secondary.css
 │   │   │   │   ├── settings.css
@@ -48,48 +50,41 @@ offkey/
 │   │   │   │   └── feedback.css
 │   │   │   ├── utils/       # 工具函数
 │   │   │   │   ├── bridge.ts
-│   │   │   │   ├── theme.ts
 │   │   │   │   ├── appearance.ts
 │   │   │   │   ├── checkForUpdates.ts
 │   │   │   │   └── providerApi.ts
 │   │   │   └── reference-icons.json
 │   │   │
 │   │   ├── hub/             # 主窗口
-│   │   │   ├── components/
+│   │   │   ├── components/    # HubHeader、SettingsPanel 等
 │   │   │   ├── pages/
-│   │   │   ├── state/
-│   │   │   ├── hub.html
+│   │   │   ├── state/         # 共享录音状态订阅 recording.ts
 │   │   │   ├── App.tsx
 │   │   │   └── main.tsx
 │   │   │
 │   │   ├── floating-bar/    # 浮动条窗口
 │   │   │   ├── components/
-│   │   │   ├── floating-bar.html
 │   │   │   ├── App.tsx
 │   │   │   ├── main.tsx
 │   │   │   └── styles.css
 │   │   │
 │   │   ├── login/           # 登录窗口
 │   │   │   ├── components/
-│   │   │   ├── login.html
 │   │   │   ├── App.tsx
 │   │   │   └── main.tsx
 │   │   │
 │   │   ├── onboarding/      # 引导窗口
 │   │   │   ├── components/
-│   │   │   ├── onboarding.html
 │   │   │   ├── App.tsx
 │   │   │   └── main.tsx
 │   │   │
 │   │   ├── sidebar/         # 侧边栏窗口
 │   │   │   ├── components/
-│   │   │   ├── sidebar.html
 │   │   │   ├── App.tsx
 │   │   │   └── main.tsx
 │   │   │
 │   │   └── interactive-card/ # 交互卡片窗口
 │   │       ├── components/
-│   │       ├── interactive-card.html
 │   │       ├── App.tsx
 │   │       └── main.tsx
 │   │

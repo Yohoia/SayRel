@@ -6,11 +6,11 @@ import MicRounded from '@mui/icons-material/MicRounded'
 import HelpOutlineRounded from '@mui/icons-material/HelpOutlineRounded'
 import { api } from '../shared/utils/bridge'
 import { toast } from '../shared/components/Toast'
+import { VoiceInstrument } from '../shared/components/VoiceInstrument'
 import { startRecorder, type RecorderHandle } from '../floating-bar/audio'
 import '../shared/styles/secondary.css'
 
-// Layout/permissions: DvUhSfBn:1280–1340, 1374–1455, 1595–1638.
-// Shortcut and finish: 2XHPuyUf.js components va/re/Pa (shipped bundle).
+// Keep permission, recording and shortcut semantics while sharing the paper UI.
 const STEPS = ['permissions', 'microphone', 'shortcut', 'done'] as const
 type Step = (typeof STEPS)[number]
 export function OnboardingApp() {
@@ -55,19 +55,19 @@ export function OnboardingApp() {
   const next = () => setStep(STEPS[Math.min(index + 1, STEPS.length - 1)])
   const back = () => setStep(STEPS[Math.max(0, index - 1)])
   return <main className="secondary-onboarding">
-    <header className="secondary-onboarding-header drag"><nav aria-label="设置进度">{['注册', '设置', '体验一下'].map((label, i) => <span className={i === (step === 'done' ? 2 : 1) ? 'active' : ''} key={label}>{label}{i < 2 && <ChevronRightRounded />}</span>)}</nav></header>
+    <header className="secondary-onboarding-header drag"><div className="secondary-onboarding-brand"><img className="brand-icon" src="./assets/brand/offkey-icon-128.png" alt="" width={22} height={22} /><span>Offkey</span></div><nav aria-label="设置进度">{['注册', '设置', '体验一下'].map((label, i) => <span className={i === (step === 'done' ? 2 : 1) ? 'active' : ''} key={label}>{label}{i < 2 && <ChevronRightRounded />}</span>)}</nav></header>
     <div className="secondary-onboarding-progress" style={{ width: `${(index + 1) * 25}%` }} />
     {step === 'done' ? <section className="secondary-onboarding-done"><h1><span>说话，</span> 别打字</h1><div className="secondary-done-shortcuts"><ShortcutSummary title="语音输入" shortcut={shortcut} /><ShortcutSummary title="问任何问题" shortcut={askShortcut} /></div><button className="secondary-primary-button" onClick={() => void api.page.completeOnboarding()}>我们出发吧</button></section> : <div className="secondary-onboarding-layout">
       <section className="secondary-onboarding-left"><div className="secondary-onboarding-content">
         <div className="secondary-onboarding-back">{index > 0 && <button className="secondary-text-button" onClick={back}><ArrowBackRounded />返回</button>}</div>
         <div className={`secondary-onboarding-copy ${step === 'shortcut' ? 'shortcut-copy' : ''}`}>
-          <h1>{step === 'permissions' ? (mic && accessibility ? '感谢您的信任，我们重视您的隐私' : '在您的计算机上设置 Offkey') : step === 'microphone' ? '口述以测试您的麦克风' : <><span>按下测试您的快捷键以</span> 听写</>}</h1>
+          <p className="secondary-edition">0{index + 1} / {step === 'permissions' ? 'ACCESS' : step === 'microphone' ? 'VOICE INPUT' : 'SHORTCUT'}</p><h1>{step === 'permissions' ? (mic && accessibility ? <>感谢您的信任，<br />我们重视您的隐私</> : '在您的计算机上设置 Offkey') : step === 'microphone' ? '口述以测试您的麦克风' : <><span>按下测试您的快捷键以</span> 听写</>}</h1>
           {step === 'permissions' && <div className="secondary-permissions">
             <PermissionRow title="允许 Offkey 将文本粘贴到任何文本框中" description="这让 Offkey 能够将您的口述内容放入正确的文本框中。" help="Offkey 使用此功能根据您正在使用的应用程序收集上下文，并暂时访问您的剪贴板以粘贴文本。" granted={accessibility} onGrant={async () => setAccessibility(await api.permission.request('accessibility'))} />
             <PermissionRow title="允许 Offkey 使用您的麦克风" description="Offkey 仅在您主动使用时访问麦克风。" help="当麦克风处于活动状态时，Offkey 会发出声音并显示动画。" collapsed={!accessibility} granted={mic} onGrant={async () => setMic(await api.permission.request('microphone'))} />
           </div>}
-          {step === 'microphone' && <><p className="secondary-onboarding-description">您计算机内置的麦克风将确保最佳的转录效果。</p><p className="secondary-onboarding-question">您在说话时看到蓝色条形图在移动吗？</p></>}
-          {step === 'shortcut' && <><p className="secondary-onboarding-description">我们推荐使用 <kbd>{shortcut}</kbd> 键，位于键盘左下角。</p><p className="secondary-onboarding-question">按下时，您看到按钮变蓝吗？</p></>}
+          {step === 'microphone' && <><p className="secondary-onboarding-description">您计算机内置的麦克风将确保最佳的转录效果。</p><p className="secondary-onboarding-question">说话时，音量条有变化吗？</p></>}
+          {step === 'shortcut' && <><p className="secondary-onboarding-description">我们推荐使用 <kbd>{shortcut}</kbd> 键，位于键盘左下角。</p><p className="secondary-onboarding-question">按下时，快捷键有高亮吗？</p></>}
         </div>
         <footer className="secondary-onboarding-footer">
           {step === 'microphone' && <button className="secondary-outline-button" onClick={() => void api.page.openSettings('microphone')}>不，换个麦克风</button>}
@@ -76,9 +76,9 @@ export function OnboardingApp() {
         </footer>
       </div></section>
       <aside className={`secondary-onboarding-right ${step}-art`}>
-        {step === 'permissions' && (accessibility ? <><img className="secondary-microphone-art light-art" src="./assets/B8YXZviC.png" alt="麦克风" /><img className="secondary-microphone-art dark-art" src="./assets/B2-LRdJC.png" alt="麦克风" /></> : <><img className="secondary-accessibility-art light-art" src="./assets/Ck6WD2NS.gif" alt="辅助功能权限设置" /><img className="secondary-accessibility-art dark-art" src="./assets/3oXgh2ks.gif" alt="辅助功能权限设置" /></>)}
-        {step === 'microphone' && <div className="secondary-mic-test"><div className="secondary-volume-bars" role="meter" aria-label="麦克风音量" aria-valuenow={Math.round(level * 100)} aria-valuemin={0} aria-valuemax={100}><MicRounded />{Array.from({ length: 14 }, (_, i) => <i key={i} className={i < Math.ceil(Math.min(1, level * 4) * 14) ? 'active' : ''} />)}</div></div>}
-        {step === 'shortcut' && (shortcut.toLowerCase() === 'fn' ? <><img className="secondary-keyboard-art light-art" src={`./assets/${pressed ? 'Bt3eR-rj' : 'DFTEPrsg'}.webp`} alt="Fn 键" /><img className="secondary-keyboard-art dark-art" src={`./assets/${pressed ? 'CxW9ztGh' : 'CeKEbMYr'}.webp`} alt="Fn 键" /></> : <div className={`secondary-shortcut-card ${pressed ? 'is-pressed' : ''}`}>{shortcut.split('+').map((key) => <kbd key={key}>{key}</kbd>)}</div>)}
+        {step === 'permissions' && (accessibility ? <VoiceInstrument /> : <><img className="secondary-accessibility-art light-art" src="./assets/Ck6WD2NS.gif" alt="辅助功能权限设置" /><img className="secondary-accessibility-art dark-art" src="./assets/3oXgh2ks.gif" alt="辅助功能权限设置" /></>)}
+        {step === 'microphone' && <div className="secondary-mic-test"><VoiceInstrument /><div className="secondary-volume-bars" role="meter" aria-label="麦克风音量" aria-valuenow={Math.round(level * 100)} aria-valuemin={0} aria-valuemax={100}><MicRounded />{Array.from({ length: 14 }, (_, i) => <i key={i} className={i < Math.ceil(Math.min(1, level * 4) * 14) ? 'active' : ''} />)}</div></div>}
+        {step === 'shortcut' && <div className={`secondary-keyboard-panel ${pressed ? 'is-pressed' : ''}`}><div className="secondary-keyboard-grid" aria-hidden="true">{Array.from({length:36},(_,i)=><i key={i} />)}</div><div className={`secondary-shortcut-card ${pressed ? 'is-pressed' : ''}`}>{shortcut.split('+').map((key)=><kbd key={key}>{key}</kbd>)}</div><p>{pressed ? '正在聆听' : '按下快捷键，开始口述'}</p></div>}
       </aside>
     </div>}
   </main>

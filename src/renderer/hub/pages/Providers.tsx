@@ -101,7 +101,7 @@ export function ProvidersPage() {
   useEffect(() => { void reload(); const off = bridge.on('store:changed', () => { void reload() }); return () => { ++loadVersion.current; off?.() } }, [reload])
   const apply = (next: ServiceProviders) => { ++loadVersion.current; setState(next); setError('') }
   return <div className="page providers-page">
-    <header className="page-heading"><h1 className="page-title">服务商</h1></header>
+    <header className="page-heading"><div className="page-heading-copy"><p className="page-index">04 / CONNECTIONS</p><h1 className="page-title">服务商</h1></div></header>
     {error && <div className="providers-page-error" role="alert"><span>{error}</span><button className="text-button" onClick={() => void reload()}>重新加载</button></div>}
     {loading ? <div className="hub-loading" role="status" aria-label="正在加载服务商" /> : <>
       <div className="segmented-tabs providers-tabs" role="tablist" aria-label="服务类型">{services.map(service => <button type="button" key={service} id={`provider-tab-${service}`} role="tab" aria-selected={activeService === service} aria-controls={`provider-panel-${service}`} tabIndex={activeService === service ? 0 : -1} onClick={() => setActiveService(service)} onKeyDown={event => {

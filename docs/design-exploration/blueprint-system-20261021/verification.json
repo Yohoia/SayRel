@@ -1,0 +1,114 @@
+{
+  "scope": "Isolated offline fixtures; no real microphone, account, providers or user data",
+  "typecheck": "passed",
+  "settingsControls": "7 passed",
+  "suites": {
+    "ui": [
+      {
+        "run": 1,
+        "passed": true,
+        "log": "/tmp/offkey-system-ui-final1.log"
+      },
+      {
+        "run": 2,
+        "passed": true,
+        "log": "/tmp/offkey-system-ui-final2.log"
+      },
+      {
+        "run": 3,
+        "passed": true,
+        "log": "/tmp/offkey-system-ui-final3.log"
+      }
+    ],
+    "retention": [
+      {
+        "run": 1,
+        "passed": true,
+        "log": "/tmp/offkey-system-retention-final1.log"
+      },
+      {
+        "run": 2,
+        "passed": true,
+        "log": "/tmp/offkey-system-retention-final2.log"
+      },
+      {
+        "run": 3,
+        "passed": true,
+        "log": "/tmp/offkey-system-retention-final3.log"
+      }
+    ],
+    "home": [
+      {
+        "run": 1,
+        "passed": true,
+        "log": "/tmp/offkey-system-home-final1.log"
+      },
+      {
+        "run": 2,
+        "passed": true,
+        "log": "/tmp/offkey-system-home-final2.log"
+      },
+      {
+        "run": 3,
+        "passed": true,
+        "log": "/tmp/offkey-system-home-final3.log"
+      }
+    ],
+    "providers": [
+      {
+        "run": 1,
+        "passed": true,
+        "log": "/tmp/offkey-system-providers-final1.log"
+      },
+      {
+        "run": 2,
+        "passed": true,
+        "log": "/tmp/offkey-system-providers-final2.log"
+      },
+      {
+        "run": 3,
+        "passed": true,
+        "log": "/tmp/offkey-system-providers-final3.log"
+      }
+    ],
+    "feedback": [
+      {
+        "run": 1,
+        "passed": true,
+        "log": "/tmp/offkey-system-feedback-final1.log"
+      },
+      {
+        "run": 2,
+        "passed": true,
+        "log": "/tmp/offkey-system-feedback-final2.log"
+      },
+      {
+        "run": 3,
+        "passed": true,
+        "log": "/tmp/offkey-system-feedback-final3.log"
+      }
+    ]
+  },
+  "visualReview": "One independent existing-interface review plus correction recheck; passed, no score",
+  "toolLimitations": [
+    "shoot.mjs static and 2x captures succeeded; motion globals were undefined",
+    "ffmpeg unavailable; motion not independently verified as continuous video"
+  ],
+  "visualStates": 30,
+  "postReviewUI": "passed",
+  "latestPaletteChange": {
+    "background": "#f2f2f2",
+    "primaryText": "#0000c2",
+    "systemAppearance": "fixed paper palette",
+    "typecheck": "passed",
+    "homeInteraction": "passed once after palette change",
+    "feedbackInteraction": "passed once after palette change",
+    "screenshots": 30,
+    "visualInspection": [
+      "dashboard",
+      "settings",
+      "login"
+    ],
+    "previousSuites": "Three-run results above belong to the preceding blue-background migration."
+  }
+}

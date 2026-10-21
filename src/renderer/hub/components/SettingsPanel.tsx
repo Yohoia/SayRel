@@ -58,7 +58,7 @@ export function SettingsPanel({ section: initialSection = 'settings', onSectionC
   useEffect(() => { contentRef.current?.scrollTo({ top: 0 }) }, [section])
   return (
     <div className="settings-shell">
-      <nav className="settings-nav" aria-label="设置导航">
+      <nav className="settings-nav" aria-label="设置导航"><div className="settings-nav-brand"><img className="brand-icon" src="./assets/brand/offkey-icon-128.png" alt="" width={24} height={24} /><span>Offkey</span><small>PREFERENCES</small></div>
         {SECTIONS.map((id) => <button key={id} type="button" aria-current={section === id ? 'page' : undefined}
           className={`settings-nav-item ${section === id ? 'is-selected' : ''}`}
           onClick={() => { setSection(id); onSectionChange?.(id) }}>
@@ -177,7 +177,7 @@ function AccountSection() {
 
 function PersonalizationSection() {
   const t = useSettingsText()
-  return <><div className="settings-personal-card"><div className="settings-personal-heading"><span>{t('整体个性化：')}</span><strong>--</strong><button className="settings-pill" disabled title="个性化学习服务尚未接入">{t('启用个性化')}</button></div><div className="settings-personal-empty"><div className="settings-personal-chart" /><span>{t('数据不足')}</span></div></div><p className="settings-personal-contact">{t('对个性化有任何疑问吗？请通过电子邮件联系我们 <0>hello@typeless.com</0>').split('<0>')[0]}<button onClick={() => void window.offkey.invoke('page:open-url-scheme', 'mailto:hello@typeless.com?subject=Question%20about%20Personalization')}>hello@typeless.com</button></p></>
+  return <><div className="settings-personal-card"><div className="settings-personal-heading"><span>{t('整体个性化：')}</span><strong>--</strong><button className="settings-pill" disabled title="个性化学习服务尚未接入">{t('启用个性化')}</button></div><div className="settings-personal-empty"><div className="settings-personal-chart" /><span>{t('数据不足')}</span></div></div></>
 }
 
 function ExternalRow({ label, url }: { label: string; url: string }) {

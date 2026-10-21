@@ -31,6 +31,17 @@ __pycache__/
 /docs/ui-evidence/
 /.firecrawl/
 
+# Local agent installations and design reference captures
+/.agents/
+/.claude/
+/.specruns/
+/skills-lock.json
+
+# Keep the accepted design record; exploration drafts stay local
+/docs/design-exploration/*
+!/docs/design-exploration/blueprint-system-20261021/
+/docs/design-exploration/blueprint-system-20261021/browser-evidence/
+
 # Duplicate imported assets; identical runtime copies live in renderer/public
 /resources/assets/
 /resources/fonts/

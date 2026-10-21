@@ -1,25 +1,24 @@
-/* Typeless dictionary: CHQBpmae 104352–104618, 106087–106534. */
 .dictionary-page { gap:16px; }
-.dictionary-page .dictionary-list { flex:1; min-height:0; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px 6px; overflow:auto; }
-.dictionary-page .dictionary-word { gap:4px; min-height:36px; padding:8px; }
-.dictionary-page .dictionary-source { display:flex; padding:4px; border-radius:8px; }
+.dictionary-page .dictionary-list { flex:1; min-height:0; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0 28px; overflow:auto; }
+.dictionary-page .dictionary-word { gap:4px; min-height:56px; padding:12px 8px; }
+.dictionary-page .dictionary-source { display:flex; padding:4px; border-radius:var(--radius-control); }
 .dictionary-page .dictionary-word-name { padding:2px 0; }
-.dictionary-page .dictionary-word .dictionary-more { width:32px; height:32px; border-radius:8px; padding:9px; margin:-6px 0; }
-.dictionary-page .dictionary-word-menu { position:absolute; top:calc(100% + 6px); right:0; z-index:20; min-width:112px; padding:4px; border:1px solid var(--line-soft); border-radius:8px; background:var(--paper); box-shadow:0 4px 16px #0002; }
-.dictionary-page .dictionary-word-menu button { display:flex; width:100%; align-items:center; gap:8px; padding:6px 8px; border-radius:4px; text-align:left; font-size:14px; }
+.dictionary-page .dictionary-word .dictionary-more { width:32px; height:32px; border-radius:var(--radius-control); padding:9px; margin:-6px 0; }
+.dictionary-page .dictionary-word-menu { position:absolute; top:calc(100% + 6px); right:0; z-index:20; min-width:112px; padding:4px; border:1px solid var(--line-soft); border-radius:var(--radius-control); background:var(--paper); box-shadow:var(--shadow-popover); }
+.dictionary-page .dictionary-word-menu button { display:flex; width:100%; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--radius-control); text-align:left; font-size:14px; }
 .dictionary-page .dictionary-word-menu button:hover { background:var(--fill-hover); }
 .dictionary-page .dictionary-word-menu button:disabled { color:var(--ink-disabled); cursor:not-allowed; }
 .dictionary-page .dictionary-word-menu hr { border:0; border-top:1px solid var(--line-soft); margin:4px 0; }
 .dictionary-page .empty-state { justify-content:flex-start; padding-top:96px; gap:8px; }
 .dictionary-page .empty-state h2 { font-size:20px; font-weight:700; line-height:24px; }
-.dictionary-page .empty-state p { font-size:14px; line-height:16px; }
-.dictionary-page .search-field { width:212px; height:32px; padding:2px 4px 2px 6px; border-radius:999px; }
+.dictionary-page .empty-state p { font-size:14px; line-height:22px; }
+.dictionary-page .search-field { width:212px; height:36px; padding:4px 8px; border-radius:var(--radius-control); }
 .dictionary-modal .modal-card { width:448px; max-width:100%; }
 .dictionary-modal .modal-card h2 { font-size:18px; line-height:24px; margin-bottom:16px; }
-.dictionary-modal .text-input { padding:8px 10px; border-radius:10px; font-size:16px; font-weight:400; line-height:24px; }
+.dictionary-modal .text-input { padding:8px 10px; border-radius:var(--radius-control); font-size:16px; font-weight:400; line-height:24px; }
 .dictionary-modal .modal-footer { margin-top:24px; gap:8px; align-items:center; }
-.dictionary-modal .modal-footer .primary-button,.dictionary-modal .modal-footer .secondary-button { height:32px; min-height:32px; padding:0 12px; font-size:14px; line-height:16px; }
-.dictionary-modal .dictionary-import { display:flex; align-items:center; gap:6px; margin-right:auto; font-size:14px; line-height:16px; }
+.dictionary-modal .modal-footer .primary-button,.dictionary-modal .modal-footer .secondary-button { height:32px; min-height:32px; padding:0 12px; font-size:14px; line-height:22px; }
+.dictionary-modal .dictionary-import { display:flex; align-items:center; gap:6px; margin-right:auto; font-size:14px; line-height:22px; }
 .dictionary-modal .modal-card>p { overflow-wrap:anywhere; }
 .dictionary-add-modal .modal-close { display:none; }
 /* Selection/CSV preview from CHQBpmae 105539–105623, 106400–106534, 106663–106750. */
@@ -29,7 +28,7 @@
 .dictionary-page .segmented-tabs button { gap:4px; }
 .dictionary-page .segmented-tabs .dictionary-glyph { width:14px; height:14px; color:var(--ink-disabled); }
 .dictionary-page .auto-word { color:var(--success); }
-.dictionary-word-actions { position:absolute; right:1px; top:50%; transform:translateY(-50%); display:flex; align-items:center; padding-left:4px; border-radius:6px; opacity:0; visibility:hidden; pointer-events:none; transition:opacity .15s ease-in-out; }
+.dictionary-word-actions { position:absolute; right:1px; top:50%; transform:translateY(-50%); display:flex; align-items:center; padding-left:4px; border-radius:var(--radius-control); opacity:0; visibility:hidden; pointer-events:none; transition:opacity .15s ease-in-out; }
 .dictionary-page .dictionary-word .dictionary-word-actions .icon-button { width:32px; height:32px; margin:0; opacity:1; }
 .dictionary-page .dictionary-word-name { padding-right:0; transition:padding-right .15s ease-in-out; }
 .dictionary-page .dictionary-word:hover .dictionary-word-name,.dictionary-page .dictionary-word:focus-within .dictionary-word-name,.dictionary-page .dictionary-word.is-menu-open .dictionary-word-name { padding-right:68px; }
@@ -37,12 +36,14 @@
 .dictionary-page .is-selecting .dictionary-word .dictionary-word-name { padding-right:36px; }
 .dictionary-page .dictionary-word.is-selected { background:var(--fill-selected); }
 .dictionary-page .dictionary-word.is-menu-open { z-index:21; }
-.dictionary-page .dictionary-word-menu button { padding:8px 12px; border-radius:8px; line-height:1.4; }
+.dictionary-page .dictionary-word-menu button { padding:8px 12px; border-radius:var(--radius-control); line-height:1.4; }
 .dictionary-page .dictionary-word-menu button.danger { color:var(--error); }
-.dictionary-selection { display:flex; align-items:center; height:40px; flex-shrink:0; font-size:14px; line-height:16px; }
+.dictionary-selection { display:flex; align-items:center; height:40px; flex-shrink:0; font-size:14px; line-height:22px; }
 .dictionary-selection .checkbox-minus-bar { color:var(--paper); }
-.dictionary-selection-delete { display:flex; align-items:center; gap:6px; height:32px; margin-left:12px; padding:6px 12px; border:1px solid var(--line); border-radius:999px; color:var(--error); }
+.dictionary-selection-delete { display:flex; align-items:center; gap:6px; height:32px; margin-left:12px; padding:6px 12px; border:1px solid var(--line); border-radius:var(--radius-control); color:var(--error); }
 .dictionary-selection-delete:hover { background:var(--fill-hover); }
-.dictionary-preview-count { color:var(--ink-soft); font-size:14px; line-height:16px; overflow-wrap:anywhere; }
+.dictionary-preview-count { color:var(--ink-soft); font-size:14px; line-height:22px; overflow-wrap:anywhere; }
 .dictionary-preview-list { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; max-height:360px; overflow:auto; margin:16px -24px 0; padding:16px 24px 24px; border-top:1px solid var(--line-soft); }
-.dictionary-preview-list>span { padding:8px; font-size:14px; line-height:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dictionary-preview-list>span { padding:8px; font-size:14px; line-height:22px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+@media(max-width:760px) { .dictionary-page .dictionary-list { grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 16px; } }

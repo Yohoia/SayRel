@@ -1,0 +1,216 @@
+{
+  "reports": [
+    {
+      "name": "dashboard",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "history",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "dictionary",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "providers",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "settings",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "settings-账户",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "settings-个性化",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "settings-关于",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "settings-帮助",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "settings-help-small",
+      "width": 840,
+      "height": 560,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "settings-small",
+      "width": 840,
+      "height": 560,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "settings-small-bottom",
+      "width": 840,
+      "height": 560,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "history-empty",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "dictionary-empty",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "dashboard-dark",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "history-dark",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "dictionary-dark",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "providers-dark",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "login",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "onboarding-permissions",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "onboarding-microphone",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "onboarding-shortcut",
+      "width": 1080,
+      "height": 750,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "answer-card",
+      "width": 800,
+      "height": 500,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "context-sidebar",
+      "width": 350,
+      "height": 500,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "floating-hover",
+      "width": 750,
+      "height": 500,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "floating-starting-microphone",
+      "width": 750,
+      "height": 500,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "floating-recording",
+      "width": 750,
+      "height": 500,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "floating-hands-free",
+      "width": 750,
+      "height": 500,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "floating-hands-free-dictating",
+      "width": 750,
+      "height": 500,
+      "overflow": false,
+      "missing": []
+    },
+    {
+      "name": "floating-error",
+      "width": 750,
+      "height": 500,
+      "overflow": false,
+      "missing": []
+    }
+  ],
+  "errors": [],
+  "scope": "Offline fixtures; isolated profile; no real microphone, account or providers"
+}

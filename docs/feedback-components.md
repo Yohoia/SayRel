@@ -4,7 +4,7 @@
 
 ## Toast
 
-从 `src/renderer/shared/Toast.tsx` 导入 `toast`。所有类型使用黑底白字胶囊，只显示一句消息。成功消息左侧带对勾，进行中消息左侧带加载指示。
+从 `src/renderer/shared/components/Toast.tsx` 导入 `toast`。所有类型使用共享 `--accent` 蓝底、`--accent-ink` 灰白文字和 3px 小圆角，只显示一句消息。成功消息左侧带对勾，进行中消息左侧带加载指示。
 
 ```tsx
 toast.success('保存成功')
@@ -24,7 +24,7 @@ toast.dismiss(id)
 
 ## 二次确认
 
-从 `src/renderer/shared/ConfirmDialog.tsx` 导入 `ConfirmDialog`。父组件负责执行操作、维护 `pending`，并在成功后关闭弹窗。
+从 `src/renderer/shared/components/ConfirmDialog.tsx` 导入 `ConfirmDialog`。父组件负责执行操作、维护 `pending`，并在成功后关闭弹窗。
 
 ```tsx
 <ConfirmDialog
@@ -61,4 +61,4 @@ node scripts/ui-build.mjs
 
 验收通过真实页面入口驱动操作，使用临时配置和离线数据。当前截图与检查结果保存于 `docs/ui-evidence/feedback-minimal/`，不验证真实登录、模型服务或更新下载。
 
-完整界面脚本 `ui-offline.cjs` 有既有的英文设置标题断言失败：按中文文案反查翻译键时，「设置」命中了引导页的 `Set up`，脚本预期 `Settings`。本次没有修改该翻译映射。
+视觉规则见 [DESIGN.md](../DESIGN.md)。确认弹窗采用灰白面板与蓝色细线，主按钮蓝底灰白字。

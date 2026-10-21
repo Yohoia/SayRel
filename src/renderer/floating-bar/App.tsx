@@ -23,12 +23,12 @@ type BarStatus =
 
 const BASE_STYLE = {
   opacity: 0.5,
-  background: '#808080',
+  background: 'var(--paper)',
   width: 40,
   height: 6,
-  borderRadius: 99,
+  borderRadius: 8,
   boxShadow:
-    '0px 2px 4px 0px rgba(0, 0, 0, 0.25), 0px 0px 20px 0px rgba(0, 0, 0, 0.15), 0px 25px 30px 0px rgba(0, 0, 0, 0.25)',
+    'var(--shadow-popover)',
   transition: 'all 0.2s cubic-bezier(0.05, 0.6, 0.4, 0.95)',
   willChange: 'opacity, transform, background-color, width, height',
   backfaceVisibility: 'hidden' as const,
@@ -41,7 +41,7 @@ const SIZES = {
   height: 34,
   width: 70,
   handsFreeWidth: 116,
-  border: '1px solid rgba(255, 255, 255, 0.32)'
+  border: '1px solid var(--line-strong)'
 }
 
 export function FloatingBarApp() {
@@ -187,7 +187,7 @@ export function FloatingBarApp() {
         {showWaveform && <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', height: 24, overflow: handsFree ? 'visible' : 'hidden' }}>
           {handsFree && <button className="floating-action" style={cancelButtonStyle} aria-label="取消听写" onClick={() => { if (!preview) click('cancel') }}><Icon name="close" size={16} /><span className="floating-tooltip" role="tooltip">取消</span></button>}
           <div style={{ width: 38, flexShrink: 0, margin: '0 8px' }}><Waveform analyser={recorder?.analyser ?? null} active width={38} /></div>
-          {visibleCountdown && <span style={{ width: 32, marginRight: 8, flexShrink: 0, fontSize: 12, lineHeight: '16px', fontWeight: 400, color: '#fff' }}>{visibleCountdown}</span>}
+          {visibleCountdown && <span style={{ width: 32, marginRight: 8, flexShrink: 0, fontSize: 12, lineHeight: '16px', fontWeight: 400, color: 'var(--ink)' }}>{visibleCountdown}</span>}
           {handsFree && <button className="floating-action" style={finishButtonStyle} aria-label="完成听写" onClick={() => { if (!preview) click('finish') }}><Icon name="check" size={16} /><span className="floating-tooltip" role="tooltip">完成 <kbd>{hotkey.shortcutLabel}</kbd></span></button>}
         </div>}
         {refining && <RefiningContent />}
@@ -210,10 +210,10 @@ function computeStyle(status: BarStatus, hasCountdown: boolean): React.CSSProper
     width: starting ? 54 : refining ? 92 : (handsFree ? SIZES.handsFreeWidth : SIZES.width) + (hasCountdown && status === 'recording' || hasCountdown && handsFree ? 40 : 0),
     height: starting ? 12 : SIZES.height,
     padding: handsFree || refining ? '4px' : '4px 6px',
-    background: starting ? 'rgba(0,0,0,.5)' : '#000',
+    background: 'var(--paper)',
     opacity: 1,
     border: SIZES.border,
-    boxShadow: status === 'hover' || status === 'error' ? BASE_STYLE.boxShadow : '0px 0px 20px 0px rgba(0, 0, 0, 0.15), 0px 25px 30px 0px rgba(0, 0, 0, 0.25)',
+    boxShadow: status === 'hover' || status === 'error' ? BASE_STYLE.boxShadow : 'var(--shadow-popover)',
     transform: 'translateZ(0) scaleX(1) scaleY(1)',
     overflow: starting || refining ? 'hidden' : undefined,
     transition: refining ? 'width 0.2s ease-in-out' : BASE_STYLE.transition
@@ -237,29 +237,29 @@ function RefiningContent() {
     return () => cancelAnimationFrame(frame)
   }, [])
   return <>
-    <div aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 16, overflow: 'hidden', pointerEvents: 'none' }}><div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${progress}%`, background: 'rgba(242,241,240,.25)' }} /></div>
-    <div style={{ position: 'relative', zIndex: 1, width: 90, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ShimmerText active fontSize={14} fontWeight={450} lineHeight="16px" speed={64} shimmerWidth={24} waitMs={300} angle={90} dim="rgba(242,241,240,.5)" high="rgba(242,241,240,.3)" blur={3.4}>正在思考</ShimmerText></div>
+    <div aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 8, overflow: 'hidden', pointerEvents: 'none' }}><div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${progress}%`, background: 'var(--fill-selected)' }} /></div>
+    <div style={{ position: 'relative', zIndex: 1, width: 90, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ShimmerText active fontSize={14} fontWeight={450} lineHeight="16px" speed={64} shimmerWidth={24} waitMs={300} angle={90} dim="var(--ink-tertiary)" high="var(--ink)" blur={3.4}>正在思考</ShimmerText></div>
   </>
 }
 
-const cancelButtonStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: 24, height: 24, padding: 4, borderRadius: 12, background: '#424242', color: '#fff', transition: 'width .2s ease-in-out,height .2s ease-in-out,opacity .1s,transform .2s ease-in-out' }
-const finishButtonStyle: React.CSSProperties = { ...cancelButtonStyle, background: '#fff', color: '#1d1a1a', zIndex: 2 }
+const cancelButtonStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: 24, height: 24, padding: 4, borderRadius: 3, background: 'var(--fill-selected)', color: 'var(--ink)', transition: 'width .2s ease-in-out,height .2s ease-in-out,opacity .1s,transform .2s ease-in-out' }
+const finishButtonStyle: React.CSSProperties = { ...cancelButtonStyle, background: 'var(--accent)', color: 'var(--accent-ink)', zIndex: 2 }
 
 const errorBubbleStyle: React.CSSProperties = {
   marginBottom: 12,
   padding: '8px 12px',
   borderRadius: 8,
-  background: 'rgba(29, 26, 26, 1)',
-  color: 'rgba(242, 241, 240, 1)',
+  background: 'var(--paper)',
+  color: 'var(--ink)',
   fontSize: 13,
   maxWidth: 360,
-  boxShadow: '0px 25px 30px 0px rgba(0, 0, 0, 0.25), 0px 0px 20px 0px rgba(0, 0, 0, 0.15)'
+  boxShadow: 'var(--shadow-popover)'
 }
 
 const hintStyle: React.CSSProperties = {
   marginTop: 8,
-  fontSize: 11,
-  color: 'rgba(242, 241, 240, 0.75)',
+  fontSize: 13,
+  color: 'var(--ink)',
   textShadow: '0 1px 2px rgba(0,0,0,0.4)'
 }
 
@@ -272,7 +272,7 @@ function shimmerOverlayStyle(): React.CSSProperties {
     marginTop: -13.5,
     width: 27,
     height: 27,
-    background: 'rgb(242 241 240 / 25%)',
+    background: 'var(--fill-selected)',
     borderRadius: '50%',
     filter: 'blur(10px)',
     animation: 'loadingMove 500ms cubic-bezier(0.42, 0, 0.58, 1) infinite',

@@ -1,97 +1,95 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { api } from '../../shared/utils/bridge'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { z } from 'zod'
+import { api, bridge } from '../../shared/utils/bridge'
 import { checkForUpdates } from '../../shared/utils/checkForUpdates'
-import { Icon } from '../../shared/components/Icons'
+import { toast } from '../../shared/components/Toast'
 import { useAppSettings } from '../state/settings'
+import { useRecordingPhase } from '../state/recording'
 
 const APPLICATIONS = [
-  { name: 'Gmail', image: 'CotTEwvz.svg', description: "将口述的想法转化为精致、格式良好的邮件，听起来像你。", url: 'https://mail.google.com/' },
-  { name: 'Slack', image: 'CrMLWYxm.webp', description: "分享清晰的团队更新，不打断你的思路。", url: 'https://app.slack.com/' },
-  { name: 'ChatGPT', image: 'chatgpt.svg', description: "说出你的提示，快速获得更好的答案。", url: 'https://chatgpt.com/' },
-  { name: 'Google Docs', image: 'BTKanheq.svg', description: "将口述的想法转化为清晰、结构化的写作。", url: 'https://docs.google.com/' },
-  { name: 'WhatsApp', image: 'BYfssDPr.webp', description: "将快速的想法转化为自然的消息，听起来像你。", url: 'https://web.whatsapp.com/' },
-  { name: 'Claude', image: 'D19j9GyN.webp', description: "头脑风暴并完善复杂的想法，无需打字。", url: 'https://claude.ai/' },
-  { name: 'Notion', image: 'CzPJbMfN.webp', description: "捕捉想法并将其组织成清晰的笔记。", url: 'https://www.notion.so/' },
-  { name: 'Line', image: 'C6gt8qzb.webp', description: "将快速的想法转化为更丰富、随时可发送的消息。", url: 'https://line.me/' },
-  { name: 'Gemini', image: 'BaSTVbqz.svg', description: "通过说话进行头脑风暴、提问并获得答案。", url: 'https://gemini.google.com/' }
+  { name: 'Gmail', url: 'https://mail.google.com/' },
+  { name: 'Slack', url: 'https://app.slack.com/' },
+  { name: 'ChatGPT', url: 'https://chatgpt.com/' },
+  { name: 'Notion', url: 'https://www.notion.so/' },
+  { name: 'Google Docs', url: 'https://docs.google.com/' }
 ]
+const historySchema = z.object({ items: z.array(z.object({
+  duration: z.number().nullable(), refinedText: z.string().nullable()
+})) })
+const versionSchema = z.object({ appVersion: z.string() })
+type Usage = { status: 'loading' } | { status: 'error' } | { status: 'ready'; minutes: number; words: number; count: number }
+let hasEntered = false
 
 export function DashboardPage() {
-  const { settings } = useAppSettings()
-  const aside = useRef<HTMLElement>(null)
-  const [anchor, setAnchor] = useState<{ left: number; width: number }>()
-  useLayoutEffect(() => {
-    const element = aside.current
-    if (!element) return
-    const update = () => { const { left, width } = element.getBoundingClientRect(); setAnchor({ left, width }) }
-    update()
-    const observer = new ResizeObserver(update)
-    observer.observe(element)
-    window.addEventListener('resize', update)
-    return () => { observer.disconnect(); window.removeEventListener('resize', update) }
-  }, [])
-  const [items, setItems] = useState<any[]>([])
-  const [statsLoaded, setStatsLoaded] = useState(false)
-  const [version, setVersion] = useState('1.0.0')
+  const { settings, loaded } = useAppSettings()
+  const [animateEntry] = useState(() => !hasEntered)
+  const { phase } = useRecordingPhase()
+  const [usage, setUsage] = useState<Usage>({ status: 'loading' })
+  const [version, setVersion] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
+  const [activeShortcut, setActiveShortcut] = useState(0)
+  const usageRequest = useRef(0)
+  const mounted = useRef(false)
+  const loadUsage = useCallback(async () => {
+    const request = ++usageRequest.current
+    setUsage({ status: 'loading' })
+    try {
+      const { items } = historySchema.parse(await api.history.list({ limit: 200 }))
+      const segmenter = new Intl.Segmenter('zh-CN', { granularity: 'word' })
+      const words = items.reduce((sum, item) => sum + Array.from(segmenter.segment(item.refinedText ?? '')).filter(part => part.isWordLike).length, 0)
+      if (mounted.current && request === usageRequest.current) setUsage({ status: 'ready', count: items.length, minutes: Math.round(items.reduce((sum, item) => sum + (item.duration ?? 0), 0) / 60000), words })
+    } catch {
+      if (mounted.current && request === usageRequest.current) setUsage({ status: 'error' })
+    }
+  }, [])
   useEffect(() => {
     let active = true
-    Promise.all([api.history.list({ limit: 200 }), api.app.systemInfo()])
-      .then(([list, info]) => { if (active) { setItems(list?.items ?? []); setVersion(info?.appVersion ?? '1.0.0'); setStatsLoaded(true) } }).catch(() => undefined)
-    return () => { active = false }
-  }, [])
-  const duration = items.reduce((sum, item) => sum + (item.duration ?? 0), 0) / 60000
-  const words = items.reduce((sum, item) => sum + (countWords(item.refinedText ?? '')), 0)
-  const stats = [
-    { icon: 'clock' as const, label: "总口述时间", value: Math.round(duration), unit: "分钟" },
-    { icon: 'mic' as const, label: "口述字数", value: words, unit: "字" },
-    { icon: 'bolt' as const, label: "平均口述速度", value: duration ? Math.round(words / duration) : 0, unit: "每分钟字数" },
-    { icon: 'hourglass' as const, label: "节省时间", value: Math.max(0, Math.round(words / 40 - duration)), unit: "分钟" },
-    { icon: 'personal' as const, label: "个性化", value: "--", unit: "" }
+    hasEntered = true
+    mounted.current = true
+    void loadUsage()
+    void api.app.systemInfo().then((value: unknown) => {
+      const result = versionSchema.safeParse(value)
+      if (active && result.success) setVersion(result.data.appVersion)
+    }).catch(() => undefined)
+    const offHistory = bridge.on('history:changed', loadUsage)
+    window.addEventListener('focus', loadUsage)
+    return () => { active = false; mounted.current = false; offHistory?.(); window.removeEventListener('focus', loadUsage) }
+  }, [loadUsage])
+  const shortcuts = [
+    { label: '口述', ordinal: '01', binding: settings.shortcut },
+    { label: '翻译', ordinal: '02', binding: settings.translationShortcut },
+    { label: '问任何问题', ordinal: '03', binding: settings.askAnythingShortcut }
   ]
-  return <div className="page home-page">
-    <div className="home-ambience" aria-hidden="true" />
-    <h1 className="page-title home-title">说话，不要打字</h1>
-    <div className="home-columns">
-      <div className="home-primary dotted-surface">
-        <section className="shortcut-card" aria-label="语音快捷键">
-          <Shortcut title="口述" description="杂乱的想法 → 清晰的文字" binding={settings.shortcut.accelerator} enabled={settings.shortcut.enabled} />
-          <Shortcut title="翻译" description="自然的语言 → 清晰、地道的写作" binding={settings.translationShortcut.accelerator} enabled={settings.translationShortcut.enabled} />
-          <Shortcut title="问任何问题" description="编辑或询问文本" binding={settings.askAnythingShortcut.accelerator} enabled={settings.askAnythingShortcut.enabled} accent="ask" />
-        </section>
-        <section className="use-cases" aria-labelledby="use-cases-title">
-          <h2 id="use-cases-title">热门使用案例</h2>
-          <div className="use-case-grid">{APPLICATIONS.map((app) => <button className="use-case-card" key={app.name} onClick={() => void api.page.openUrl(app.url)}>
-            <div className="use-case-top"><img src={'./assets/' + app.image} alt="" width={32} height={32} /><span className="use-case-arrow"><Icon name="arrow" /></span></div>
-            <h3>{app.name}</h3><p>{app.description}</p>
-          </button>)}</div><div className="use-case-more"><button className="secondary-button" onClick={() => void api.page.openUrl('https://www.typeless.com/use-cases')}>查看全部<Icon name="arrow" size={14} /></button></div>
-        </section>
-      </div>
-      <aside className="home-aside" ref={aside}>
-        <section className="usage-stats" aria-label="使用统计">{stats.map((stat) => <div className="usage-stat" key={stat.label} title={stat.label}><Icon name={stat.icon} /><p className={!statsLoaded || !items.length || stat.value === "--" ? "is-default" : undefined}><strong>{!statsLoaded || !items.length ? "--" : stat.value.toLocaleString()}</strong><span>{!statsLoaded || !items.length ? "" : stat.unit}</span></p></div>)}</section>
-        <button className="home-banner home-banner-referral" onClick={() => void api.page.openUrl('https://www.typeless.com/referral')}><div><h2>推荐朋友<span className="home-banner-arrow"><Icon name="arrow" /></span></h2><p>获得 <strong>$5 代金券</strong> 每个邀请。</p></div></button>
-        <button className="home-banner home-banner-affiliate" onClick={() => void api.page.openUrl('https://www.typeless.com/affiliate')}><div><h2>联盟计划<span className="home-banner-arrow"><Icon name="arrow" /></span></h2><p>赚取 <strong>25%</strong> 重复佣金。</p></div></button>
-        <footer className="app-version" style={anchor}><span>版本 v{version}</span><button disabled={checking} onClick={async () => { setChecking(true); try { await checkForUpdates(version) } finally { setChecking(false) } }}>{checking ? '正在检查…' : '检查更新'}</button></footer>
-      </aside>
+  const openSettings = () => { void api.page.openSettings('settings').catch(() => toast.error('无法打开设置，请重试')) }
+  return <div className={'home-canvas' + (animateEntry ? ' home-enter' : '')} data-recording-phase={phase}>
+    <div className="home-composition">
+      <section className="home-manifesto" aria-labelledby="home-title">
+        <p className="home-eyebrow">VOICE INTO WORDS</p>
+        <h1 className="page-title home-headline" id="home-title" aria-label="Speak. Leave your mark."><span>SPEAK.</span><span>LEAVE</span><span>YOUR MARK.</span></h1>
+        <p className="home-intro">说出脑海里的想法，<br />让文字留下你的笔迹。</p>
+        <div className="home-shortcuts" aria-label="语音快捷键" onMouseLeave={() => setActiveShortcut(0)}>
+          <span className="home-shortcut-highlight" aria-hidden="true" style={{ transform: `translateY(${activeShortcut * 100}%)` }} />
+          {shortcuts.map((shortcut, index) => <button key={shortcut.ordinal} className="home-shortcut" onMouseEnter={() => setActiveShortcut(index)} onFocus={() => setActiveShortcut(index)} onBlur={() => setActiveShortcut(0)} onClick={openSettings} title={'设置' + shortcut.label + '快捷键'}>
+            <span className="home-shortcut-name">{shortcut.label}<small>{shortcut.ordinal}</small></span>
+            <span className="home-shortcut-binding">{!loaded ? <span>读取中</span> : !shortcut.binding.enabled ? <span>已停用</span> : shortcut.binding.accelerator.split('+').map((key, keyIndex) => <kbd key={keyIndex}>{key === 'CommandOrControl' ? '⌘ / Ctrl' : key}</kbd>)}</span>
+          </button>)}
+        </div>
+      </section>
+      <figure className="home-instrument" aria-label="蓝墨星盘：声音成为文字的轨迹">
+        <div className="home-astrolabe"><img className="light-art" src="./assets/home/astrolabe.svg" alt="" width={500} height={500} /><img className="dark-art" src="./assets/home/astrolabe-dark.svg" alt="" width={500} height={500} /><span className="home-listening-ring" aria-hidden="true" /></div>
+        <figcaption><span>OFFKEY / VOICE — TEXT</span><span>让声音落在纸上</span></figcaption>
+      </figure>
     </div>
+    <section className="home-applications" aria-label="在常用应用中使用 Offkey">
+      <p>在你熟悉的应用里</p>
+      <div className="home-stamps">{APPLICATIONS.map((app, index) => <button key={app.name} className="home-stamp" onClick={() => void api.page.openUrl(app.url).catch(() => toast.error('无法打开应用，请重试'))} aria-label={'打开 ' + app.name} title={'打开 ' + app.name}><span>{app.name}</span><small>0{index + 1}</small><span className="home-stamp-arrow" aria-hidden="true">↗</span></button>)}</div>
+    </section>
+    <footer className="home-footer">
+      <div className="home-usage" aria-live="polite" title="统计最近 200 条记录">
+        <span className="home-usage-label">最近记录</span>
+        {usage.status === 'ready' ? <><span><strong>{usage.minutes.toLocaleString()}</strong>分钟</span><span><strong>{usage.words.toLocaleString()}</strong>字</span>{usage.count === 0 && <span className="home-first-use">从一次口述开始</span>}</> : usage.status === 'loading' ? <span>读取中…</span> : <><span>统计暂不可用</span><button onClick={() => void loadUsage()}>重试</button></>}
+      </div>
+      <div className="home-version">{version && <span>v{version}</span>}<button disabled={checking || !version} onClick={async () => { if (!version) return; setChecking(true); try { await checkForUpdates(version) } finally { setChecking(false) } }}>{checking ? '检查中…' : '检查更新'}</button></div>
+    </footer>
   </div>
-}
-
-function Shortcut({ title, description, binding, enabled, accent, unavailable }: { title: string; description: string; binding: string; enabled: boolean; accent?: string; unavailable?: boolean }) {
-  return <div className="shortcut-row"><div className="shortcut-copy"><h2>{title}</h2><p>{description}</p></div><div className={'shortcut-keys ' + (accent ?? '')}>{enabled ? binding.split('+').map((key, i) => <kbd key={key + i}>{key === 'Shift' ? 'Left Shift' : key}</kbd>) : <span className="muted" title={unavailable ? "当前版本暂不支持翻译" : undefined}>{unavailable ? "暂不可用" : "已停用"}</span>}</div></div>
-}
-
-export function formatRelative(iso: string | null): string {
-  if (!iso) return '未知'
-  const then = new Date(iso).getTime()
-  if (Number.isNaN(then)) return '未知'
-  const minutes = Math.floor((Date.now() - then) / 60000)
-  if (minutes < 1) return '刚刚'
-  if (minutes < 60) return `${minutes} 分钟前`
-  if (minutes < 1440) return `${Math.floor(minutes / 60)} 小时前`
-  return new Date(iso).toLocaleDateString('zh-CN')
-}
-
-function countWords(text: string): number {
-  return Array.from(new Intl.Segmenter('zh-CN', { granularity: 'word' }).segment(text)).filter((part) => part.isWordLike).length
 }

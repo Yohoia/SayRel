@@ -5,8 +5,8 @@ const DEFAULTS = {
   shimmerWidth: 60,
   angle: 115,
   waitMs: 1200,
-  dim: 'rgba(242, 241, 240, 0.7)',
-  high: 'rgba(242, 241, 240, 1)'
+  dim: 'var(--ink-tertiary)',
+  high: 'var(--ink)'
 }
 
 /**

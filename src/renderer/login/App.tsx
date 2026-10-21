@@ -3,7 +3,7 @@ import { api } from '../shared/utils/bridge'
 import { toast } from '../shared/components/Toast'
 import '../shared/styles/secondary.css'
 
-// Typeless 2.8.2: Cql4ZCsL login shell and BebSff9M authentication card.
+// Authentication providers retain their existing IPC behavior.
 const PROVIDERS = [
   { id: 'google', label: '使用 Google 继续' },
   { id: 'email', label: '使用电子邮件继续' },
@@ -30,9 +30,10 @@ export function LoginApp() {
   }
   return <main className="secondary-login">
     <div className="secondary-titlebar drag" />
+    <section className="secondary-login-intro"><p className="secondary-edition">OFFKEY / VOICE INTO WORDS</p><h2>YOUR<br />NEXT<br />WORD.</h2><p>给想法留出空间，<br />让声音成为文字。</p><div className="secondary-login-imprint"><span>声音的笔迹</span><span aria-hidden="true">↗</span></div></section>
     <section className="secondary-login-card no-drag">
       <div className="secondary-login-heading">
-        <img src="./assets/brand/offkey-icon-128.png" width={48} height={48} alt="Offkey" />
+        <img className="brand-icon" src="./assets/brand/offkey-icon-128.png" width={48} height={48} alt="Offkey" />
         <div><h1>欢迎使用 Offkey</h1><p>说话，不要打字</p></div>
       </div>
       <div className="secondary-login-providers">{PROVIDERS.map((provider, i) => <Fragment key={provider.id}><button aria-label={provider.label} style={{ gridRow: i + 1 }} className={'secondary-provider-button ' + (provider.id === 'google' ? 'is-primary' : '')} disabled={waiting || remoteWaiting} onClick={() => void start(provider.id)} /><img className="secondary-provider-icon" style={{ gridRow: i + 1 }} src={'./assets/login-' + provider.id + '.svg'} width={20} height={20} alt="" /><span className={'secondary-provider-label ' + (provider.id === 'google' ? 'is-primary' : '')} style={{ gridRow: i + 1 }}>{provider.label}</span></Fragment>)}</div>

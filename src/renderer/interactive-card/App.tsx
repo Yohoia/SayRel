@@ -74,7 +74,7 @@ export function CardApp() {
     <main className="secondary-card-shell">
       <section className="secondary-result-card" ref={cardRef}>
         <header className="secondary-result-brandbar drag">
-          <img className="secondary-result-logo" src="./assets/brand/offkey-logo-horizontal-800x250.png" alt="Offkey" />
+          <div className="secondary-result-logo"><img className="brand-icon" src="./assets/brand/offkey-icon-128.png" alt="" width={22} height={22} /><span>Offkey</span></div>
           <button className="secondary-icon-button no-drag" aria-label="关闭回答" title="关闭 · Esc" onClick={() => api.page.closeCard()}><CloseRounded /></button>
         </header>
         <div className="secondary-result-scroll no-drag">

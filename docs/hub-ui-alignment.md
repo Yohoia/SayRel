@@ -1,5 +1,7 @@
 # Hub UI 对齐记录
 
+> 2026-10-21 更新：全应用已迁移至 [当前设计规范](../DESIGN.md) 的 灰白底、Hermes 蓝字体系，主导航统一置顶。下文保留 Typeless 功能与源码依据，涉及旧配色、侧栏和圆角的视觉描述为历史记录。新截图与验证见 [全应用改版记录](design-exploration/blueprint-system-20261021/README.md)。
+
 > 历史记录：后续接续工作已修改这里列出的快捷键、录音会话、词典编辑和历史功能。当前实现及验证结论以 [接续记录](continuation-status.md) 为准；下方旧故障与旧范围不代表现状。
 
 日期：2026-10-19。参考包：Typeless 2.8.2。以下源码行号均指 `reference/deob/renderer/CHQBpmae/deobfuscated.js`，除非另有说明。静态源码核对不代表完成真实界面像素验收。
