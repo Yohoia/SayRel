@@ -14,6 +14,7 @@ const common = {
   endpoint: z.string().trim().max(2048),
   apiKey: z.string().trim().max(4096),
   models: z.array(z.string().trim().min(1).max(200)).max(200),
+  preferredModel: z.string().trim().min(1).max(200).optional(),
   appId: z.string().trim().max(200),
   accessToken: z.string().trim().max(4096),
   resourceId: z.string().trim().max(200),
@@ -23,6 +24,7 @@ export const providerProfileSchema = z.discriminatedUnion('service', [
   z.object({ ...common, service: z.literal('transcription'), protocol: z.enum(transcriptionProtocols) }),
   z.object({ ...common, service: z.literal('refinement'), protocol: z.enum(refinementProtocols) })
 ]).superRefine((profile, ctx) => {
+  if (profile.preferredModel && !profile.models.includes(profile.preferredModel)) ctx.addIssue({ code: 'custom', path: ['preferredModel'], message: '请选择此服务商的模型' })
   if (profile.protocol === 'local-whisper') return
   try {
     const url = new URL(profile.endpoint)

@@ -483,7 +483,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
 ]
 
 export function createProviderProfile(preset: ProviderPreset, id: string = preset.id): ProviderProfile {
-  const common = { id, presetId: preset.id, name: preset.name, enabled: true, endpoint: preset.endpoint, apiKey: '', models: [...preset.models], appId: '', accessToken: '', resourceId: 'volc.bigasr.sauc.duration', apiVersion: '2024-10-21' }
+  const common = { id, presetId: preset.id, name: preset.name, enabled: false, endpoint: preset.endpoint, apiKey: '', models: [...preset.models], appId: '', accessToken: '', resourceId: 'volc.bigasr.sauc.duration', apiVersion: '2024-10-21' }
   if (preset.service === 'transcription') {
     const protocol = preset.protocol
     if (protocol === 'openai-chat' || protocol === 'openai-responses' || protocol === 'anthropic' || protocol === 'gemini' || protocol === 'ollama' || protocol === 'azure-openai') throw new Error('Invalid transcription preset')

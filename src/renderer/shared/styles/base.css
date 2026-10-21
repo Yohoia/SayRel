@@ -38,7 +38,7 @@
   --primary: #f2f1f0;
   color-scheme: dark;
 }
-* { box-sizing:border-box; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+* { box-sizing:border-box; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; scrollbar-width:none; }
 html,body,#root { margin:0; padding:0; width:100%; height:100%; font-family:var(--font-sans); color:var(--ink); }
 body { background:var(--paper); overflow:hidden; user-select:none; }
 h1,h2,h3,p { margin:0; }
@@ -50,9 +50,7 @@ button,a { -webkit-tap-highlight-color:transparent; }
 button:focus-visible,a:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
 input:focus-visible,textarea:focus-visible,select:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 ::selection { background:rgba(31,93,242,.2); }
-::-webkit-scrollbar { width:8px; height:8px; }
-::-webkit-scrollbar-thumb { background:var(--line); border-radius:99px; }
-::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar { display:none; width:0; height:0; }
 .drag { -webkit-app-region:drag; }
 .no-drag { -webkit-app-region:no-drag; }
 .sr-only { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }

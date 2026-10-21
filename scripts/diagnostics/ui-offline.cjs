@@ -32,6 +32,11 @@ async function shot(name) {
   const report = await win.webContents.executeJavaScript(`({ text: document.body.innerText.slice(0, 1600), overflow: document.documentElement.scrollWidth > innerWidth, missingImages: [...document.images].filter(i => !i.complete || !i.naturalWidth).map(i => i.src) })`)
   assert.equal(report.overflow, false, name + ' overflows')
   assert.deepEqual(report.missingImages, [], name + ' missing images')
+  const visibleScrollbars = await win.webContents.executeJavaScript(`Array.from(document.querySelectorAll('*')).filter(node => {
+    const style = getComputedStyle(node);
+    return /(auto|scroll)/.test(style.overflowX + style.overflowY) && (style.scrollbarWidth !== 'none' || getComputedStyle(node, '::-webkit-scrollbar').display !== 'none');
+  }).map(node => node.className || node.tagName)`)
+  assert.deepEqual(visibleScrollbars, [], name + ' visible scrollbars')
   reports.push({ name, ...report })
   console.log('PASS ' + name)
 }

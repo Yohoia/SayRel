@@ -6,12 +6,17 @@ import { EMPTY_SERVICE_PROVIDERS, providerActionSchema, providerProfileSchema, s
 assert.equal(new Set(PROVIDER_PRESETS.map(p => p.id)).size, PROVIDER_PRESETS.length)
 for (const preset of PROVIDER_PRESETS) {
   const draft = createProviderProfile(preset)
+  assert.equal(draft.enabled, false, `${preset.id} must start disabled`)
   const parsed = providerProfileSchema.safeParse({ ...draft, endpoint: draft.endpoint || 'https://example.test/v1' })
   assert.ok(parsed.success, preset.id)
 }
 const preset = PROVIDER_PRESETS.find(p => p.id === 'llm-deepseek')
 assert.ok(preset)
-const profile = { ...createProviderProfile(preset), apiKey: 'fake-key' }
+const disabledProfile = { ...createProviderProfile(preset), apiKey: 'fake-key' }
+const disabledState = updateProviderState(EMPTY_SERVICE_PROVIDERS, { action: 'save', profile: disabledProfile })
+assert.equal(disabledState.profiles[0].enabled, false)
+assert.equal(disabledState.refinement, null)
+const profile = { ...disabledProfile, enabled: true }
 let state = updateProviderState(EMPTY_SERVICE_PROVIDERS, { action: 'save', profile, activateModel: profile.models[0] })
 assert.equal(state.refinement?.providerId, profile.id)
 assert.throws(() => updateProviderState(state, { action: 'select', service: 'transcription', selection: state.refinement }))
@@ -29,6 +34,16 @@ assert.equal(state.refinement, null)
 state = updateProviderState(state, { action: 'remove', id: profile.id })
 assert.deepEqual(state, EMPTY_SERVICE_PROVIDERS)
 console.log(`PASS service configuration: ${PROVIDER_PRESETS.length} presets, role isolation, URL/protocol validation, removal/disable/default integrity`)
+
+const preferredModel = profile.models[profile.models.length - 1]
+const incompleteProfile = { ...profile, apiKey: '', preferredModel }
+const incompleteState = updateProviderState(EMPTY_SERVICE_PROVIDERS, { action: 'save', profile: incompleteProfile })
+assert.equal(incompleteState.refinement, null)
+assert.equal(incompleteState.profiles[0].preferredModel, preferredModel)
+assert.equal(mergeSettings({ serviceProviders: incompleteState }).serviceProviders.profiles[0].preferredModel, preferredModel)
+assert.equal(providerProfileSchema.safeParse({ ...incompleteProfile, preferredModel: 'missing-model' }).success, false)
+assert.throws(() => updateProviderState(incompleteState, { action: 'select', service: 'refinement', selection: { providerId: profile.id, model: preferredModel } }))
+console.log('PASS model preference saves without credentials; incomplete profiles cannot become active providers')
 
 const oldEmpty = mergeSettings({ provider: { ...DEFAULT_SETTINGS.provider, apiKey: null } })
 assert.equal(oldEmpty.serviceProviders.transcription, null)
