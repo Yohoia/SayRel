@@ -1,8 +1,8 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { FloatingBarApp } from './App'
-import '../shared/base.css'
-import '../shared/appearance'
+import '../shared/styles/base.css'
+import '../shared/utils/appearance'
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

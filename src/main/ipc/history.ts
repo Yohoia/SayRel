@@ -54,7 +54,7 @@ export function registerHistoryHandlers(handle: (c: string, f: Handler) => void)
     const config = settings.get()
     const freed = history.diskUsage()
     if (config.audioRetentionDays > 0) {
-      history.deleteByDuration(config.audioRetentionDays * 24 * 60 * 60 * 1000)
+      await history.deleteAudioByDuration(config.audioRetentionDays * 24 * 60 * 60 * 1000)
     }
     return { before: freed, after: history.diskUsage() }
   })

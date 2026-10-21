@@ -1,0 +1,40 @@
+import assert from 'node:assert/strict'
+import { mergeSettings, DEFAULT_SETTINGS } from '../../src/shared/settings'
+import { createProviderProfile, PROVIDER_PRESETS } from '../../src/shared/providerPresets'
+import { EMPTY_SERVICE_PROVIDERS, providerActionSchema, providerProfileSchema, serviceProvidersSchema, updateProviderState } from '../../src/shared/providers'
+
+assert.equal(new Set(PROVIDER_PRESETS.map(p => p.id)).size, PROVIDER_PRESETS.length)
+for (const preset of PROVIDER_PRESETS) {
+  const draft = createProviderProfile(preset)
+  const parsed = providerProfileSchema.safeParse({ ...draft, endpoint: draft.endpoint || 'https://example.test/v1' })
+  assert.ok(parsed.success, preset.id)
+}
+const preset = PROVIDER_PRESETS.find(p => p.id === 'llm-deepseek')
+assert.ok(preset)
+const profile = { ...createProviderProfile(preset), apiKey: 'fake-key' }
+let state = updateProviderState(EMPTY_SERVICE_PROVIDERS, { action: 'save', profile, activateModel: profile.models[0] })
+assert.equal(state.refinement?.providerId, profile.id)
+assert.throws(() => updateProviderState(state, { action: 'select', service: 'transcription', selection: state.refinement }))
+assert.throws(() => updateProviderState(state, { action: 'save', profile: { ...profile, models: [] } }))
+assert.throws(() => updateProviderState(state, { action: 'select', service: 'refinement', selection: { providerId: profile.id, model: 'missing' } }))
+assert.equal(providerActionSchema.safeParse({ action: 'save', profile: { ...profile, protocol: 'qwen-asr' } }).success, false)
+assert.equal(providerActionSchema.safeParse({ action: 'test', profile: { ...profile, endpoint: 'file:///etc/hosts' }, model: 'model' }).success, false)
+assert.equal(providerActionSchema.safeParse({ action: 'test', profile: { ...profile, endpoint: 'https://user:secret@example.test' }, model: 'model' }).success, false)
+assert.equal(serviceProvidersSchema.safeParse({ ...state, profiles: [profile, profile] }).success, false)
+state = updateProviderState(state, { action: 'save', profile: { ...profile, enabled: false } })
+assert.equal(state.refinement, null)
+state = updateProviderState(state, { action: 'save', profile, activateModel: profile.models[0] })
+state = updateProviderState(state, { action: 'save', profile: { ...profile, models: ['new-model'] } })
+assert.equal(state.refinement, null)
+state = updateProviderState(state, { action: 'remove', id: profile.id })
+assert.deepEqual(state, EMPTY_SERVICE_PROVIDERS)
+console.log(`PASS service configuration: ${PROVIDER_PRESETS.length} presets, role isolation, URL/protocol validation, removal/disable/default integrity`)
+
+const oldEmpty = mergeSettings({ provider: { ...DEFAULT_SETTINGS.provider, apiKey: null } })
+assert.equal(oldEmpty.serviceProviders.transcription, null)
+assert.equal(oldEmpty.serviceProviders.refinement, null)
+const oldLocal = mergeSettings({ provider: { ...DEFAULT_SETTINGS.provider, transcription: 'local-whisper', model: '/usr/local/bin/whisper-cli', baseUrl: '/models/ggml.bin' , refinement: 'mock' } })
+assert.equal(oldLocal.serviceProviders.profiles[0].endpoint, '/usr/local/bin/whisper-cli')
+assert.deepEqual(oldLocal.serviceProviders.profiles[0].models, ['/models/ggml.bin'])
+assert.ok(oldLocal.serviceProviders.transcription)
+console.log('PASS old unconfigured and local Whisper settings migrate without invalid defaults')

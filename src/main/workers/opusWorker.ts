@@ -1,19 +1,6 @@
-/**
- * Opus encoding worker.
- *
- * Receives a raw PCM (float32) buffer plus format info and returns a complete
- * Ogg/Opus byte stream. Two strategies are attempted:
- *
- *   1. in-memory buffer encode (fast path)
- *   2. file-backed encode (fallback for very large recordings)
- *
- * Encoders are resolved in order: the bundled `opusscript` WASM encoder, then
- * an optional native `libopusenc` helper when present.
- */
-import { parentPort, workerData } from 'node:worker_threads'
-import { promises as fs } from 'node:fs'
-import { createRequire } from 'node:module'
-import { join } from 'node:path'
+/** Encodes each recording as an independent, sample-accurate Ogg/Opus stream. */
+import { parentPort } from 'node:worker_threads'
+import OpusScript from 'opusscript'
 import { performance } from 'node:perf_hooks'
 
 type EncodeRequest = {
@@ -36,22 +23,6 @@ type EncodeResponse = {
   nativeErrorCode?: number
 }
 
-const require = createRequire(import.meta.url)
-
-let encoder: any = null
-
-function getEncoder(): any {
-  if (encoder) return encoder
-  const OpusScript = require('opusscript')
-  // The third argument is the application enum itself, not an options object.
-  encoder = new OpusScript(
-    workerData?.sampleRate ?? 16000,
-    workerData?.channels ?? 1,
-    OpusScript.Application.AUDIO
-  )
-  return encoder
-}
-
 function pcmToInt16(pcm: Float32Array): Int16Array {
   const out = new Int16Array(pcm.length)
   for (let i = 0; i < pcm.length; i++) {
@@ -63,7 +34,6 @@ function pcmToInt16(pcm: Float32Array): Int16Array {
 
 /** Minimal Ogg page writer, enough to wrap Opus packets in an Ogg stream. */
 function oggWriter(serial: number) {
-  const pageSize = 4096
   const crcTable = (() => {
     const table = new Uint32Array(256)
     for (let i = 0; i < 256; i++) {
@@ -80,7 +50,6 @@ function oggWriter(serial: number) {
     return c >>> 0
   }
 
-  let granule = 0n
   const pages: Uint8Array[] = []
 
   function page(segments: Uint8Array[], granulePos: bigint, headerType: number): Uint8Array {
@@ -115,9 +84,8 @@ function oggWriter(serial: number) {
   }
 
   return {
-    writePacket(packet: Uint8Array, samples: number) {
-      granule += BigInt(samples)
-      pages.push(page([packet], granule, 0))
+    writePacket(packet: Uint8Array, granule: number, flags = 0) {
+      pages.push(page([packet], BigInt(granule), flags))
     },
     finish(): Uint8Array {
       const total = pages.reduce((a, p) => a + p.length, 0)
@@ -128,9 +96,6 @@ function oggWriter(serial: number) {
         offset += p.length
       }
       return out
-    },
-    headerPage(head: Uint8Array, tags: Uint8Array): Uint8Array {
-      return page([head, tags], 0n, 0x02)
     }
   }
 }
@@ -159,67 +124,58 @@ function opusTags(comment = 'Offkey'): Uint8Array {
   return tags
 }
 
-async function encodeBuffer(req: EncodeRequest): Promise<EncodeResponse> {
-  const started = performance.now()
-  const pcm = new Float32Array(req.pcm)
-  const int16 = pcmToInt16(pcm)
-  const enc = getEncoder()
-  enc.setBitrate?.(req.bitrate)
-
-  const frameSize = Math.floor(req.sampleRate * 0.02) // 20 ms
-  const writer = oggWriter((Math.random() * 0xffffffff) >>> 0)
-
-  const headPacket = opusHead(req.channels, req.sampleRate)
-  const tagsPacket = opusTags()
-  writer.headerPage(Uint8Array.from(headPacket), Uint8Array.from(tagsPacket))
-
-  for (let offset = 0; offset < int16.length; offset += frameSize) {
-    const chunk = int16.subarray(offset, Math.min(offset + frameSize, int16.length))
-    if (!chunk.length) break
-    const packet = enc.encode(
-      Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength),
-      chunk.length
-    )
-    writer.writePacket(new Uint8Array(packet), chunk.length)
-  }
-  const ogg = writer.finish()
-  const ended = performance.now()
-  return {
-    id: req.id,
-    ok: true,
-    ogg,
-    durationMs: Math.round((pcm.length / req.channels / req.sampleRate) * 1000),
-    encodingTime: Math.round(ended - started)
+function opusSampleRate(value: number): ConstructorParameters<typeof OpusScript>[0] {
+  switch (value) {
+    case 8000: case 12000: case 16000: case 24000: case 48000: return value
+    default: throw new Error('Unsupported Opus sample rate')
   }
 }
 
-parentPort?.on('message', async (req: EncodeRequest) => {
+function encodeBuffer(req: EncodeRequest): EncodeResponse {
+  const started = performance.now()
+  const rate = opusSampleRate(req.sampleRate)
+  if (req.channels !== 1 && req.channels !== 2) throw new Error('Opus requires mono or stereo PCM')
+  const pcm = new Float32Array(req.pcm)
+  if (pcm.length % req.channels !== 0) throw new Error('Incomplete interleaved PCM sample')
+  const int16 = pcmToInt16(pcm)
+  const enc = new OpusScript(rate, req.channels, OpusScript.Application.AUDIO)
+  try {
+    enc.setBitrate(req.bitrate)
+    enc.encoderCTL(4006, req.vbr ? 1 : 0)
+    const frameSize = rate / 50
+    // OpusScript's libopus AUDIO mode adds 6.5 ms of lookahead, expressed at 48 kHz.
+    const preSkip = 312
+    const lookahead = preSkip * rate / 48000
+    const samples = pcm.length / req.channels
+    const frames = Math.ceil((samples + lookahead) / frameSize)
+    const writer = oggWriter((Math.random() * 0xffffffff) >>> 0)
+    writer.writePacket(opusHead(req.channels, rate, preSkip), 0, 0x02)
+    writer.writePacket(opusTags(), 0)
+    const frame = new Int16Array(frameSize * req.channels)
+    for (let index = 0; index < frames; index++) {
+      const offset = index * frame.length
+      frame.fill(0)
+      frame.set(int16.subarray(offset, offset + frame.length))
+      const packet = enc.encode(Buffer.from(frame.buffer), frameSize)
+      const last = index === frames - 1
+      const granule = last ? samples * 48000 / rate + preSkip : (index + 1) * frameSize * 48000 / rate
+      writer.writePacket(new Uint8Array(packet), granule, last ? 0x04 : 0)
+    }
+    return {
+      id: req.id, ok: true, ogg: writer.finish(),
+      durationMs: Math.round(samples / rate * 1000),
+      encodingTime: Math.round(performance.now() - started)
+    }
+  } finally {
+    enc.delete()
+  }
+}
+
+parentPort?.on('message', (req: EncodeRequest) => {
   if (req.method !== 'encode') return
   try {
-    const response = await encodeBuffer(req)
-    parentPort?.postMessage(response)
-  } catch (err: any) {
-    // Buffer path failed: retry through the file path so very large payloads
-    // do not have to live in one contiguous allocation twice.
-    try {
-      const dir = workerData?.tempDir ?? join(process.cwd(), 'opus_temp')
-      await fs.mkdir(dir, { recursive: true })
-      const file = join(dir, `${req.id}.pcm`)
-      await fs.writeFile(file, Buffer.from(req.pcm))
-      const raw = await fs.readFile(file)
-      const retry: EncodeRequest = {
-        ...req,
-        pcm: raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer
-      }
-      const response = await encodeBuffer(retry)
-      await fs.unlink(file).catch(() => {})
-      parentPort?.postMessage(response)
-    } catch (inner: any) {
-      parentPort?.postMessage({
-        id: req.id,
-        ok: false,
-        error: inner?.message ?? String(inner)
-      } satisfies EncodeResponse)
-    }
+    parentPort?.postMessage(encodeBuffer(req))
+  } catch (error) {
+    parentPort?.postMessage({ id: req.id, ok: false, error: error instanceof Error ? error.message : String(error) } satisfies EncodeResponse)
   }
 })

@@ -85,11 +85,46 @@ const keyboardCallback = koffi.proto('void KeyboardEventCallback(char *)')
 const keyListeners = new Set<(e: KeyEvent) => void>()
 let keyboardMonitorStarted = false
 
+/** Validate that an unknown value is a valid KeyEvent */
+function isValidKeyEvent(obj: unknown): obj is KeyEvent {
+  if (!obj || typeof obj !== 'object') return false
+
+  // Ensure the object has no prototype pollution
+  if (Object.getPrototypeOf(obj) !== Object.prototype) {
+    log.warn('Key event has suspicious prototype')
+    return false
+  }
+
+  const event = obj as any
+  return (
+    typeof event.key === 'string' &&
+    typeof event.pressed === 'boolean' &&
+    typeof event.combination === 'string' &&
+    typeof event.ts === 'number'
+  )
+}
+
 function emitKey(raw: unknown) {
   const text = typeof raw === 'string' ? raw : readString(raw)
   if (!text) return
   try {
-    const event = JSON.parse(text) as KeyEvent
+    // Parse JSON with prototype pollution protection
+    const parsed = JSON.parse(text, (key, value) => {
+      // Filter dangerous keys that could pollute prototypes
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+        log.warn(`Rejected dangerous key in native event: ${key}`)
+        return undefined
+      }
+      return value
+    })
+
+    // Validate the parsed object structure
+    if (!isValidKeyEvent(parsed)) {
+      log.error('Invalid key event structure from native', text)
+      return
+    }
+
+    const event = parsed as KeyEvent
     for (const listener of keyListeners) listener(event)
   } catch (err) {
     log.error('bad keyboard event payload', err)
@@ -136,11 +171,12 @@ export const keyboard = {
 const contextCallback = koffi.proto('void ContextStringCallback(char *)')
 
 function asyncStringCall(
+  lib: typeof libs.context,
   fname: string,
   timeoutMs = 2000
 ): Promise<any | null> {
   return new Promise((resolve) => {
-    const bind = fn(libs.context, fname, 'void', [koffi.pointer(contextCallback)])
+    const bind = fn(lib, fname, 'void', [koffi.pointer(contextCallback)])
     if (!bind) return resolve(null)
     let settled = false
     const done = (value: string | null) => {
@@ -154,22 +190,33 @@ function asyncStringCall(
       }
     }
     const timer = setTimeout(() => done(null), timeoutMs)
-    const cb = koffi.register((raw: unknown) => done(readString(raw)), koffi.pointer(contextCallback))
+    let cb: ReturnType<typeof koffi.register> | null = null
+    const release = () => {
+      if (cb === null) return
+      koffi.unregister(cb)
+      cb = null
+    }
     try {
+      cb = koffi.register((raw: unknown) => {
+        try { done(readString(raw)) }
+        // A timeout settles JS only; Swift may still call this pointer later.
+        finally { release() }
+      }, koffi.pointer(contextCallback))
       bind(cb)
     } catch (err) {
       log.error(`${fname} failed`, err)
       done(null)
+      release()
     }
   })
 }
 
 export const context = {
   available: !!libs.context,
-  getFocusedAppInfo: () => asyncStringCall('getFocusedAppInfoAsync'),
-  getFocusedElementInfo: () => asyncStringCall('getFocusedElementInfoAsync'),
-  getFocusedElementRelatedContent: () => asyncStringCall('getFocusedElementRelatedContentAsync', 3000),
-  getFocusedVisibleText: () => asyncStringCall('getFocusedVisibleTextAsync', 4000),
+  getFocusedAppInfo: () => asyncStringCall(libs.context, 'getFocusedAppInfoAsync'),
+  getFocusedElementInfo: () => asyncStringCall(libs.context, 'getFocusedElementInfoAsync'),
+  getFocusedElementRelatedContent: () => asyncStringCall(libs.context, 'getFocusedElementRelatedContentAsync', 3000),
+  getFocusedVisibleText: () => asyncStringCall(libs.context, 'getFocusedVisibleTextAsync', 4000),
   setFocusedWindowEnhancedUserInterface:
     (fn(libs.context, 'setFocusedWindowEnhancedUserInterface', 'int', ['int']) as
       | ((on: number) => number)
@@ -186,20 +233,10 @@ export const util = {
   deviceIsLidOpen: fn(libs.util, 'deviceIsLidOpen', 'int', []) as (() => number) | null,
   getDeviceId: fn(libs.util, 'getDeviceId', 'str', []) as (() => string) | null,
   getAudioDevicesJSON: fn(libs.util, 'getAudioDevicesJSON', 'str', []) as (() => string) | null,
-  getAudioDevicesJSONAsync: () =>
-    new Promise<any[]>((resolve) => {
-      const bind = fn(libs.util, 'getAudioDevicesJSONAsync', 'void', [koffi.pointer(contextCallback)])
-      if (!bind) return resolve([])
-      const cb = koffi.register((raw: unknown) => {
-        const text = readString(raw)
-        try {
-          resolve(text ? JSON.parse(text) : [])
-        } catch {
-          resolve([])
-        }
-      }, koffi.pointer(contextCallback))
-      bind(cb)
-    }),
+  getAudioDevicesJSONAsync: async (): Promise<any[]> => {
+    const devices: unknown = await asyncStringCall(libs.util, 'getAudioDevicesJSONAsync')
+    return Array.isArray(devices) ? devices : []
+  },
   isAudioMuted: fn(libs.util, 'isAudioMuted', 'int', []) as (() => number) | null,
   muteAudio: fn(libs.util, 'muteAudio', 'int', []) as (() => number) | null,
   unmuteAudio: fn(libs.util, 'unmuteAudio', 'int', []) as (() => number) | null,

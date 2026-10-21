@@ -8,7 +8,7 @@ export function SettingsModalHost({ open, section, onClose }: { open: boolean; s
     const previousFocus = document.activeElement as HTMLElement | null
     dialogRef.current?.focus()
     const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || document.querySelector('.settings-subdialog [role="dialog"]')) return
+      if (event.defaultPrevented || document.querySelector('.settings-subdialog [role="dialog"],[role="alertdialog"]')) return
       if (event.key === 'Escape') { event.preventDefault(); onClose() }
       if (event.key === 'Tab') {
         const controls = dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), select:not(:disabled), input:not(:disabled), textarea:not(:disabled), a[href]')

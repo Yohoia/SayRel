@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api } from '../shared/bridge'
+import { api } from '../shared/utils/bridge'
 
 /**
  * Local mirror of the recorder session.

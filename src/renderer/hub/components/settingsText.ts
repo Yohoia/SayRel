@@ -4,6 +4,7 @@ import zh from '../../../../resources/locales/zh-CN/index.json'
 
 const locales = import.meta.glob('../../../../resources/locales/*/index.json')
 const source = { ...zh.common, ...zh.client } as Record<string, string>
+export type SettingsTextKey = keyof typeof zh.common | keyof typeof zh.client
 const sourceKeys = new Map(Object.entries(source).filter(([, value]) => typeof value === 'string').map(([key, value]) => [value.replaceAll('Typeless', 'Offkey'), key]))
 const cache = new Map<string, Record<string, string>>()
 export const interfaceLanguages = Object.keys(locales).map(path => path.split('/').at(-2)!).filter(code => code !== 'en-US').map(code => ({
@@ -27,8 +28,8 @@ export function useSettingsText() {
     })
     return () => { active = false }
   }, [locale])
-  return (text: string) => {
-    const key = sourceKeys.get(text)
+  return (text: string, translationKey?: SettingsTextKey) => {
+    const key = translationKey ?? sourceKeys.get(text)
     return (key && dictionary[key] || text).replaceAll('Typeless', 'Offkey')
   }
 }

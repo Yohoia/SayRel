@@ -6,6 +6,7 @@ const root = resolve(import.meta.dirname, '..')
 await build({
   configFile: false,
   root: resolve(root, 'src/renderer'),
+  publicDir: resolve(root, 'public'),
   base: './',
   plugins: [react(), {
     name: 'offkey-offline-review',

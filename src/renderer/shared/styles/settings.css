@@ -100,7 +100,6 @@
 .settings-pill:hover { background:var(--fill-hover); }
 .settings-pill.is-primary { color:white; background:#1f5df2; border-color:#1f5df2; }
 .settings-pill:disabled { opacity:.45; cursor:default; }
-.settings-error { color:var(--error) !important; font-size:12px; line-height:18px; }
 .settings-subdialog .modal-card { max-width:448px; max-height:calc(100vh - 64px); overflow:auto; border-radius:12px; }
 .settings-subdialog .modal-card h2 { font-size:18px; line-height:28px; font-weight:590; }
 .settings-subdialog .modal-card > p { color:var(--ink-tertiary); font-size:14px; line-height:20px; }

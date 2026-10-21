@@ -20,7 +20,6 @@
 .dictionary-modal .modal-footer { margin-top:24px; gap:8px; align-items:center; }
 .dictionary-modal .modal-footer .primary-button,.dictionary-modal .modal-footer .secondary-button { height:32px; min-height:32px; padding:0 12px; font-size:14px; line-height:16px; }
 .dictionary-modal .dictionary-import { display:flex; align-items:center; gap:6px; margin-right:auto; font-size:14px; line-height:16px; }
-.dictionary-modal .dictionary-delete { background:var(--error); color:white; }
 .dictionary-modal .modal-card>p { overflow-wrap:anywhere; }
 .dictionary-add-modal .modal-close { display:none; }
 /* Selection/CSV preview from CHQBpmae 105539–105623, 106400–106534, 106663–106750. */

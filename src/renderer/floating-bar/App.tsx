@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DEFAULT_SETTINGS, type Settings } from '../../shared/settings'
-import { api } from '../shared/bridge'
+import { api } from '../shared/utils/bridge'
 import { Waveform } from './Waveform'
 import { startRecorder, type RecorderHandle } from './audio'
 import { RecorderSessionController } from './sessionController'
 import { useHotkeyState } from './useHotkeyState'
 import { ShimmerText } from './ShimmerText'
 import { StatusIcons } from './StatusIcons'
-import { Icon } from '../shared/Icons'
-import './floating-bar.css'
+import { Icon } from '../shared/components/Icons'
+import './styles.css'
 
 type BarStatus =
   | 'idle-hidden'

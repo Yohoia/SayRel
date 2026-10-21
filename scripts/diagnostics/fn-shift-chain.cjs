@@ -4,18 +4,19 @@ const ts = require('typescript'), assert = require('node:assert/strict')
 const root = path.resolve(__dirname, '../..')
 const flush = () => new Promise(resolve => setImmediate(resolve))
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r }); return { promise, resolve } }
-const broadcasts = [], inserted = [], rows = []
+const broadcasts = [], inserted = [], rows = [], refinementStates = []
 let forwardBroadcast = () => {}
 const logger = { debug(){}, info(){}, warn(){}, error(){} }
 function load(file, overrides = {}) {
   const exports = {}
   const source = ts.transpileModule(fs.readFileSync(path.join(root, file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
-  vm.runInNewContext(source, { exports, require: id => id in overrides ? overrides[id] : id in mocks ? mocks[id] : require(id), process: { env: {} }, console, Buffer, Float32Array, AbortController, structuredClone, queueMicrotask, setTimeout, clearTimeout, setInterval, clearInterval }, { filename: file })
+  vm.runInNewContext(source, { exports, require: id => id in overrides ? overrides[id] : id in mocks ? mocks[id] : require(id), process: { env: {} }, console, Buffer, Float32Array, AbortController, URL, structuredClone, queueMicrotask, setTimeout, clearTimeout, setInterval, clearInterval }, { filename: file })
   return exports
 }
 const mocks = { '../lib/logger': { createLogger: () => logger } }
 const shared = load('src/shared/constants.ts')
 mocks['./constants'] = shared
+mocks['./providers'] = load('src/shared/providers.ts')
 mocks['./settingsControls'] = load('src/shared/settingsControls.ts')
 mocks['../../shared/settingsControls'] = mocks['./settingsControls']
 const { DEFAULT_SETTINGS, mergeSettings } = load('src/shared/settings.ts')
@@ -30,7 +31,7 @@ Object.assign(mocks, {
   './dictionary': { listDictionary: () => [] }, './voiceActions': { runVoiceAction: async () => 'answer' },
   './insertion': { insertText: async text => { inserted.push(text); return { ok: true } } },
   './transcription': { transcribe: (...args) => transcribe(...args) },
-  './providers': { createProviders: () => ({ transcription: { transcribe: async (...args) => (await transcribe(...args)).result }, refinement: { refine: async ({ transcript }) => ({ text: transcript }) } }) },
+  './providers': { createProviders: (_legacy, state) => { refinementStates.push(state); return { transcription: { transcribe: async (...args) => (await transcribe(...args)).result }, refinement: { refine: async ({ transcript }) => ({ text: transcript }) } } } },
   '../lib/settings': { settings: { get: () => config } }, './contextCapture': { captureAudioContext: async () => null }
 })
 const { RecordingMachine } = load('src/main/services/recordingMachine.ts')
@@ -98,6 +99,51 @@ async function start(machine) { await machine.start(); const id = machine.getSta
     const next = await start(m); transcribe = async () => { throw new Error('offline') }
     const again = m.finish(); m.markStopped(next); await again; m.cancel()
     await m.retry(); assert.equal(m.getState().phase, 'starting'); m.cancel()
+  })
+  await test('live transcription and retry retain the capture provider snapshot and use separate cancellation signals', async () => {
+    const saved = structuredClone(config)
+    const provider = { id: 'original', presetId: '', name: 'Original', enabled: true, service: 'transcription', protocol: 'openai-transcription', endpoint: 'https://original.example/v1', apiKey: 'original-key', models: ['original-model'], appId: '', accessToken: '', resourceId: '', apiVersion: '' }
+    config.serviceProviders = { profiles: [provider], transcription: { providerId: provider.id, model: 'original-model' }, refinement: null }
+    const originalState = structuredClone(config.serviceProviders)
+    const m = new RecordingMachine(), id = await start(m)
+    config.serviceProviders = { profiles: [], transcription: null, refinement: null }
+    let firstSignal
+    transcribe = async options => {
+      assert.deepEqual(options.config.serviceProviders, originalState)
+      assert.equal(options.signal.aborted, false)
+      firstSignal = options.signal
+      throw new Error('temporary transport failure')
+    }
+    const finished = m.finish(); m.markStopped(id); await finished
+    assert.equal(m.getState().phase, 'error')
+    assert.equal(firstSignal.aborted, true)
+    transcribe = async options => {
+      assert.deepEqual(options.config.serviceProviders, originalState)
+      assert.notEqual(options.signal, firstSignal)
+      assert.equal(options.signal.aborted, false)
+      return { result: { text: 'snapshot retry' }, ogg: Buffer.alloc(0) }
+    }
+    await m.retry()
+    assert.deepEqual(refinementStates.at(-1), originalState)
+    assert.equal(m.getState().phase, 'idle')
+    Object.assign(config, saved)
+  })
+  await test('production transcription uses supplied snapshot for live and historical audio without reloading settings', async () => {
+    const snapshot = structuredClone(config), signal = new AbortController().signal, captured = []
+    const { transcribe: run } = load('src/main/services/transcription.ts', {
+      '../lib/workers': { workerThreads: { encodeOpus: async () => ({ ogg: Buffer.from('encoded-audio') }) } },
+      '../lib/settings': { settings: { get() { throw new Error('must not read mutable global settings') } } },
+      './providers': { createProviders: (legacy, state) => {
+        assert.equal(legacy, snapshot.provider); assert.equal(state, snapshot.serviceProviders)
+        return { transcription: { transcribe: async req => { captured.push(req); return { text: 'snapshot', provider: 'probe', detectedLanguage: null } } } }
+      } }
+    })
+    const pcm = new Float32Array([.2, .4])
+    await run({ pcm, config: snapshot, signal, durationMs: 2, mode: 'voice_transcript' })
+    assert.equal(captured[0].pcm, pcm); assert.equal(captured[0].signal, signal); assert.equal(captured[0].sampleRate, 16000)
+    assert.equal(captured[0].audioBuffer.toString(), 'encoded-audio')
+    await run({ audioPath: '/fixture.ogg', config: snapshot, signal, durationMs: 2, mode: 'voice_transcript' })
+    assert.equal(captured[1].audioBuffer.toString(), 'fixture-audio'); assert.equal(captured[1].signal, signal)
   })
   await test('saved-history retry updates existing record without pasting; errors reach caller', async () => {
     const m = new RecordingMachine(), before = inserted.length

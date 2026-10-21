@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { api } from '../../shared/bridge'
-import { Icon } from '../../shared/Icons'
+import { api } from '../../shared/utils/bridge'
+import { checkForUpdates } from '../../shared/utils/checkForUpdates'
+import { Icon } from '../../shared/components/Icons'
 import { useAppSettings } from '../state/settings'
 
 const APPLICATIONS = [
@@ -32,7 +33,7 @@ export function DashboardPage() {
   const [items, setItems] = useState<any[]>([])
   const [statsLoaded, setStatsLoaded] = useState(false)
   const [version, setVersion] = useState('1.0.0')
-  const [update, setUpdate] = useState("检查更新")
+  const [checking, setChecking] = useState(false)
   useEffect(() => {
     let active = true
     Promise.all([api.history.list({ limit: 200 }), api.app.systemInfo()])
@@ -70,7 +71,7 @@ export function DashboardPage() {
         <section className="usage-stats" aria-label="使用统计">{stats.map((stat) => <div className="usage-stat" key={stat.label} title={stat.label}><Icon name={stat.icon} /><p className={!statsLoaded || !items.length || stat.value === "--" ? "is-default" : undefined}><strong>{!statsLoaded || !items.length ? "--" : stat.value.toLocaleString()}</strong><span>{!statsLoaded || !items.length ? "" : stat.unit}</span></p></div>)}</section>
         <button className="home-banner home-banner-referral" onClick={() => void api.page.openUrl('https://www.typeless.com/referral')}><div><h2>推荐朋友<span className="home-banner-arrow"><Icon name="arrow" /></span></h2><p>获得 <strong>$5 代金券</strong> 每个邀请。</p></div></button>
         <button className="home-banner home-banner-affiliate" onClick={() => void api.page.openUrl('https://www.typeless.com/affiliate')}><div><h2>联盟计划<span className="home-banner-arrow"><Icon name="arrow" /></span></h2><p>赚取 <strong>25%</strong> 重复佣金。</p></div></button>
-        <footer className="app-version" style={anchor}><span>版本 v{version}</span><button onClick={async () => { setUpdate("正在检查…"); try { const result = await api.updater.check(); setUpdate(result?.status === 'available' ? "有可用更新" : "检查更新") } catch { setUpdate("重试") } }}>{update}</button></footer>
+        <footer className="app-version" style={anchor}><span>版本 v{version}</span><button disabled={checking} onClick={async () => { setChecking(true); try { await checkForUpdates(version) } finally { setChecking(false) } }}>{checking ? '正在检查…' : '检查更新'}</button></footer>
       </aside>
     </div>
   </div>

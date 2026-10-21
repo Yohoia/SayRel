@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { api } from '../shared/bridge'
+import { api } from '../shared/utils/bridge'
 import { TitleBar } from './components/TitleBar'
 import { SideNav } from './components/SideNav'
 import { DashboardPage } from './pages/Dashboard'
 import { HistoryPage } from './pages/History'
 import { DictionaryPage } from './pages/Dictionary'
 import { SettingsPage } from './pages/Settings'
+import { ProvidersPage } from './pages/Providers'
 import { SettingsModalHost } from './components/SettingsModal'
 import { AppSettingsProvider } from './state/settings'
-import '../shared/hub.css'
+import { ToastViewport } from '../shared/components/Toast'
+import '../shared/styles/hub.css'
 
 export function HubApp() {
   const [ready, setReady] = useState(false)
@@ -40,6 +42,7 @@ export function HubApp() {
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/dictionary" element={<DictionaryPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/providers" element={<ProvidersPage />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
         </main>
@@ -48,6 +51,7 @@ export function HubApp() {
           section={settingsOpen ?? 'general'}
           onClose={() => setSettingsOpen(null)}
         />
+        <ToastViewport />
       </div>
     </AppSettingsProvider>
   )

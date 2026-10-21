@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, inArray, like, lt, ne, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, like, lt, ne, or, sql } from 'drizzle-orm'
 import { unlink } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { getDb, getRawDb, schema } from '../db'
@@ -224,6 +224,28 @@ export function deleteByDuration(minAgeMs: number): number {
     if (row.audioLocalPath) unlink(row.audioLocalPath).catch(() => {})
   }
   return rows.length
+}
+
+export async function deleteAudioByDuration(minAgeMs: number): Promise<number> {
+  const cutoff = new Date(Date.now() - minAgeMs).toISOString()
+  const db = getDb()
+  const rows = db.select({ id: table.id, audioLocalPath: table.audioLocalPath }).from(table)
+    .where(and(lt(table.createdAt, cutoff), isNotNull(table.audioLocalPath))).all()
+  let removed = 0
+  for (const row of rows) {
+    if (!row.audioLocalPath) continue
+    try {
+      await unlink(row.audioLocalPath).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error
+      })
+      db.update(table).set({ audioLocalPath: null })
+        .where(and(eq(table.id, row.id), eq(table.audioLocalPath, row.audioLocalPath))).run()
+      removed++
+    } catch (error) {
+      log.warn('audio retention could not remove file', { id: row.id, error })
+    }
+  }
+  return removed
 }
 
 /** Rows the sync worker should push, cheapest-first. */

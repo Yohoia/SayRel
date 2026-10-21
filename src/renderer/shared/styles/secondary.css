@@ -43,7 +43,6 @@ html[data-offkey-surface="interactive-card"] #root { background: transparent; }
 .secondary-text-button { display: inline-flex; align-items: center; gap: 8px; padding: 0; font-size: 14px; line-height: 20px; color: var(--ink-soft); }
 .secondary-text-button:hover { color: var(--ink); }
 .secondary-text-button svg { width: 18px; height: 18px; }
-.secondary-error { margin: 0; color: var(--error); font-size: 13px; line-height: 20px; }
 .secondary-primary-button,
 .secondary-outline-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 8px 16px; border-radius: 999px; font-size: 16px; line-height: 24px; font-weight: 400; white-space: nowrap; }
 .secondary-primary-button { background: var(--primary); color: var(--paper); }

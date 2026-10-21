@@ -1,4 +1,4 @@
-import { Icon } from '../shared/Icons'
+import { Icon } from '../shared/components/Icons'
 
 /** Typeless uses ten quiet grey dots for both the hover and error pill. */
 export function StatusIcons({ status }: { status: string }) {

@@ -7,11 +7,11 @@ const log = createLogger('cleanup')
 
 let jobs: schedule.Job[] = []
 
-/** Nightly retention: history rows first, then orphaned audio files. */
+/** History and audio have independent retention periods. */
 export function startCleanupSchedule(): void {
   stopCleanupSchedule()
   jobs.push(
-    schedule.scheduleJob('0 3 * * *', () => {
+    schedule.scheduleJob('0 3 * * *', async () => {
       const config = settings.get()
       try {
         if (config.historyRetentionDays > 0) {
@@ -19,8 +19,8 @@ export function startCleanupSchedule(): void {
           log.info(`history retention removed ${removed} rows`)
         }
         if (config.audioRetentionDays > 0) {
-          const removed = history.deleteByDuration(config.audioRetentionDays * 86_400_000)
-          log.info(`audio retention removed ${removed} rows`)
+          const removed = await history.deleteAudioByDuration(config.audioRetentionDays * 86_400_000)
+          log.info(`audio retention removed ${removed} files`)
         }
       } catch (err) {
         log.error('cleanup job failed', err)
@@ -30,7 +30,6 @@ export function startCleanupSchedule(): void {
   jobs.push(
     schedule.scheduleJob('*/30 * * * *', () => {
       try {
-        history.deleteByDuration(Math.max(0, 0))
         const usage = history.diskUsage()
         if (usage.bytes > 2 * 1024 * 1024 * 1024) {
           log.warn(`recordings exceed 2GB (${usage.bytes} bytes)`)

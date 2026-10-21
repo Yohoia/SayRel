@@ -219,15 +219,29 @@ function applySideEffects(next: ReturnType<typeof settings.get>): void {
 }
 
 function applicationPathFor(bundleId: string): string {
+  // Validate bundleId to prevent command injection
+  if (!/^[a-zA-Z0-9.-]+$/.test(bundleId)) {
+    log.error(`Invalid bundle ID format: ${bundleId}`)
+    return '/Applications'
+  }
+
   try {
-    const output = require('node:child_process')
-      .execSync(`mdfind "kMDItemCFBundleIdentifier == '${bundleId}'" | head -1`, {
-        encoding: 'utf8'
-      })
-      .trim()
-    if (output) return output
-  } catch {
-    /* fall through */
+    // Use spawnSync with array arguments to prevent injection
+    const { spawnSync } = require('node:child_process')
+    const result = spawnSync('mdfind', [
+      `kMDItemCFBundleIdentifier == '${bundleId}'`
+    ], {
+      encoding: 'utf8',
+      timeout: 5000, // 5 second timeout
+      maxBuffer: 1024 * 1024 // 1MB max output
+    })
+
+    if (result.status === 0 && result.stdout) {
+      const output = result.stdout.split('\n')[0].trim()
+      if (output) return output
+    }
+  } catch (err) {
+    log.error(`Failed to find application path for ${bundleId}`, err)
   }
   return '/Applications'
 }

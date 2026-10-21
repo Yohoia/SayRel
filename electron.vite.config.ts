@@ -34,6 +34,7 @@ export default defineConfig({
   },
   renderer: {
     root: r('src/renderer'),
+    publicDir: r('public'),
     plugins: [react()],
     resolve: {
       alias: {

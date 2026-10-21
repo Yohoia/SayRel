@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
-import { readFile, writeFile } from 'node:fs/promises'
+import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { paths } from '../lib/paths'
 import { createLogger } from '../lib/logger'
@@ -47,7 +47,7 @@ export class RecordingMachine extends EventEmitter {
   private session: Session | null = null
   private disabled = false
   private countdown: NodeJS.Timeout | null = null
-  private retryInput: { pcm: Float32Array; mode: Mode; durationMs: number; context: AudioContextSnapshot | null } | null = null
+  private retryInput: { pcm: Float32Array; mode: Mode; durationMs: number; context: AudioContextSnapshot | null; config: Settings } | null = null
 
   getState(): RecordingMachineState { return this.state }
   isDisabled(): boolean { return this.disabled }
@@ -158,7 +158,7 @@ export class RecordingMachine extends EventEmitter {
         const context = await session.context
         this.requireActive(session)
         const input = { pcm: mergeFrames(session.frames), mode: session.mode,
-          durationMs: (session.stoppedAt ?? Date.now()) - session.startedAt, context }
+          durationMs: (session.stoppedAt ?? Date.now()) - session.startedAt, context, config: structuredClone(session.config) }
         session.frames = []
         if (!input.pcm.length) { this.cancel(); return }
         this.retryInput = input
@@ -219,6 +219,7 @@ export class RecordingMachine extends EventEmitter {
     }
     if (this.session || this.disabled) return
     const session = this.newSession(this.retryInput.mode)
+    session.config = structuredClone(this.retryInput.config)
     this.session = session
     this.transition('finishing', { sessionId: session.id, mode: session.mode, error: null })
     try { await this.complete(session, this.retryInput) }
@@ -252,10 +253,9 @@ export class RecordingMachine extends EventEmitter {
         micDevice: config.micDevice, appVersion: process.env.npm_package_version ?? '1.0.0' })
       session.historyWritten = true
     }
-    // Keep the existing live transcription and polishing implementations intact.
-    const { result, ogg } = input.audioPath
-      ? { result: await createProviders(config.provider).transcription.transcribe({ audioBuffer: await readFile(input.audioPath), audioPath: input.audioPath, mimeType: 'audio/ogg', durationMs: input.durationMs, language: config.transcriptionLanguage, dictionary, context: input.context, mode: input.mode }), ogg: Buffer.alloc(0) }
-      : await transcribe({ pcm: input.pcm, durationMs: input.durationMs, language: config.transcriptionLanguage, dictionary, context: input.context, mode: input.mode })
+    const { result, ogg } = await transcribe({ pcm: input.pcm, audioPath: input.audioPath,
+      durationMs: input.durationMs, language: config.transcriptionLanguage, dictionary,
+      context: input.context, mode: input.mode, config, signal: session.controller.signal })
     this.requireActive(session)
     if (config.historyEnabled && config.saveAudio && ogg.length) {
       const file = join(paths.recordings, `${session.id}.ogg`)
@@ -268,8 +268,8 @@ export class RecordingMachine extends EventEmitter {
       refined = await runVoiceAction({ transcript: result.text, mode: input.mode, context: input.context, config, signal: session.controller.signal })
     } else if (result.text) {
       try {
-        refined = (await createProviders(config.provider).refinement.refine({ transcript: result.text, mode: input.mode,
-          language: result.detectedLanguage, dictionary, context: input.context, instructions: config.customInstructions || undefined })).text
+        refined = (await createProviders(config.provider, config.serviceProviders).refinement.refine({ transcript: result.text, mode: input.mode,
+          language: result.detectedLanguage, dictionary, context: input.context, instructions: config.customInstructions || undefined, signal: session.controller.signal })).text
       } catch (err) { log.warn('refinement failed, using raw transcript', err) }
     }
     this.requireActive(session)

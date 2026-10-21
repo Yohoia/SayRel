@@ -40,11 +40,13 @@ export interface MicDeviceInfo {
   transport?: string | null
 }
 
-export interface ModeMeta {
-  aiResult?: AiResult | null
-  command?: string | null
-  [key: string]: unknown
-}
+/**
+ * Mode metadata - uses discriminated union to prevent invalid states
+ */
+export type ModeMeta =
+  | { kind: 'ai'; aiResult: AiResult }
+  | { kind: 'command'; command: string }
+  | { kind: 'empty' }
 
 export interface AiResult {
   text: string
@@ -153,6 +155,9 @@ export interface DictionaryEntry {
 }
 
 export interface TranscriptionRequest {
+  pcm?: Float32Array
+  sampleRate?: number
+  signal?: AbortSignal
   audioPath?: string | null
   audioBuffer?: Buffer | null
   mimeType?: string | null
@@ -172,6 +177,7 @@ export interface TranscriptionResult {
 }
 
 export interface RefineRequest {
+  signal?: AbortSignal
   transcript: string
   mode: Mode
   language?: string | null

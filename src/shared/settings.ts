@@ -1,3 +1,4 @@
+import { EMPTY_SERVICE_PROVIDERS, providerConfigurationIssue, serviceProvidersSchema, type ServiceProviders, type ProviderProfile } from './providers'
 import { normalizeTranslationTargets } from './settingsControls'
 import { MODES, type Mode } from './constants'
 
@@ -72,6 +73,8 @@ export interface Settings {
     refinementModel: string | null
   }
 
+  serviceProviders: ServiceProviders
+
   // Onboarding
   onboardingCompleted: boolean
   onboardingStep: number | null
@@ -133,6 +136,8 @@ export const DEFAULT_SETTINGS: Settings = {
     refinementModel: 'gpt-4o-mini'
   },
 
+  serviceProviders: EMPTY_SERVICE_PROVIDERS,
+
   onboardingCompleted: false,
   onboardingStep: null,
   defaultModeSelected: false
@@ -154,18 +159,50 @@ export function mergeSettings(persisted: Partial<Settings> | undefined): Setting
       }
     }
   }
+
+  // Helper to merge nested objects
+  const mergeNested = <T extends object>(base: T, partial: Partial<T> | undefined): T => {
+    return { ...base, ...(partial ?? {}) }
+  }
+
   return {
     ...DEFAULT_SETTINGS,
     ...(persisted ?? {}),
-    ...normalizeTranslationTargets(persisted?.translationTargetLanguages ?? [persisted?.translationTargetLanguage ?? 'en'], persisted?.translationTargetLanguage ?? 'en'),
+    ...normalizeTranslationTargets(
+      persisted?.translationTargetLanguages ?? [persisted?.translationTargetLanguage ?? 'en'],
+      persisted?.translationTargetLanguage ?? 'en'
+    ),
     additionalShortcuts: persisted?.additionalShortcuts ?? {},
-    shortcut: { ...DEFAULT_SETTINGS.shortcut, ...(persisted?.shortcut ?? {}) },
-    commandShortcut: { ...DEFAULT_SETTINGS.commandShortcut, ...(persisted?.commandShortcut ?? {}) },
-    askAnythingShortcut: {
-      ...DEFAULT_SETTINGS.askAnythingShortcut,
-      ...(persisted?.askAnythingShortcut ?? {})
-    },
-    translationShortcut: { ...DEFAULT_SETTINGS.translationShortcut, ...(persisted?.translationShortcut ?? {}) },
-    provider: { ...DEFAULT_SETTINGS.provider, ...(persisted?.provider ?? {}) }
+    shortcut: mergeNested(DEFAULT_SETTINGS.shortcut, persisted?.shortcut),
+    commandShortcut: mergeNested(DEFAULT_SETTINGS.commandShortcut, persisted?.commandShortcut),
+    askAnythingShortcut: mergeNested(DEFAULT_SETTINGS.askAnythingShortcut, persisted?.askAnythingShortcut),
+    translationShortcut: mergeNested(DEFAULT_SETTINGS.translationShortcut, persisted?.translationShortcut),
+    provider: mergeNested(DEFAULT_SETTINGS.provider, persisted?.provider),
+    serviceProviders: persisted?.serviceProviders
+      ? serviceProvidersSchema.parse(persisted.serviceProviders)
+      : migrateProviderSettings(persisted?.provider)
   }
+}
+
+function migrateProviderSettings(legacy: Settings['provider'] | undefined): ServiceProviders {
+  if (!legacy) return { ...EMPTY_SERVICE_PROVIDERS, profiles: [] }
+  const endpoint = legacy.baseUrl ?? 'https://api.openai.com/v1'
+  const apiKey = legacy.apiKey ?? ''
+  const fields = { enabled: true, appId: '', accessToken: '', resourceId: '', apiVersion: '2024-10-21' }
+  const state: ServiceProviders = { profiles: [], transcription: null, refinement: null }
+  if (legacy.transcription !== 'mock' && (legacy.transcription !== 'local-whisper' || legacy.baseUrl)) {
+    const local = legacy.transcription === 'local-whisper'
+    const model = local ? legacy.baseUrl || '' : legacy.model || 'whisper-1'
+    const profile: ProviderProfile = { ...fields, id: 'migrated-transcription', presetId: local ? 'asr-local-whisper' : 'asr-openai', name: local ? 'Whisper' : '语音转写', service: 'transcription', protocol: local ? 'local-whisper' : 'openai-transcription', endpoint: local ? legacy.model || 'whisper-cli' : endpoint, apiKey: local ? '' : apiKey, models: [model] }
+    state.profiles.push(profile)
+    if (!providerConfigurationIssue(profile)) state.transcription = { providerId: profile.id, model }
+  }
+  if (legacy.refinement !== 'mock') {
+    const model = legacy.refinementModel || legacy.model || 'gpt-4o-mini'
+    const profile: ProviderProfile = { ...fields, id: 'migrated-refinement', presetId: 'llm-openai_compatible', name: '文本润写', service: 'refinement', protocol: 'openai-chat', endpoint, apiKey, models: [model] }
+    state.profiles.push(profile)
+    // Empty old keys should lead to an unconfigured role, even for compatible endpoints.
+    if (apiKey || /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::|\/|$)/.test(endpoint)) state.refinement = { providerId: profile.id, model }
+  }
+  return serviceProvidersSchema.parse(state)
 }

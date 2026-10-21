@@ -6,6 +6,7 @@ import { createLogger } from '../lib/logger'
 import { broadcast } from '../windows'
 import { IPC } from '../../shared/ipc'
 import type { AuthSession, UserInfo } from '../../shared/types'
+import { TokenResponseSchema, UserInfoResponseSchema, parseApiResponse } from '../../shared/api-schemas'
 
 const log = createLogger('auth')
 
@@ -22,22 +23,37 @@ const store = new Store<Persisted>({
 let cached: AuthSession | null = null
 let loginInFlight = false
 
+// Secure storage for pending PKCE flows (replaces globalThis usage)
+const pendingLogins = new Map<string, { verifier: string; state: string; timestamp: number }>()
+
 function encryptSession(session: AuthSession, userId: string): string {
   const plaintext = JSON.stringify(session)
-  if (safeStorage.isEncryptionAvailable()) {
-    return safeStorage.encryptString(plaintext).toString('base64')
+  if (!safeStorage.isEncryptionAvailable()) {
+    log.error('safeStorage encryption not available - refusing to persist session')
+    throw new Error('Cannot persist session: encryption not available on this system')
   }
-  // Local-only fallback: obfuscated but not secret. Encryption is preferred.
-  return Buffer.from(plaintext, 'utf8').toString('base64')
+  return safeStorage.encryptString(plaintext).toString('base64')
 }
 
 function decryptSession(cipher: string): AuthSession | null {
+  if (!safeStorage.isEncryptionAvailable()) {
+    log.error('Cannot decrypt session: encryption not available')
+    // Security: Never fall back to plaintext decryption
+    return null
+  }
+
   try {
     const buffer = Buffer.from(cipher, 'base64')
-    const plaintext = safeStorage.isEncryptionAvailable()
-      ? safeStorage.decryptString(buffer)
-      : buffer.toString('utf8')
-    return JSON.parse(plaintext) as AuthSession
+    const plaintext = safeStorage.decryptString(buffer)
+    const parsed = JSON.parse(plaintext)
+
+    // Validate the parsed session structure
+    if (!parsed || typeof parsed !== 'object') {
+      log.error('Invalid session structure')
+      return null
+    }
+
+    return parsed as AuthSession
   } catch (err) {
     log.error('failed to decrypt session', err)
     return null
@@ -55,7 +71,7 @@ export function getCurrentSession(): AuthSession | null {
 export function isLoggedIn(): boolean {
   const session = getCurrentSession()
   if (!session) return false
-  if (!session.expiresAt) return true
+  if (!session.expiresAt || session.expiresAt <= 0) return true
   return Date.now() < session.expiresAt
 }
 
@@ -93,9 +109,18 @@ export async function startAppLogin(): Promise<{ url: string; state: string }> {
   if (loginInFlight) throw new Error('login already in progress')
   loginInFlight = true
   broadcast(IPC.AUTH_APP_LOGIN_LOADING_CHANGED, true)
+
+  // Clean up stale login attempts (older than 10 minutes)
+  const now = Date.now()
+  for (const [key, value] of pendingLogins.entries()) {
+    if (now - value.timestamp > 600_000) {
+      pendingLogins.delete(key)
+    }
+  }
+
   const { challenge, state, verifier } = createLoginChallenge()
-  // The verifier stays in this process and is exchanged with the code.
-  ;(globalThis as any).__offkeyPkce = { verifier, state }
+  // Store PKCE verifier securely in closure-scoped Map instead of globalThis
+  pendingLogins.set(state, { verifier, state, timestamp: now })
 
   const url = new URL(`${ENDPOINTS.web}/login/app`)
   url.searchParams.set('scheme', PRODUCT.urlScheme)
@@ -109,12 +134,16 @@ export async function startAppLogin(): Promise<{ url: string; state: string }> {
 
 /** Called by the custom-protocol handler once the browser redirects back. */
 export async function completeAppLogin(code: string, state: string): Promise<AuthSession> {
-  const pending = (globalThis as any).__offkeyPkce as { verifier: string; state: string } | undefined
+  const pending = pendingLogins.get(state)
   if (!pending || pending.state !== state) {
     loginInFlight = false
     broadcast(IPC.AUTH_APP_LOGIN_FAILED, 'state-mismatch')
     throw new Error('login state mismatch')
   }
+
+  // Clean up the pending login immediately
+  pendingLogins.delete(state)
+
   try {
     const response = await fetch(`${ENDPOINTS.api}/oauth/exchange_app_login_code`, {
       method: 'POST',
@@ -126,25 +155,29 @@ export async function completeAppLogin(code: string, state: string): Promise<Aut
       })
     })
     if (!response.ok) throw new Error(`exchange failed: ${response.status}`)
-    const payload = (await response.json()) as {
-      access_token: string
-      refresh_token?: string
-      expires_in?: number
-      user?: UserInfo
+
+    // Validate response with zod schema
+    const json = await response.json()
+    const payload = parseApiResponse(TokenResponseSchema, json, 'token exchange')
+
+    // Validate user info if present
+    let user: UserInfo | null = null
+    if ('user' in json && json.user) {
+      user = parseApiResponse(UserInfoResponseSchema, json.user, 'user info')
     }
+
     const session: AuthSession = {
-      userId: payload.user?.id ?? 'local',
+      userId: user?.id ?? 'local',
       accessToken: payload.access_token,
       refreshToken: payload.refresh_token ?? null,
       expiresAt: payload.expires_in ? Date.now() + payload.expires_in * 1000 : null,
-      user: payload.user ?? null
+      user: user
     }
     persistSession(session)
     return session
   } finally {
     loginInFlight = false
     broadcast(IPC.AUTH_APP_LOGIN_LOADING_CHANGED, false)
-    ;(globalThis as any).__offkeyPkce = undefined
   }
 }
 

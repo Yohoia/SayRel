@@ -2,7 +2,7 @@
 const vm = require('node:vm'), fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict')
 let Processor
 const messages = []
-vm.runInNewContext(fs.readFileSync(path.resolve(__dirname, '../../src/renderer/public/capture-worklet.js'), 'utf8'), {
+vm.runInNewContext(fs.readFileSync(path.resolve(__dirname, '../../public/capture-worklet.js'), 'utf8'), {
   AudioWorkletProcessor: class { port = { postMessage: value => messages.push(value) } },
   Float32Array,
   registerProcessor: (_name, implementation) => { Processor = implementation }

@@ -64,7 +64,8 @@ app.whenReady().then(async () => {
   await shot('settings-language-variants')
   await win.webContents.executeJavaScript("document.querySelector('.settings-variant .hub-select').click()")
   await waitFor("!!document.querySelector('[role=listbox]')")
-  await clickText('[role=option]', '英语（英国）')
+  const britishEnglish = await win.webContents.executeJavaScript("new Intl.DisplayNames(['zh-CN'],{type:'language'}).of('en-GB')")
+  await clickText('[role=option]', britishEnglish)
   await waitFor("document.querySelector('.settings-variant .hub-select').innerText.includes('英国')")
   await closeDialog()
   assert.ok((await win.webContents.executeJavaScript("window.offkey.invoke('store:use','get')")).preferredLanguages.includes('en-GB'))
@@ -115,7 +116,7 @@ app.whenReady().then(async () => {
   await page('interactive-card.html'); await shot('answer-card')
   writeFileSync(join(output, 'report.json'), JSON.stringify({ reports, errors, scope: 'Offline fixtures; no real microphone, keys, providers or user data' }, null, 2))
   assert.deepEqual(errors, [])
-}).catch(error => { console.error(error); process.exitCode = 1 }).finally(() => {
+}).catch(error => { console.error(error); console.error(errors.join('\n')); process.exitCode = 1 }).finally(() => {
   win?.destroy(); app.exit(process.exitCode || 0)
 })
 app.on('quit', () => { rmSync(profile, { recursive: true, force: true }) })

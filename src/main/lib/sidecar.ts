@@ -20,9 +20,21 @@ export const rsa = {
     return { enabled: store.get('enabled'), publicKey: store.get('publicKey') }
   },
   setConfig(config: unknown): RsaConfig {
+    // Validate input to prevent injection attacks
+    if (typeof config !== 'object' || config === null) {
+      throw new Error('Invalid RSA config: must be an object')
+    }
     const next = config as Partial<RsaConfig>
-    if (typeof next.enabled === 'boolean') store.set('enabled', next.enabled)
-    if (typeof next.publicKey === 'string' || next.publicKey === null) {
+    if ('enabled' in next) {
+      if (typeof next.enabled !== 'boolean') {
+        throw new Error('Invalid RSA config: enabled must be boolean')
+      }
+      store.set('enabled', next.enabled)
+    }
+    if ('publicKey' in next) {
+      if (typeof next.publicKey !== 'string' && next.publicKey !== null) {
+        throw new Error('Invalid RSA config: publicKey must be string or null')
+      }
       store.set('publicKey', next.publicKey)
     }
     return this.getConfig()
@@ -32,7 +44,9 @@ export const rsa = {
   },
   encrypt(value: string): string {
     const key = store.get('publicKey')
-    if (!key) return value
+    if (!key) {
+      throw new Error('RSA encryption failed: no public key configured')
+    }
     try {
       return publicEncrypt(
         { key, padding: constants.RSA_PKCS1_OAEP_PADDING },
@@ -40,7 +54,7 @@ export const rsa = {
       ).toString('base64')
     } catch (err) {
       log.error('rsa encrypt failed', err)
-      return value
+      throw new Error(`RSA encryption failed: ${err instanceof Error ? err.message : 'unknown error'}`)
     }
   },
   clear(): boolean {

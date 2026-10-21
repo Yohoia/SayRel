@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { api, bridge } from '../../shared/bridge'
+import { api, bridge } from '../../shared/utils/bridge'
 import { DEFAULT_SETTINGS, type Settings } from '../../../shared/settings'
+import { toast } from '../../shared/components/Toast'
 
 type Ctx = {
   settings: Settings
@@ -30,8 +31,11 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
   }, [])
 
   const patch = useCallback(async (partial: Partial<Settings>) => {
-    const next = await api.settings.patch(partial)
-    if (next) setSettings({ ...DEFAULT_SETTINGS, ...next })
+    try {
+      const next = await api.settings.patch(partial)
+      if (next) setSettings({ ...DEFAULT_SETTINGS, ...next })
+      toast.success('保存成功')
+    } catch (error) { toast.error('保存失败，请重试'); throw error }
   }, [])
 
   useEffect(() => {

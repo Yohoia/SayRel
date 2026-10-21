@@ -1,7 +1,7 @@
 {
   "name": "offkey",
   "version": "1.0.0",
-  "description": "Offkey \u2014 voice-first writing assistant for the desktop",
+  "description": "Offkey — voice-first writing assistant for the desktop",
   "author": "Offkey",
   "license": "MIT",
   "private": true,
@@ -21,8 +21,10 @@
     "icons": "tsx scripts/gen-icons.ts",
     "dist:mac": "electron-vite build && electron-builder --mac",
     "verify:voice": "node scripts/diagnostics/fn-shift-chain.cjs && node scripts/diagnostics/renderer-session.cjs && node scripts/diagnostics/audio-tail.cjs && node scripts/diagnostics/worklet-drain.cjs && python3 scripts/diagnostics/native-hotkeys.py",
-    "verify:ui": "node scripts/ui-build.mjs && electron scripts/diagnostics/ui-offline.cjs",
-    "verify:settings": "node scripts/diagnostics/settings-controls.cjs"
+    "verify:ui": "node scripts/ui-build.mjs && electron scripts/diagnostics/ui-offline.cjs && electron scripts/diagnostics/history-retention-ui.cjs",
+    "verify:settings": "node scripts/diagnostics/settings-controls.cjs",
+    "verify:providers": "node scripts/verify-providers.mjs",
+    "verify:regressions": "ELECTRON_RUN_AS_NODE=1 electron scripts/diagnostics/retention.cjs && node scripts/diagnostics/native-callbacks.cjs && node scripts/diagnostics/opus.cjs && ELECTRON_RUN_AS_NODE=1 electron scripts/diagnostics/packaged-db.cjs"
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.16",
@@ -45,7 +47,8 @@
     "notistack": "^3.0.2",
     "opusscript": "^0.1.1",
     "plist": "^3.1.0",
-    "undici": "^7.16.0"
+    "undici": "^7.16.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
@@ -58,10 +61,12 @@
     "@types/diff": "^8.0.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.10.0",
+    "@types/node-schedule": "^2.1.8",
     "@types/plist": "^3.0.5",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/ui": "^5.0.5",
     "electron": "33.4.11",
     "electron-builder": "^25.1.8",
     "electron-vite": "^3.1.0",
@@ -73,6 +78,7 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vite": "^6.0.0",
+    "vitest": "^5.0.5",
     "zustand": "^5.0.3"
   },
   "resolutions": {
@@ -96,6 +102,7 @@
         "filter": [
           "build/**/*",
           "lib/**/*",
+          "db/**/*",
           "locales/**/*"
         ]
       }

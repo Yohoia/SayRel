@@ -4,9 +4,10 @@ import ArrowBackRounded from '@mui/icons-material/ArrowBackRounded'
 import CheckRounded from '@mui/icons-material/CheckRounded'
 import MicRounded from '@mui/icons-material/MicRounded'
 import HelpOutlineRounded from '@mui/icons-material/HelpOutlineRounded'
-import { api } from '../shared/bridge'
+import { api } from '../shared/utils/bridge'
+import { toast } from '../shared/components/Toast'
 import { startRecorder, type RecorderHandle } from '../floating-bar/audio'
-import '../shared/secondary.css'
+import '../shared/styles/secondary.css'
 
 // Layout/permissions: DvUhSfBn:1280–1340, 1374–1455, 1595–1638.
 // Shortcut and finish: 2XHPuyUf.js components va/re/Pa (shipped bundle).
@@ -20,7 +21,6 @@ export function OnboardingApp() {
   const [askShortcut, setAskShortcut] = useState('Fn+Space')
   const [level, setLevel] = useState(0)
   const [micReady, setMicReady] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [pressed, setPressed] = useState(false)
   const [tested, setTested] = useState(false)
   useEffect(() => {
@@ -39,12 +39,11 @@ export function OnboardingApp() {
     let cancelled = false
     let recorder: RecorderHandle | null = null
     setMicReady(false)
-    setError(null)
-    api.settings.get().then((s: any) => startRecorder({ deviceId: s?.micDevice, onChunk: () => undefined, onLevel: setLevel })).then(async (handle) => {
+    api.settings.get().then((s: any) => startRecorder({ deviceId: s?.micDevice, onChunk: () => undefined, onLevel: setLevel })).then(async (handle: RecorderHandle) => {
       if (cancelled) { await handle.stop(); return }
       recorder = handle
       setMicReady(true)
-    }).catch(() => { if (!cancelled) setError('无法访问麦克风。请检查设置。') })
+    }).catch(() => { if (!cancelled) { toast.error('无法访问麦克风，请检查设置') } })
     return () => { cancelled = true; void recorder?.stop() }
   }, [step])
   useEffect(() => api.recording.onState((state: any) => {
@@ -78,14 +77,15 @@ export function OnboardingApp() {
       </div></section>
       <aside className={`secondary-onboarding-right ${step}-art`}>
         {step === 'permissions' && (accessibility ? <><img className="secondary-microphone-art light-art" src="./assets/B8YXZviC.png" alt="麦克风" /><img className="secondary-microphone-art dark-art" src="./assets/B2-LRdJC.png" alt="麦克风" /></> : <><img className="secondary-accessibility-art light-art" src="./assets/Ck6WD2NS.gif" alt="辅助功能权限设置" /><img className="secondary-accessibility-art dark-art" src="./assets/3oXgh2ks.gif" alt="辅助功能权限设置" /></>)}
-        {step === 'microphone' && <div className="secondary-mic-test"><div className="secondary-volume-bars" role="meter" aria-label="麦克风音量" aria-valuenow={Math.round(level * 100)} aria-valuemin={0} aria-valuemax={100}><MicRounded />{Array.from({ length: 14 }, (_, i) => <i key={i} className={i < Math.ceil(Math.min(1, level * 4) * 14) ? 'active' : ''} />)}</div>{error && <p className="secondary-error" role="alert">{error}</p>}</div>}
+        {step === 'microphone' && <div className="secondary-mic-test"><div className="secondary-volume-bars" role="meter" aria-label="麦克风音量" aria-valuenow={Math.round(level * 100)} aria-valuemin={0} aria-valuemax={100}><MicRounded />{Array.from({ length: 14 }, (_, i) => <i key={i} className={i < Math.ceil(Math.min(1, level * 4) * 14) ? 'active' : ''} />)}</div></div>}
         {step === 'shortcut' && (shortcut.toLowerCase() === 'fn' ? <><img className="secondary-keyboard-art light-art" src={`./assets/${pressed ? 'Bt3eR-rj' : 'DFTEPrsg'}.webp`} alt="Fn 键" /><img className="secondary-keyboard-art dark-art" src={`./assets/${pressed ? 'CxW9ztGh' : 'CeKEbMYr'}.webp`} alt="Fn 键" /></> : <div className={`secondary-shortcut-card ${pressed ? 'is-pressed' : ''}`}>{shortcut.split('+').map((key) => <kbd key={key}>{key}</kbd>)}</div>)}
       </aside>
     </div>}
   </main>
 }
 function PermissionRow({ title, description, help, granted, collapsed, onGrant }: { title: string; description: string; help: string; granted: boolean; collapsed?: boolean; onGrant: () => void }) {
-  return <section className="secondary-permission"><div className="secondary-permission-title"><h2>{title}</h2>{granted && <span className="secondary-permission-check"><CheckRounded /></span>}</div>{!granted && !collapsed && <><p>{description}</p><div className="secondary-permission-actions"><button className="secondary-primary-button secondary-permission-allow" onClick={onGrant}>允许</button><span title={help} tabIndex={0} aria-label={help}><HelpOutlineRounded /></span></div></>}</section>
+  const grant = async () => { try { await onGrant() } catch { toast.error('权限请求失败，请重试') } }
+  return <section className="secondary-permission"><div className="secondary-permission-title"><h2>{title}</h2>{granted && <span className="secondary-permission-check"><CheckRounded /></span>}</div>{!granted && !collapsed && <><p>{description}</p><div className="secondary-permission-actions"><button className="secondary-primary-button secondary-permission-allow" onClick={() => void grant()}>允许</button><span title={help} tabIndex={0} aria-label={help}><HelpOutlineRounded /></span></div></>}</section>
 }
 function ShortcutSummary({ title, shortcut }: { title: string; shortcut: string }) {
   return <div><h2>{title}</h2><div>{shortcut.split('+').map((key) => <kbd key={key}>{key}</kbd>)}</div></div>

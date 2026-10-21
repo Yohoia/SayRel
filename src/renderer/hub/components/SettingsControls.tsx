@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactNode, KeyboardEvent } from 'react'
 import { DEFAULT_SETTINGS, type ShortcutBinding } from '../../../shared/settings'
 import { bindingsFor, normalizeTranslationTargets, SHORTCUT_KEYS, validateShortcut, type ShortcutKey } from '../../../shared/settingsControls'
-import { api } from '../../shared/bridge'
-import { Modal } from '../../shared/Modal'
+import { api } from '../../shared/utils/bridge'
+import { Modal } from '../../shared/components/Modal'
+import { toast } from '../../shared/components/Toast'
 import { useAppSettings } from '../state/settings'
 import { HubSelect } from './HubSelect'
 import { interfaceLanguages, useSettingsText } from './settingsText'
@@ -22,7 +23,6 @@ export function ShortcutEditor({ settingKey }: { settingKey: ShortcutKey }) {
   const t = useSettingsText()
   const [editing, setEditing] = useState<number | null>(null)
   const [draft, setDraft] = useState('')
-  const [error, setError] = useState('')
   const capture = useRef('')
   const container = useRef<HTMLDivElement>(null)
   const bindings = bindingsFor(settings, settingKey)
@@ -38,10 +38,10 @@ export function ShortcutEditor({ settingKey }: { settingKey: ShortcutKey }) {
     const used = SHORTCUT_KEYS.flatMap(key => bindingsFor(current.settings, key).filter((_, i) => key !== settingKey || i !== current.editing).map(binding => binding.accelerator))
     if (current.settings.commandShortcut.enabled) used.push(current.settings.commandShortcut.accelerator)
     const problem = validateShortcut(accelerator, used)
-    if (problem) { setError(t(problem)); return }
+    if (problem) { toast.error(t(problem)); return }
     const next = [...current.bindings]
     next[current.editing] = { accelerator, enabled: true, style: 'toggle' }
-    void save(next).then(() => { setEditing(null); setError('') }).catch(() => setError('无法保存快捷键，请重试。'))
+    void save(next).then(() => { setEditing(null) }).catch(() => undefined)
   }
   useEffect(() => {
     if (editing === null) return
@@ -52,14 +52,14 @@ export function ShortcutEditor({ settingKey }: { settingKey: ShortcutKey }) {
       if (event.pressed) { capture.current = event.combination; setDraft(event.combination) }
       else if (event.combination !== 'Escape') finish.current(capture.current)
     })
-    void window.offkey.invoke('keyboard:begin-shortcut-capture').catch(() => setError('无法录制快捷键，请重试。'))
+    void window.offkey.invoke('keyboard:begin-shortcut-capture').catch(() => { toast.error('无法录制快捷键，请重试') })
     const away = (event: PointerEvent) => { if (!container.current?.contains(event.target as Node)) setEditing(null) }
     const blur = () => setEditing(null)
     window.addEventListener('blur', blur)
     document.addEventListener('pointerdown', away)
     return () => { disposed = true; off?.(); document.removeEventListener('pointerdown', away); window.removeEventListener('blur', blur); void window.offkey.invoke('keyboard:end-shortcut-capture') }
   }, [editing])
-  function begin(index: number) { capture.current = ''; setDraft(''); setError(''); setEditing(index) }
+  function begin(index: number) { capture.current = ''; setDraft(''); setEditing(index) }
   function keyDown(event: KeyboardEvent) {
     if (editing === null) return
     event.preventDefault(); event.stopPropagation()
@@ -82,7 +82,6 @@ export function ShortcutEditor({ settingKey }: { settingKey: ShortcutKey }) {
       {editing === index && index === 0 ? <button className="settings-shortcut-action" aria-label={t('重置快捷键')} title={t('重置快捷键')} onClick={() => finish.current(DEFAULT_SETTINGS[settingKey].accelerator)}>↺</button> : editing !== index && (settingKey !== 'shortcut' || bindings.length > 1) && <button className="settings-shortcut-action" aria-label={t('禁用快捷键')} title={t('禁用快捷键')} onClick={() => void save(bindings.filter((_, i) => i !== index))}>×</button>}
     </div>)}
     {editing === null && bindings.length < 4 && <button className="settings-add" onClick={event => { begin(bindings.length); requestAnimationFrame(() => container.current?.querySelector<HTMLButtonElement>('.is-recording')?.focus()) }}>{t(bindings.length ? '添加另一个' : '添加快捷方式')}</button>}
-    {error && <span className="settings-error" role="alert">{error}</span>}
   </div>
 }
 
@@ -135,7 +134,6 @@ export function MicrophonePicker({ autoOpen = false }: { autoOpen?: boolean }) {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
   const [selected, setSelected] = useState(settings.micDevice ?? '')
   const [level, setLevel] = useState(0)
-  const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   useEffect(() => { void api.audio.getDevices().then((list: any) => { if (Array.isArray(list)) setNativeDevices(list) }).catch(() => undefined) }, [])
   useEffect(() => { void navigator.mediaDevices?.enumerateDevices().then(list => setDevices(list.filter(device => device.kind === 'audioinput' && device.deviceId !== 'default'))).catch(() => undefined) }, [])
@@ -143,13 +141,13 @@ export function MicrophonePicker({ autoOpen = false }: { autoOpen?: boolean }) {
     if (!open) return
     let disposed = false, frame = 0
     let stream: MediaStream | undefined, context: AudioContext | undefined
-    setError(''); setLevel(0)
+    setLevel(0)
     const refresh = () => { void navigator.mediaDevices.enumerateDevices().then(list => { if (!disposed) setDevices(list.filter(device => device.kind === 'audioinput' && device.deviceId !== 'default')) }).catch(() => undefined) }
     void (async () => {
       try {
         const state = await api.recording.state()
         if (disposed) return
-        if (state?.phase && !['idle', 'error'].includes(state.phase)) { setError('请先结束当前录音，再测试麦克风。'); return }
+        if (state?.phase && !['idle', 'error'].includes(state.phase)) { toast.info('请先结束当前录音'); return }
         stream = await navigator.mediaDevices.getUserMedia({ audio: selected ? { deviceId: { exact: selected } } : true, video: false })
         if (disposed) { stream.getTracks().forEach(track => track.stop()); return }
         refresh()
@@ -161,7 +159,7 @@ export function MicrophonePicker({ autoOpen = false }: { autoOpen?: boolean }) {
         const samples = new Uint8Array(analyser.fftSize)
         const tick = () => { analyser.getByteTimeDomainData(samples); setLevel(Math.min(1, Math.sqrt(samples.reduce((sum, value) => sum + ((value - 128) / 128) ** 2, 0) / samples.length) * 5)); frame = requestAnimationFrame(tick) }
         tick()
-      } catch (failure) { if (!disposed) setError(failure instanceof Error ? failure.message : '无法访问麦克风') }
+      } catch (failure) { if (!disposed) { const message = failure instanceof Error ? failure.message : '无法访问麦克风'; toast.error(message) } }
     })()
     navigator.mediaDevices?.addEventListener('devicechange', refresh)
     return () => { disposed = true; cancelAnimationFrame(frame); stream?.getTracks().forEach(track => track.stop()); void context?.close().catch(() => undefined); navigator.mediaDevices?.removeEventListener('devicechange', refresh) }
@@ -178,7 +176,7 @@ export function MicrophonePicker({ autoOpen = false }: { autoOpen?: boolean }) {
   const selectDevice = async (value: string) => {
     setSaving(true)
     try { await patch({ micDevice: value || null }); setSelected(value) }
-    catch { setError('无法保存麦克风设置') }
+    catch { return }
     finally { setSaving(false) }
   }
   const meter = <span className="settings-mic-level" role="meter" aria-label="麦克风音量" aria-valuenow={Math.round(level * 100)} aria-valuemin={0} aria-valuemax={100}>{Array.from({ length: 6 }, (_, i) => <i key={i} style={{ height: `${Math.max(4, Math.min(22, level * 22 * (i % 2 ? 1 : 0.65)))}px` }} className={level > 0.02 ? 'is-active' : ''} />)}</span>
@@ -186,7 +184,6 @@ export function MicrophonePicker({ autoOpen = false }: { autoOpen?: boolean }) {
     <p>{t('选择能捕捉到您声音的麦克风。如果指示条没有移动，请尝试其他麦克风。')}</p>
     <div className="settings-mic-list" role="radiogroup" aria-label={t('麦克风')}><button role="radio" aria-checked={!selected} disabled={saving} className="settings-mic-option" onClick={() => void selectDevice('')}><span>{autoLabel}<small>{t('使用系统默认麦克风')}</small></span>{!selected && meter}</button>{devices.map(device => <button role="radio" aria-checked={selected === device.deviceId} disabled={saving} className="settings-mic-option" key={device.deviceId} onClick={() => void selectDevice(device.deviceId)}><span>{device.label || t('未知设备')}{description(device) && <small>{description(device)}</small>}</span>{selected === device.deviceId && meter}</button>)}</div>
     {!devices.length && <p>{t('未检测到麦克风')}<br />{t('检查您的设备设置或连接麦克风。')}</p>}
-    {error && <p className="settings-error" role="alert">{error}</p>}
   </SettingsDialog>}</>
 }
 

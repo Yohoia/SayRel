@@ -1,4 +1,5 @@
 import { DEFAULT_SETTINGS, mergeSettings } from '../src/shared/settings'
+import { providerActionSchema, updateProviderState } from '../src/shared/providers'
 
 const params = new URLSearchParams(location.search)
 const empty = params.get('state') === 'empty'
@@ -40,6 +41,21 @@ Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: fi
 const bridge = {
   on(channel: string, cb: (...args: any[]) => void) { const set = listeners.get(channel) ?? new Set(); set.add(cb); listeners.set(channel, set); return () => set.delete(cb) },
   async invoke(channel: string, ...args: any[]): Promise<any> {
+    if (channel === 'providers:get') return settings.serviceProviders
+    if (channel === 'providers:manage') {
+      const action = providerActionSchema.parse(args[0])
+      if (action.action === 'test') {
+        await new Promise(resolve => setTimeout(resolve, 120))
+        if (params.get('fail') === 'test') return { ok: false, message: '离线测试：模型验证失败，请检查模型权限', latencyMs: 120 }
+        return { ok: true, message: '离线界面验证通过（未连接真实服务）', latencyMs: 120 }
+      }
+      if (action.action === 'models') return ['fixture-discovered-model']
+      if (params.get('fail') === 'save') throw new Error('离线测试：保存失败，请重试')
+      await new Promise(resolve => setTimeout(resolve, 180))
+      settings = { ...settings, serviceProviders: updateProviderState(settings.serviceProviders, action) }
+      localStorage.setItem('offkey-ui-settings', JSON.stringify(settings)); emit('store:changed', settings)
+      return settings.serviceProviders
+    }
     if (channel === 'store:use') {
       if (args[0] === 'patch') { settings = mergeSettings({ ...settings, ...args[1], provider: { ...settings.provider, ...args[1]?.provider } }); localStorage.setItem('offkey-ui-settings', JSON.stringify(settings)); emit('store:changed', settings) }
       if (args[0] === 'reset') settings = mergeSettings(DEFAULT_SETTINGS)
@@ -52,10 +68,16 @@ const bridge = {
     }
     if (channel === 'db:history-get') return history.find((item) => item.id === args[0])
     if (channel === 'db:history-delete') { history = history.filter((item) => item.id !== args[0]); return true }
+    if (channel === 'db:history-delete-by-duration') {
+      const before = history.length
+      const cutoff = Date.now() - Number(args[0])
+      history = history.filter(item => new Date(item.createdAt).getTime() >= cutoff)
+      return before - history.length
+    }
     if (channel === 'db:history-clear') { history = []; return true }
     if (channel === 'dictionary:list') return words
     if (channel === 'dictionary:add') { if (params.get('fail') === 'save') throw new Error('UI fixture save failure'); words.push({ id: crypto.randomUUID(), word: args[0], source: 'manual', createdAt: new Date().toISOString() }); localStorage.setItem('offkey-ui-words', JSON.stringify(words)); return words.at(-1) }
-    if (channel === 'dictionary:remove') { words = words.filter((item: any) => item.id !== args[0]); localStorage.setItem('offkey-ui-words', JSON.stringify(words)); return true }
+    if (channel === 'dictionary:remove') { await new Promise(resolve => setTimeout(resolve, 180)); if (params.get('fail') === 'delete') throw new Error('离线测试：删除失败'); words = words.filter((item: any) => item.id !== args[0]); localStorage.setItem('offkey-ui-words', JSON.stringify(words)); return true }
     if (channel === 'dictionary:update') {
       if (params.get('fail') === 'save') throw new Error('UI fixture save failure')
       const entry = words.find((item: any) => item.id === args[0])
@@ -67,12 +89,15 @@ const bridge = {
     if (channel === 'i18n:get-language') return settings.language
     if (channel === 'i18n:set-language') { settings.language = args[0]; emit('store:changed', settings); emit('i18n:language-changed', args[0]); return args[0] }
     if (channel === 'page:floating-bar-click' && args[0] === 'translation-language') { settings.translationTargetLanguage = args[1]; emit('store:changed', settings); return true }
-    if (channel.startsWith('permission:')) return true
+    if (channel.startsWith('permission:')) { if (params.get('fail') === 'permission') { if (channel === 'permission:check-with-child-process') return false; throw new Error('离线测试：权限请求失败') }; return true }
     if (channel === 'audio:get-devices-async') return [{ deviceId: 'default', label: 'MacBook Pro Microphone', isDefault: true }]
     if (channel === 'troubleshooting:get-system-info') return { appVersion: '1.0.0', platform: 'darwin', arch: 'arm64' }
     if (channel === 'page:get-interactive-card-payload') return { title: '帮我整理这段想法', answer: '清晰的表达，从一句简单的话开始。\n\n自然地说出想法，不必急着组织措辞，让文字随着你的思路慢慢成形。', createdAt: Date.now() }
     if (channel === 'auth:get-current') return null
     if (channel === 'auth:is-logged-in') return false
+    if (channel === 'updater:check-for-update') { await new Promise(resolve => setTimeout(resolve, 700)); return { skipped: 'dev-build' } }
+    if (channel === 'auth:start-app-login' && params.get('fail') === 'login') throw new Error('离线测试：登录失败')
+    if (channel === 'clipboard:write-text' && params.get('fail') === 'clipboard') throw new Error('离线测试：复制失败')
     if (channel === 'recording-machine:state') return { phase: 'idle', context: { handsFree: false } }
     if (channel === 'page:open-settings-modal') emit('page:open-settings-modal', args[0] ?? 'general')
     if (channel === 'file:pick-and-parse-dictionary-csv') return { canceled: true }

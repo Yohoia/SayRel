@@ -53,7 +53,7 @@ export abstract class BaseWindow {
         preload: resolvePreload(),
         nodeIntegration: false,
         contextIsolation: true,
-        sandbox: false,
+        sandbox: true, // ✓ Enable sandbox for security
         spellcheck: false
       },
       ...this.getWindowOptions()

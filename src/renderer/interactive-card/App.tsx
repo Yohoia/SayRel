@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import CloseRounded from '@mui/icons-material/CloseRounded'
 import MicRounded from '@mui/icons-material/MicRounded'
 import CheckRounded from '@mui/icons-material/CheckRounded'
-import { api, bridge } from '../shared/bridge'
-import '../shared/secondary.css'
+import { api, bridge } from '../shared/utils/bridge'
+import { toast } from '../shared/components/Toast'
+import '../shared/styles/secondary.css'
 
 type Payload = {
   id: string
@@ -60,9 +61,11 @@ export function CardApp() {
 
   const copy = async () => {
     if (!payload) return
-    await api.clipboard.writeText(payload.answer)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 3000)
+    try {
+      await api.clipboard.writeText(payload.answer)
+      setCopied(true); toast.success('复制成功')
+      setTimeout(() => setCopied(false), 3000)
+    } catch { toast.error('复制失败，请重试') }
   }
 
   if (!payload) return null
@@ -75,7 +78,7 @@ export function CardApp() {
           <button className="secondary-icon-button no-drag" aria-label="关闭回答" title="关闭 · Esc" onClick={() => api.page.closeCard()}><CloseRounded /></button>
         </header>
         <div className="secondary-result-scroll no-drag">
-          {(payload.userPrompt || payload.title) && <section className="secondary-result-prompt"><div ref={promptRef} className={expanded ? 'is-expanded' : ''}><div className="secondary-prompt-row"><MicRounded /><p>{payload.userPrompt || payload.title}</p><button className={`secondary-icon-button ${promptCopied ? 'is-copied' : ''}`} aria-label="复制问题" title={promptCopied ? '已复制' : '复制'} onClick={async () => { await api.clipboard.writeText([payload.userPrompt || payload.title, payload.selectedText].filter(Boolean).join('\n')); setPromptCopied(true); setTimeout(() => setPromptCopied(false), 3000) }}>{promptCopied ? <CheckRounded /> : <CopyIcon />}</button></div>{payload.selectedText && <div className="secondary-selected-text">{payload.selectedText}</div>}</div>{collapsible && <button className="secondary-prompt-toggle" onClick={() => setExpanded(!expanded)}>{expanded ? '显示更少' : '...更多'}</button>}</section>}
+          {(payload.userPrompt || payload.title) && <section className="secondary-result-prompt"><div ref={promptRef} className={expanded ? 'is-expanded' : ''}><div className="secondary-prompt-row"><MicRounded /><p>{payload.userPrompt || payload.title}</p><button className={`secondary-icon-button ${promptCopied ? 'is-copied' : ''}`} aria-label="复制问题" title={promptCopied ? '已复制' : '复制'} onClick={async () => { try { await api.clipboard.writeText([payload.userPrompt || payload.title, payload.selectedText].filter(Boolean).join('\n')); setPromptCopied(true); setTimeout(() => setPromptCopied(false), 3000); toast.success('复制成功') } catch { toast.error('复制失败，请重试') } }}>{promptCopied ? <CheckRounded /> : <CopyIcon />}</button></div>{payload.selectedText && <div className="secondary-selected-text">{payload.selectedText}</div>}</div>{collapsible && <button className="secondary-prompt-toggle" onClick={() => setExpanded(!expanded)}>{expanded ? '显示更少' : '...更多'}</button>}</section>}
           <article className="secondary-answer">
             <header><h1><AnswerIcon />回答</h1><button className={`secondary-icon-button ${copied ? 'is-copied' : ''}`} aria-label={copied ? "已复制" : "复制回答"} title={copied ? "已复制" : "复制回答"} onClick={copy}>{copied ? <CheckRounded /> : <CopyIcon />}</button></header>
             <div className="secondary-answer-content">{payload.answer}</div>

@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
-import { Icon } from '../../shared/Icons'
-import { api } from '../../shared/bridge'
+import { Icon } from '../../shared/components/Icons'
+import { api } from '../../shared/utils/bridge'
 
 const ITEMS = [
   { to: '/dashboard', label: "首页", icon: 'home' as const },
   { to: '/history', label: "历史记录", icon: 'history' as const },
-  { to: '/dictionary', label: "词典", icon: 'dictionary' as const }
+  { to: '/dictionary', label: "词典", icon: 'dictionary' as const },
+  { to: '/providers', label: "服务商", icon: 'settings' as const }
 ]
 
 export function SideNav({ onOpenSettings }: { onOpenSettings: (section?: string) => void }) {

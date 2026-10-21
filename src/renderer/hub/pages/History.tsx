@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { api, bridge } from '../../shared/bridge'
-import { Icon } from '../../shared/Icons'
-import { Modal } from '../../shared/Modal'
+import { api, bridge } from '../../shared/utils/bridge'
+import { Icon } from '../../shared/components/Icons'
+import { Modal } from '../../shared/components/Modal'
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
+import { toast } from '../../shared/components/Toast'
 import { HubMenu } from '../components/HubMenu'
 import { useAppSettings } from '../state/settings'
 import { HubSelect } from '../components/HubSelect'
@@ -65,14 +67,14 @@ export function HistoryPage() {
   const retry = async (item: Item) => {
     if (retrying) return
     setMenu(null); setRetrying(item.id); setError('')
-    try { await bridge.invoke('db:history-retry', item.id); await load() }
-    catch (error) { setError(error instanceof Error ? error.message : '重试失败，请再试一次。') }
+    try { await bridge.invoke('db:history-retry', item.id); await load(); toast.success('已重试') }
+    catch (error) { const message = error instanceof Error ? error.message : '重试失败，请再试一次。'; toast.error(message) }
     finally { setRetrying(null) }
   }
   const download = async (item: Item) => {
     setMenu(null)
-    try { await bridge.invoke('db:history-export-audio', item.id) }
-    catch { setError('录音下载失败，文件可能已被清理。') }
+    try { const result = await bridge.invoke('db:history-export-audio', item.id); if (!result?.canceled) toast.success('保存成功') }
+    catch { toast.error('录音下载失败，文件可能已被清理') }
   }
   useEffect(() => {
     if (!menu) return
@@ -90,7 +92,29 @@ export function HistoryPage() {
     }
     return [...groups.entries()]
   }, [items, filter])
-  const copy = async (item: Item) => { try { await api.clipboard.writeText(item.refinedText ?? ''); setCopied(item.id); setTimeout(() => setCopied(null), 1500) } catch { setError('复制失败，请重试。') } }
+  const copy = async (item: Item) => { try { await api.clipboard.writeText(item.refinedText ?? ''); setCopied(item.id); setTimeout(() => setCopied(null), 1500); toast.success('复制成功') } catch { toast.error('复制失败，请重试') } }
+  const changeRetention = async (value: string) => {
+    if (busy) return
+    setBusy(true)
+    try {
+      if (value === 'never') {
+        await patch({ historyEnabled: false })
+        return
+      }
+      const days = Number(value)
+      if (settings.historyEnabled && days === settings.historyRetentionDays) return
+      const mayDelete = days > 0 && (!settings.historyEnabled || settings.historyRetentionDays === 0 || days < settings.historyRetentionDays)
+      if (mayDelete) {
+        const history = await api.history.list({ limit: 1 })
+        if (history.total > 0) {
+          setConfirmation({ type: 'retention', days })
+          return
+        }
+      }
+      await patch({ historyEnabled: true, historyRetentionDays: days })
+    } catch { toast.error('保留时间修改失败，请重试') }
+    finally { setBusy(false) }
+  }
   const confirm = async () => {
     if (!confirmation || busy) return
     setBusy(true)
@@ -98,17 +122,17 @@ export function HistoryPage() {
       if (confirmation.type === 'item') await api.history.remove(confirmation.item.id)
       else if (confirmation.type === 'all') await api.history.clear()
       else {
-        await patch({ historyRetentionDays: confirmation.days })
+        await patch({ historyEnabled: true, historyRetentionDays: confirmation.days })
         await bridge.invoke('db:history-delete-by-duration', confirmation.days * 86_400_000)
       }
-      setConfirmation(null); await load()
-    } catch { setError('操作失败，请重试。') }
+      setConfirmation(null); toast.success('删除成功'); await load()
+    } catch { toast.error('操作失败，请重试') }
     finally { setBusy(false) }
   }
   return <div className="page history-page">
     <header className="page-heading"><h1 className="page-title">历史记录</h1><div className="page-actions hub-menu-anchor"><button className="icon-button" title="更多" aria-label="历史记录操作" aria-haspopup="menu" aria-expanded={menu === 'header'} onClick={() => setMenu(menu === 'header' ? null : 'header')}><Icon name="more" /></button>{menu === 'header' && <HubMenu onClose={() => setMenu(null)}><button role="menuitem" className="danger" disabled={!items.length} onClick={() => { setMenu(null); setConfirmation({ type: 'all' }) }}><Icon name="trash" size={14} />删除所有</button></HubMenu>}</div></header>
     <section className="history-retention" aria-label="保存历史">
-      <div className="history-retention-row"><div><h2><Icon name="history" size={14} />保存历史</h2><p>选择在此设备上保留历史记录的时间。</p></div><HubSelect compact label="保留历史记录的时间" value={settings.historyEnabled ? String(settings.historyRetentionDays) : 'never'} options={RETENTION.some((option) => option.value === String(settings.historyRetentionDays)) ? RETENTION : [...RETENTION, { value: String(settings.historyRetentionDays), label: `${settings.historyRetentionDays} 天` }]} onChange={(value) => { if (value === 'never') { void patch({ historyEnabled: false }); return }; const days = Number(value); if (!settings.historyEnabled) { void patch({ historyEnabled: true, historyRetentionDays: days }); return }; if (days === settings.historyRetentionDays) return; if (days > 0 && (settings.historyRetentionDays === 0 || days < settings.historyRetentionDays) && items.length) setConfirmation({ type: 'retention', days }); else void patch({ historyRetentionDays: days }) }} /></div>
+      <div className="history-retention-row"><div><h2><Icon name="history" size={14} />保存历史</h2><p>选择在此设备上保留历史记录的时间。</p></div><HubSelect compact label="保留历史记录的时间" value={settings.historyEnabled ? String(settings.historyRetentionDays) : 'never'} options={RETENTION.some((option) => option.value === String(settings.historyRetentionDays)) ? RETENTION : [...RETENTION, { value: String(settings.historyRetentionDays), label: `${settings.historyRetentionDays} 天` }]} disabled={busy} onChange={(value) => void changeRetention(value)} /></div>
       <div className="history-retention-row"><div><h2><Icon name="shield" size={14} />您的数据保持私密</h2><p>听写历史记录仅保存在这台设备上。</p></div></div>
     </section>
     <div className="page-toolbar"><div className="segmented-tabs" role="tablist" aria-label="记录类型">{FILTERS.map((item) => <button key={item.id} role="tab" aria-selected={filter === item.id} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div></div>
@@ -120,7 +144,7 @@ export function HistoryPage() {
     </article>)}</div></section>)}</div> : <div className="empty-state history-empty"><h2>尚无口述</h2><p>一旦您在不同应用中进行口述，您的所有口述历史将出现在这里。</p></div>}
     {!loading && items.length < total && <div ref={sentinel} className="history-load-more"><button className="text-button" disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore ? '正在加载…' : '加载更多'}</button></div>}
     {selected && <Modal title="回答" onClose={() => setSelected(null)}><div className="detail-transcript">{selected.refinedText}</div><footer className="modal-footer"><button className="primary-button" onClick={() => void copy(selected)}><Icon name={copied === selected.id ? 'check' : 'copy'} />{copied === selected.id ? '已复制' : '复制文字'}</button></footer></Modal>}
-    {confirmation && <Modal title={confirmation.type === 'all' ? '删除所有历史记录？' : confirmation.type === 'item' ? '删除此转录？' : '删除旧历史记录？'} onClose={() => { if (!busy) setConfirmation(null) }}><p>{confirmation.type === 'all' ? '您所有的本地历史记录将被永久删除，无法恢复。' : confirmation.type === 'item' ? '此转录将被永久删除，无法恢复。' : `您所有的本地历史记录早于 ${RETENTION.find((option) => Number(option.value) === confirmation.days)?.label} 将被永久删除，无法恢复。`}</p><footer className="modal-footer"><button className="secondary-button" disabled={busy} onClick={() => setConfirmation(null)}>取消</button><button className="primary-button" style={{ background: 'var(--error)', color: '#fff' }} disabled={busy} onClick={() => void confirm()}>{busy ? '正在删除…' : '删除'}</button></footer></Modal>}
+    {confirmation && <ConfirmDialog title={confirmation.type === 'all' ? '删除所有历史记录？' : confirmation.type === 'item' ? '删除此转录？' : '删除旧历史记录？'} description={confirmation.type === 'all' ? '您所有的本地历史记录将被永久删除，无法恢复。' : confirmation.type === 'item' ? '此转录将被永久删除，无法恢复。' : `您所有的本地历史记录早于 ${RETENTION.find((option) => Number(option.value) === confirmation.days)?.label} 将被永久删除，无法恢复。`} subject={confirmation.type === 'item' ? confirmation.item.refinedText ?? '暂无转写文字' : undefined} pending={busy} onClose={() => { setConfirmation(null) }} onConfirm={() => void confirm()} />}
   </div>
 }
 
