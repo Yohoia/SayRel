@@ -7,5 +7,5 @@ function applyAppearance(state: unknown) {
 
 void api.appearance.getState().then(applyAppearance).catch(() => undefined)
 api.appearance.onChanged(applyAppearance)
-// The current UI is authored in Simplified Chinese. Recognition language is independent.
-document.documentElement.lang = 'zh-CN'
+// English is the initial interface language. Recognition language is independent.
+document.documentElement.lang = 'en'

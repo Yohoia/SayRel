@@ -11,9 +11,15 @@ const apiKey = 'offkey-settings-test-secret-unique'
 const legacy = { transcription: 'openai-compatible', refinement: 'openai-compatible', baseUrl: 'https://example.test/v1', apiKey: null, model: 'old-asr', refinementModel: 'old-llm' }
 app.whenReady().then(async () => {
   assert.equal(safeStorage.isEncryptionAvailable(), true, 'system encryption available in isolated test')
-  writeFileSync(join(profile, 'settings.json'), JSON.stringify({ settings: { provider: legacy }, encryptedApiKey: safeStorage.encryptString(apiKey).toString('base64') }))
+  const shortcut = { accelerator:'Control+K', enabled:true, style:'hold' }
+  writeFileSync(join(profile, 'settings.json'), JSON.stringify({ settings: { language:'zh-CN', provider:legacy, shortcut, translationTargetLanguages:['zh-CN', 'ja'], translationTargetLanguage:'ja' }, deviceId:'fixture-device', encryptedApiKey:safeStorage.encryptString(apiKey).toString('base64') }))
   const { settings } = await import(resolve(__dirname, '../../.build/provider-settings/settings.mjs'))
   const loaded = settings.get()
+  assert.equal(loaded.language, 'en', 'existing profiles switch to English on the first launch of this release')
+  assert.deepEqual(loaded.shortcut, shortcut, 'language migration preserves custom shortcuts')
+  assert.deepEqual(loaded.translationTargetLanguages, ['zh-CN', 'ja'], 'language migration preserves translation candidates')
+  assert.equal(loaded.translationTargetLanguage, 'ja', 'language migration preserves the selected translation target')
+  assert.equal(JSON.parse(readFileSync(join(profile, 'settings.json'), 'utf8')).deviceId, 'fixture-device')
   assert.equal(loaded.serviceProviders.profiles.length, 2)
   assert.equal(loaded.serviceProviders.profiles[0].apiKey, apiKey, 'encrypted legacy credentials migrate before provider profiles')
   assert.equal(loaded.serviceProviders.refinement.model, 'old-llm')
@@ -27,6 +33,9 @@ app.whenReady().then(async () => {
   settings.invalidateCache()
   assert.equal(settings.get().serviceProviders.profiles[0].apiKey, apiKey + updated.profiles[0].id, 'reload decrypts independent credentials')
   assert.equal(settings.get().provider.apiKey, apiKey)
+  settings.patch({ language: 'zh-CN' })
+  settings.invalidateCache()
+  assert.equal(settings.get().language, 'zh-CN', 'later language choices survive reloads and unrelated writes')
   settings.patch({ soundVolume: 0.5 })
   assert.equal(readDisk().includes(apiKey), false, 'read-decrypt-write remains encrypted')
   const disabled = { ...settings.get().serviceProviders, refinement: null, profiles: settings.get().serviceProviders.profiles.map(p => p.service === 'refinement' ? { ...p, enabled: false } : p) }

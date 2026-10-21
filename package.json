@@ -1,7 +1,7 @@
 {
   "name": "offkey",
   "version": "1.0.0",
-  "description": "Offkey — voice-first writing assistant for the desktop",
+  "description": "Sayrel — voice-first writing assistant for the desktop",
   "author": "Offkey",
   "license": "MIT",
   "private": true,
@@ -19,12 +19,15 @@
     "rebuild": "electron-rebuild -f -w better-sqlite3,koffi",
     "native": "bash scripts/build-native.sh",
     "icons": "tsx scripts/gen-icons.ts",
+    "icons:mac": "swift scripts/gen-mac-icons.swift",
     "dist:mac": "electron-vite build && electron-builder --mac",
     "verify:voice": "node scripts/diagnostics/fn-shift-chain.cjs && node scripts/diagnostics/renderer-session.cjs && node scripts/diagnostics/audio-tail.cjs && node scripts/diagnostics/worklet-drain.cjs && python3 scripts/diagnostics/native-hotkeys.py",
     "verify:ui": "node scripts/ui-build.mjs && electron scripts/diagnostics/ui-offline.cjs && electron scripts/diagnostics/history-retention-ui.cjs",
     "verify:settings": "node scripts/diagnostics/settings-controls.cjs",
+    "verify:brand": "node scripts/ui-build.mjs && electron scripts/diagnostics/brand-assets.cjs",
     "verify:providers": "node scripts/verify-providers.mjs",
-    "verify:regressions": "ELECTRON_RUN_AS_NODE=1 electron scripts/diagnostics/retention.cjs && node scripts/diagnostics/native-callbacks.cjs && node scripts/diagnostics/opus.cjs && ELECTRON_RUN_AS_NODE=1 electron scripts/diagnostics/packaged-db.cjs"
+    "verify:regressions": "ELECTRON_RUN_AS_NODE=1 electron scripts/diagnostics/retention.cjs && node scripts/diagnostics/native-callbacks.cjs && node scripts/diagnostics/opus.cjs && ELECTRON_RUN_AS_NODE=1 electron scripts/diagnostics/packaged-db.cjs",
+    "verify:home": "node scripts/ui-build.mjs && electron scripts/diagnostics/home-ui.cjs"
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.16",
@@ -87,7 +90,7 @@
   },
   "build": {
     "appId": "com.offkey.app",
-    "productName": "Offkey",
+    "productName": "Sayrel",
     "directories": {
       "buildResources": "resources/build"
     },

@@ -36,13 +36,6 @@
       "missing": []
     },
     {
-      "name": "settings-账户",
-      "width": 1080,
-      "height": 750,
-      "overflow": false,
-      "missing": []
-    },
-    {
       "name": "settings-个性化",
       "width": 1080,
       "height": 750,
@@ -107,13 +100,6 @@
     },
     {
       "name": "providers-dark",
-      "width": 1080,
-      "height": 750,
-      "overflow": false,
-      "missing": []
-    },
-    {
-      "name": "login",
       "width": 1080,
       "height": 750,
       "overflow": false,
@@ -198,5 +184,5 @@
     }
   ],
   "errors": [],
-  "scope": "Offline fixtures; isolated profile; no real microphone, account or providers"
+  "scope": "Offline fixtures; isolated profile; no real microphone or providers"
 }

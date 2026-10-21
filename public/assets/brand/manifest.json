@@ -1,0 +1,147 @@
+{
+  "assets": [
+    {
+      "bytes": 110912,
+      "path": "resources/build/icon.icns",
+      "pixels": [
+        1024,
+        1024
+      ],
+      "sha256": "251b023c48986cfcaf862948b41e20b092e0e77bb509ae0897d711fa076e22ca",
+      "source": "application-icons/png/1024x1024.png",
+      "transform": {
+        "artwork": 824,
+        "canvas": 1024,
+        "generator": "scripts/gen-mac-icons.swift",
+        "padding": 100
+      }
+    },
+    {
+      "bytes": 21856,
+      "path": "resources/build/icon.ico",
+      "pixels": [
+        256,
+        256
+      ],
+      "sha256": "d75f9785b6ab6940e9bb539041b51947d67d3258c855dfeb618e02277297765f",
+      "source": "application-icons/win/icon.ico"
+    },
+    {
+      "bytes": 23936,
+      "path": "resources/build/icon.png",
+      "pixels": [
+        1024,
+        1024
+      ],
+      "sha256": "23f4792b34f26c7cb82c36a469b57b9470bc7072bd930031323a941e62936048",
+      "source": "application-icons/png/1024x1024.png"
+    },
+    {
+      "bytes": 284,
+      "path": "resources/build/tray.png",
+      "pixels": [
+        16,
+        16
+      ],
+      "sha256": "35a9bf0d4280e08a0b18341adfcd67902c4e8e8c7042d36bef92775a3e161309",
+      "source": "tray/tray.png"
+    },
+    {
+      "bytes": 540,
+      "path": "resources/build/tray@2x.png",
+      "pixels": [
+        32,
+        32
+      ],
+      "sha256": "6cf87f6e3519228d4766abbb3f91c16be940315a1936324efe79e3530eac08d5",
+      "source": "tray/tray@2x.png"
+    },
+    {
+      "bytes": 2356,
+      "path": "resources/build/tray-win32.png",
+      "pixels": [
+        128,
+        128
+      ],
+      "sha256": "d27aa6650d81a1dfd5d46a2b1ba01733316f91d721036dd1e16f7db19e1a0480",
+      "source": "tray/tray-win32.png"
+    },
+    {
+      "bytes": 2356,
+      "path": "resources/build/tray-win32@2x.png",
+      "pixels": [
+        128,
+        128
+      ],
+      "sha256": "d27aa6650d81a1dfd5d46a2b1ba01733316f91d721036dd1e16f7db19e1a0480",
+      "source": "tray/tray-win32@2x.png"
+    },
+    {
+      "bytes": 786,
+      "path": "resources/build/tray-linux.png",
+      "pixels": [
+        32,
+        32
+      ],
+      "sha256": "f23819de235fdfeadf2cb3eedcd8adfb623a29e73ff3ea49f355c616425d74e9",
+      "source": "tray/tray-blue-32.png"
+    },
+    {
+      "bytes": 2392,
+      "path": "public/assets/brand/sayrel-horizontal.svg",
+      "sha256": "0c9fa9511c906d7968f24daca8056ccabf163a99964a8d5030efdd657f807b8c",
+      "source": "logos/sayrel-horizontal.svg"
+    },
+    {
+      "bytes": 1938,
+      "path": "public/assets/brand/sayrel-wordmark.svg",
+      "sha256": "cc4025e547dfd28868c7c4dd03031fcbed901059292f5ada28cc73274fca73f5",
+      "source": "logos/sayrel-wordmark.svg"
+    },
+    {
+      "bytes": 481,
+      "path": "public/assets/brand/sayrel-symbol.svg",
+      "sha256": "80ad89f2fb8476121f4513685f1f401161affe126e65c20a0c03db2226662d3b",
+      "source": "logos/sayrel-symbol.svg"
+    },
+    {
+      "bytes": 548,
+      "path": "public/assets/brand/sayrel-app-icon.svg",
+      "sha256": "8aa1d4199adc0c3462485217d5dac67cbca5dbf16fe0142744692e03e3e7f6a1",
+      "source": "logos/sayrel-app-icon.svg"
+    },
+    {
+      "bytes": 548,
+      "path": "public/favicon.svg",
+      "sha256": "8aa1d4199adc0c3462485217d5dac67cbca5dbf16fe0142744692e03e3e7f6a1",
+      "source": "favicon/favicon.svg"
+    },
+    {
+      "bytes": 4085,
+      "path": "public/favicon.ico",
+      "pixels": [
+        48,
+        48
+      ],
+      "sha256": "1939bcbc73193a3f839c562ffb1f9a9fb8c782093d9587babc847096a1d6b207",
+      "source": "favicon/favicon.ico"
+    },
+    {
+      "bytes": 47960,
+      "path": "resources/build/mac-icon.png",
+      "pixels": [
+        1024,
+        1024
+      ],
+      "sha256": "d6f1f0576c7e98a0afad8ce3ad721b39515942e0c49bfec1a74847ad0e09a88f",
+      "source": "application-icons/png/1024x1024.png",
+      "transform": {
+        "artwork": 824,
+        "canvas": 1024,
+        "generator": "scripts/gen-mac-icons.swift",
+        "padding": 100
+      }
+    }
+  ],
+  "source": "User-provided sayrel-logo package"
+}

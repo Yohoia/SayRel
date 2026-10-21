@@ -1,8 +1,10 @@
-# OffKey
+# Sayrel（OffKey）
 
-OffKey 是一个面向 macOS 的语音输入与写作助手。你在当前聚焦的输入位置用 Fn 系列快捷键说话，OffKey 负责录音、调用你配置的模型服务，并把转写、润写、翻译或问答结果放回当前工作流。
+**Speak more. Type less.** — AI-powered voice typing
 
-![OffKey 主界面，展示口述、翻译和问答三类快捷键入口](assets/readme/main-interface.png)
+Sayrel 是一个面向 macOS 的语音输入与写作助手。你在当前聚焦的输入位置用 Fn 系列快捷键说话，Sayrel 负责录音、调用你配置的模型服务，并把转写、润写、翻译或问答结果放回当前工作流。
+
+![Sayrel 主界面，展示口述、翻译和问答三类快捷键入口](assets/readme/main-interface.png)
 
 ## 它能做什么
 
@@ -12,13 +14,13 @@ OffKey 是一个面向 macOS 的语音输入与写作助手。你在当前聚焦
 | `Fn + Shift` | 口述内容并翻译到目标语言 |
 | `Fn + Space` | 提问并获得回答卡 |
 
-除快捷键输入外，OffKey 还提供：
+除快捷键输入外，Sayrel 还提供：
 
 - **历史记录**：筛选、分页、下载录音、重试和查看回答。
 - **词典**：维护专有名词，减少重复口述纠错；支持 CSV 导入。
 - **服务商**：分别配置语音转写与文本润写模型，可验证连接、发现模型并设置默认项。
 
-> 界面截图来自离线验收 fixture；真实转写、翻译与问答需要你自己的可用模型服务配置。仓库不包含密钥或用户账户数据。
+> 界面截图来自离线验收 fixture；真实转写、翻译与问答需要你自己的可用模型服务配置。应用无需登录，服务商密钥由你自行配置。
 
 ## 快速开始
 
@@ -30,11 +32,11 @@ npm run native
 npm run dev
 ```
 
-首次启动按引导授予麦克风和辅助功能权限，然后在顶部导航打开「服务商」，分别配置转写与润写模型。默认快捷键可在设置中修改。
+首次启动按引导授予麦克风和辅助功能权限，然后在顶部导航打开「Providers」，分别配置转写与润写模型。默认快捷键可在设置中修改。
 
-![OffKey 服务商设置页，展示语音转写与文本润色两个配置分类](assets/readme/provider-settings.png)
+![Sayrel 服务商设置页，展示语音转写与文本润色两个配置分类](assets/readme/provider-settings.png)
 
-界面统一使用灰白底、Hermes 蓝字、窄体展示标题和等宽快捷键。当前视觉规则见 [设计规范](DESIGN.md)，全应用截图见 [改版记录](docs/design-exploration/blueprint-system-20261021/README.md)。
+界面默认英文，使用 Sayrel 品牌素材、灰白底与 Hermes 蓝字；本地 Rules 字体用于展示标题和导航，Inter 用于正文，JetBrains Mono 用于快捷键。字体来源、Logo 对应位置及授权边界见 [品牌素材文档](docs/brand-assets.md)。当前视觉规则见 [设计规范](DESIGN.md)，全应用截图见 [改版记录](docs/design-exploration/blueprint-system-20261021/README.md)。
 
 ## 工作方式
 
@@ -60,6 +62,7 @@ npm run verify:voice
 npm run verify:settings
 npm run verify:providers
 npm run verify:ui
+npm run verify:brand
 npm run build
 ```
 
@@ -83,11 +86,11 @@ docs/          实现记录、参考依据和已知差异
 
 - 项目仍在活跃开发中，尚未完成与原版 Typeless 的全量 1:1 复刻验收。
 - 翻译、问答和真实键盘→麦克风→供应商→目标输入框的端到端验收依赖系统权限与可用模型服务。
-- 历史主界面统计当前基于最近 200 条记录，不是完整的云端账户统计。
+- 首页统计当前基于最近 200 条本地历史记录。
 - 原版订阅、计费、云端学习和完整课程不在当前实现范围内。
 
 详细状态见 [接续记录](docs/continuation-status.md)、[主界面对齐说明](docs/hub-ui-alignment.md) 和 [设置页对齐说明](docs/settings-parity.md)。
 
 ## 许可证
 
-MIT
+项目代码使用 MIT。第三方字体遵循各自授权；Rules 的应用嵌入与分发授权待确认，见 [品牌素材文档](docs/brand-assets.md)。

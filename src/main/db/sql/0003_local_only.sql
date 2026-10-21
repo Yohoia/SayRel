@@ -1,0 +1,12 @@
+DROP INDEX IF EXISTS idx_history_v2_user_created_at;
+DROP INDEX IF EXISTS idx_history_v2_user_status_created_at;
+DROP INDEX IF EXISTS idx_history_v2_push_candidate_v2;
+DROP INDEX IF EXISTS idx_dictionary_user;
+ALTER TABLE history_v2 DROP COLUMN user_id;
+ALTER TABLE history_v2 DROP COLUMN server_updated_at;
+ALTER TABLE history_v2 DROP COLUMN sync_status;
+ALTER TABLE history_v2 DROP COLUMN sync_attempt_count;
+ALTER TABLE history_v2 DROP COLUMN synced_from_cloud;
+ALTER TABLE dictionary DROP COLUMN user_id;
+CREATE INDEX IF NOT EXISTS idx_history_v2_created_at ON history_v2 (created_at);
+CREATE INDEX IF NOT EXISTS idx_history_v2_status_created_at ON history_v2 (status, created_at);

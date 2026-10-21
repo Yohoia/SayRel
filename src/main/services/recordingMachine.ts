@@ -113,7 +113,7 @@ export class RecordingMachine extends EventEmitter {
       case 'FINISH': case 'TIMEOUT': return this.finish()
       case 'CANCEL': return this.cancel()
       case 'RETRY': return this.retry()
-      case 'ERROR': if (this.session) this.reportError(this.session.id, event.error ?? '录音失败'); return
+      case 'ERROR': if (this.session) this.reportError(this.session.id, event.error ?? "Recording failed"); return
       default: return
     }
   }
@@ -147,7 +147,7 @@ export class RecordingMachine extends EventEmitter {
     // Install the ACK waiter before publishing finishing: even immediate ACKs cannot be lost.
     const drained = new Promise<void>((resolve, reject) => {
       session.resolveStop = resolve
-      session.stopTimer = setTimeout(() => reject(new Error('麦克风停止超时，请检查权限后重试')), 15000)
+      session.stopTimer = setTimeout(() => reject(new Error("The microphone timed out while stopping. Check permissions and try again.")), 15000)
     })
     this.transition('finishing', { recorderState: { isStartingMicrophone: false }, recorderTimeoutState: null })
     session.completion = (async () => {
@@ -226,9 +226,9 @@ export class RecordingMachine extends EventEmitter {
     catch (err) { if (this.active(session)) this.fail(session, err) }
   }
   async retryHistory(id: string): Promise<void> {
-    if (this.session || this.disabled) throw new Error('请等待当前录音处理完成')
+    if (this.session || this.disabled) throw new Error("Wait for the current recording to finish processing")
     const row = history.getHistory(id)
-    if (!row?.audioLocalPath) throw new Error('此条历史没有保存录音，无法重试')
+    if (!row?.audioLocalPath) throw new Error("No audio was saved for this recording, so it cannot be retried")
     const session = this.newSession(row.mode as Mode)
     session.id = id
     session.historyRetry = true

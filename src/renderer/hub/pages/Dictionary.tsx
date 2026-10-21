@@ -10,7 +10,7 @@ import '../../shared/styles/dictionary.css'
 
 type Entry = { id: string; word: string; source: string; language: string | null; createdAt: string }
 type ImportEntry = { word: string; language?: string }
-const FILTERS = [{ id: 'all', label: '所有' }, { id: 'auto', label: '自动添加' }, { id: 'manual', label: '手动添加' }]
+const FILTERS = [{ id: 'all', label: "All" }, { id: 'auto', label: "Auto-added" }, { id: 'manual', label: "Added manually" }]
 
 export function DictionaryPage() {
   const [entries, setEntries] = useState<Entry[]>([])
@@ -29,7 +29,7 @@ export function DictionaryPage() {
   const [error, setError] = useState('')
   const load = useCallback(async () => {
     try { const list = await api.dictionary.list(); setEntries(Array.isArray(list) ? list : []); setError('') }
-    catch { setError('词典加载失败，请重试。') }
+    catch { setError("Could not load the dictionary. Please try again.") }
     finally { setLoading(false) }
   }, [])
   useEffect(() => { void load() }, [load])
@@ -49,8 +49,8 @@ export function DictionaryPage() {
     event.preventDefault()
     if (!draft.trim() || busy) return
     setBusy(true)
-    try { await api.dictionary.add(draft.trim()); await load(); setNewWord(false); setDraft(''); toast.success('保存成功') }
-    catch { toast.error('保存失败，请重试') }
+    try { await api.dictionary.add(draft.trim()); await load(); setNewWord(false); setDraft(''); toast.success("Saved") }
+    catch { toast.error("Could not save. Please try again.") }
     finally { setBusy(false) }
   }
   const saveEdit = async (event: React.FormEvent) => {
@@ -60,8 +60,8 @@ export function DictionaryPage() {
     try {
       const updated = await api.dictionary.update(editing.id, draft.trim())
       setEntries((current) => current.map((entry) => entry.id === editing.id ? updated : entry))
-      setEditing(null); setDraft(''); toast.success('保存成功')
-    } catch (error) { toast.error(error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': Error: /, '') : '保存失败，请重试') }
+      setEditing(null); setDraft(''); toast.success("Saved")
+    } catch (error) { toast.error(error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': Error: /, '') : "Could not save. Please try again.") }
     finally { setBusy(false) }
   }
   const remove = async () => {
@@ -70,8 +70,8 @@ export function DictionaryPage() {
     const removed = new Set<string>()
     try {
       for (const entry of deleting) { await api.dictionary.remove(entry.id); removed.add(entry.id) }
-      setDeleting([]); toast.success('删除成功')
-    } catch { toast.error('删除失败，请重试'); setDeleting((current) => current.filter((entry) => !removed.has(entry.id))) }
+      setDeleting([]); toast.success("Deleted")
+    } catch { toast.error("Could not delete. Please try again."); setDeleting((current) => current.filter((entry) => !removed.has(entry.id))) }
     finally {
       setEntries((items) => items.filter((item) => !removed.has(item.id)))
       setSelected((current) => new Set([...current].filter((id) => !removed.has(id))))
@@ -91,9 +91,9 @@ export function DictionaryPage() {
         if (!word || word.length > 100 || known.has(word.toLocaleLowerCase())) continue
         known.add(word.toLocaleLowerCase()); valid.push({ word, language: entry.language })
       }
-      if (!valid.length) { toast.info('未找到可导入的词条'); return }
-      setPreview({ entries: valid, fileName: result.fileName ?? 'CSV 文件' })
-    } catch { toast.error('文件读取失败') }
+      if (!valid.length) { toast.info("No words found to import"); return }
+      setPreview({ entries: valid, fileName: result.fileName ?? "CSV file" })
+    } catch { toast.error("Could not read the file") }
     finally { setBusy(false) }
   }
   const importPreview = async () => {
@@ -102,17 +102,17 @@ export function DictionaryPage() {
     let imported = 0
     try {
       for (const entry of preview.entries) { await api.dictionary.add(entry.word, { source: 'csv', language: entry.language }); imported++ }
-      setPreview(null); setNewWord(false); setDraft(''); toast.success('导入成功')
-    } catch { setPreview({ ...preview, entries: preview.entries.slice(imported) }); toast.error('导入失败，请重试') }
+      setPreview(null); setNewWord(false); setDraft(''); toast.success("Imported")
+    } catch { setPreview({ ...preview, entries: preview.entries.slice(imported) }); toast.error("Could not import. Please try again.") }
     finally { await load(); setBusy(false) }
   }
   return <div className="page dictionary-page">
-    <header className="page-heading"><div className="page-heading-copy"><p className="page-index">03 / LEXICON</p><h1 className="page-title">词典</h1></div><div className="page-actions"><button className="primary-button" onClick={() => { setNewWord(true); setDraft(''); setPreview(null) }}><Icon name="plus" />新词</button></div></header>
-    {multiSelect ? <div className="dictionary-selection"><button className="icon-button" aria-label={allSelected ? '清除选择' : '全选'} role="checkbox" aria-checked={allSelected ? true : 'mixed'} onClick={() => setSelected(allSelected ? new Set() : new Set(visible.map((entry) => entry.id)))}><DictionaryGlyph name={allSelected ? 'checked' : 'mixed'} /></button><span>已选择 {selected.size} 个词</span><button className="dictionary-selection-delete" onClick={() => { setDeleting(entries.filter((entry) => selected.has(entry.id))) }}><Icon name="trash" size={14} />删除</button></div> : <div className="page-toolbar"><div className="segmented-tabs" role="tablist" aria-label="词条来源">{FILTERS.map((item) => <button key={item.id} role="tab" aria-selected={filter === item.id} onClick={() => setFilter(item.id)}>{item.id === 'auto' && <Icon name="sparkle" size={14} className="auto-word" />}{item.id === 'manual' && <DictionaryGlyph name="manual" />}{item.label}</button>)}</div>{searchOpen ? <label className="search-field"><Icon name="search" /><input autoFocus value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') { setSearch(''); setSearchOpen(false) } }} maxLength={60} onBlur={() => { if (!search) setSearchOpen(false) }} placeholder="搜索" aria-label="搜索词典" /><button aria-label="关闭搜索" onClick={() => { setSearch(''); setSearchOpen(false) }}><Icon name="close" size={12} /></button></label> : <button className="icon-button" aria-label="搜索词典" onClick={() => setSearchOpen(true)}><Icon name="search" /></button>}</div>}
-    {error && <p role="alert" className="inline-error">{error} <button className="text-button" onClick={() => void load()}>重试</button></p>}
-    {loading ? <div className="hub-loading" role="status" aria-label="正在加载" /> : visible.length === 0 ? <div className="empty-state">{!search && <h2>还没有词汇</h2>}<p>{search ? '未找到与您的搜索匹配的单词。' : (filter === 'auto' ? 'Offkey会自动学习您独特的名称和词汇，并将其添加到您的个人词典中。' : filter === 'manual' ? '您可以手动将独特的名称和词汇添加到您的个人词典中。' : 'Offkey会记住您独特的名称和词汇，这些都是通过您的编辑自动学习或您手动添加的。')}</p></div> : <div className={`dictionary-list ${multiSelect ? 'is-selecting' : ''}`}>{visible.map((entry) => <div className={`dictionary-word ${selected.has(entry.id) ? 'is-selected' : ''} ${menu === entry.id ? 'is-menu-open' : ''}`} key={entry.id}><span className="dictionary-source" title={entry.source === 'auto' ? '由Offkey自动添加' : '手动添加'}>{entry.source === 'auto' ? <Icon name="sparkle" size={12} className="auto-word" /> : <DictionaryGlyph name="manual" />}</span><span className="dictionary-word-name" title={entry.word}>{entry.word}</span><div className="dictionary-word-actions">{!multiSelect && <button className="icon-button dictionary-more" aria-label={`编辑和删除 ${entry.word}`} title="编辑和删除" aria-haspopup="menu" aria-expanded={menu === entry.id} onClick={() => setMenu(menu === entry.id ? null : entry.id)}><Icon name="more" /></button>}<button className="icon-button dictionary-select-word" aria-label={`选择 ${entry.word}`} aria-pressed={selected.has(entry.id)} onClick={() => toggle(entry.id)}><DictionaryGlyph name={selected.has(entry.id) ? 'checked' : 'unchecked'} /></button></div>{menu === entry.id && <HubMenu width={112} onClose={() => setMenu(null)}><button role="menuitem" onClick={() => { setEditing(entry); setDraft(entry.word); setMenu(null) }}>编辑</button><hr /><button role="menuitem" className="danger" onClick={() => { setDeleting([entry]); setMenu(null) }}><Icon name="trash" size={14} />删除</button></HubMenu>}</div>)}</div>}
-    {newWord && <div className="dictionary-modal dictionary-add-modal"><Modal title="添加到词典" onClose={closeAdd}>{preview ? <><p className="dictionary-preview-count">{preview.entries.length} 个有效单词在 {preview.fileName} 中找到</p><div className="dictionary-preview-list">{preview.entries.map((entry) => <span key={entry.word} title={entry.word}>{entry.word}</span>)}</div><footer className="modal-footer"><button className="secondary-button" disabled={busy} onClick={closeAdd}>取消</button><button className="primary-button" disabled={busy || !preview.entries.length} onClick={() => void importPreview()}>{busy ? '正在添加…' : '添加单词'}</button></footer></> : <form onSubmit={add}><input id="new-word" aria-label="添加新词" className="text-input" autoFocus value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && event.nativeEvent.isComposing) event.preventDefault() }} placeholder="添加新词" maxLength={100} /><footer className="modal-footer"><button type="button" className="dictionary-import" disabled={busy} title="使用一列的 CSV 文件，每行一个单词。" onClick={() => void importCsv()}><Icon name="download" />导入 CSV</button><button type="button" className="secondary-button" disabled={busy} onClick={closeAdd}>取消</button><button className="primary-button" disabled={busy || !draft.trim()}>{busy ? '正在添加…' : '添加词汇'}</button></footer></form>}</Modal></div>}
-    {editing && <div className="dictionary-modal dictionary-add-modal"><Modal title="编辑词汇" onClose={() => { if (!busy) setEditing(null) }}><form onSubmit={saveEdit}><input className="text-input" aria-label="编辑词汇" autoFocus value={draft} maxLength={100} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && event.nativeEvent.isComposing) event.preventDefault() }} /><footer className="modal-footer"><button type="button" className="secondary-button" disabled={busy} onClick={() => setEditing(null)}>取消</button><button className="primary-button" disabled={busy || !draft.trim()}>{busy ? '正在保存…' : '保存'}</button></footer></form></Modal></div>}
-    {deleting.length > 0 && <ConfirmDialog title={multiSelect ? `删除 ${deleting.length} 个词？` : '删除词汇？'} description={multiSelect ? '所选的词将被永久删除，无法恢复。' : `“${deleting[0].word}”将被永久删除，无法恢复。`} pending={busy} onClose={() => { setDeleting([]); }} onConfirm={() => void remove()} />}
+    <header className="page-heading"><div className="page-heading-copy"><p className="page-index">03 / LEXICON</p><h1 className="page-title">Dictionary</h1></div><div className="page-actions"><button className="primary-button" onClick={() => { setNewWord(true); setDraft(''); setPreview(null) }}><Icon name="plus" />New word</button></div></header>
+    {multiSelect ? <div className="dictionary-selection"><button className="icon-button" aria-label={allSelected ? "Clear selection" : "Select all"} role="checkbox" aria-checked={allSelected ? true : 'mixed'} onClick={() => setSelected(allSelected ? new Set() : new Set(visible.map((entry) => entry.id)))}><DictionaryGlyph name={allSelected ? 'checked' : 'mixed'} /></button><span>{selected.size} words selected</span><button className="dictionary-selection-delete" onClick={() => { setDeleting(entries.filter((entry) => selected.has(entry.id))) }}><Icon name="trash" size={14} />Delete</button></div> : <div className="page-toolbar"><div className="segmented-tabs" role="tablist" aria-label="Word source">{FILTERS.map((item) => <button key={item.id} role="tab" aria-selected={filter === item.id} onClick={() => setFilter(item.id)}>{item.id === 'auto' && <Icon name="sparkle" size={14} className="auto-word" />}{item.id === 'manual' && <DictionaryGlyph name="manual" />}{item.label}</button>)}</div>{searchOpen ? <label className="search-field"><Icon name="search" /><input autoFocus value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') { setSearch(''); setSearchOpen(false) } }} maxLength={60} onBlur={() => { if (!search) setSearchOpen(false) }} placeholder="Search" aria-label="Search dictionary" /><button aria-label="Close search" onClick={() => { setSearch(''); setSearchOpen(false) }}><Icon name="close" size={12} /></button></label> : <button className="icon-button" aria-label="Search dictionary" onClick={() => setSearchOpen(true)}><Icon name="search" /></button>}</div>}
+    {error && <p role="alert" className="inline-error">{error} <button className="text-button" onClick={() => void load()}>Retry</button></p>}
+    {loading ? <div className="hub-loading" role="status" aria-label="Loading" /> : visible.length === 0 ? <div className="empty-state">{!search && <h2>No words yet</h2>}<p>{search ? "No words found matching your search." : (filter === 'auto' ? "Sayrel automatically learns your unique names and words from your edits and adds them to your personal dictionary." : filter === 'manual' ? "You can manually add your unique names and words to your personal dictionary." : "Sayrel remembers your unique names and words, learned automatically from your edits or added manually by you.")}</p></div> : <div className={`dictionary-list ${multiSelect ? 'is-selecting' : ''}`}>{visible.map((entry) => <div className={`dictionary-word ${selected.has(entry.id) ? 'is-selected' : ''} ${menu === entry.id ? 'is-menu-open' : ''}`} key={entry.id}><span className="dictionary-source" title={entry.source === 'auto' ? "Auto-added by Sayrel" : "Added manually"}>{entry.source === 'auto' ? <Icon name="sparkle" size={12} className="auto-word" /> : <DictionaryGlyph name="manual" />}</span><span className="dictionary-word-name" title={entry.word}>{entry.word}</span><div className="dictionary-word-actions">{!multiSelect && <button className="icon-button dictionary-more" aria-label={`Edit and delete ${entry.word}`} title="Edit and delete" aria-haspopup="menu" aria-expanded={menu === entry.id} onClick={() => setMenu(menu === entry.id ? null : entry.id)}><Icon name="more" /></button>}<button className="icon-button dictionary-select-word" aria-label={`Select ${entry.word}`} aria-pressed={selected.has(entry.id)} onClick={() => toggle(entry.id)}><DictionaryGlyph name={selected.has(entry.id) ? 'checked' : 'unchecked'} /></button></div>{menu === entry.id && <HubMenu width={112} onClose={() => setMenu(null)}><button role="menuitem" onClick={() => { setEditing(entry); setDraft(entry.word); setMenu(null) }}>Edit</button><hr /><button role="menuitem" className="danger" onClick={() => { setDeleting([entry]); setMenu(null) }}><Icon name="trash" size={14} />Delete</button></HubMenu>}</div>)}</div>}
+    {newWord && <div className="dictionary-modal dictionary-add-modal"><Modal title="Add to dictionary" onClose={closeAdd}>{preview ? <><p className="dictionary-preview-count">{preview.entries.length} valid words found in {preview.fileName}</p><div className="dictionary-preview-list">{preview.entries.map((entry) => <span key={entry.word} title={entry.word}>{entry.word}</span>)}</div><footer className="modal-footer"><button className="secondary-button" disabled={busy} onClick={closeAdd}>Cancel</button><button className="primary-button" disabled={busy || !preview.entries.length} onClick={() => void importPreview()}>{busy ? "Adding…" : "Add words"}</button></footer></> : <form onSubmit={add}><input id="new-word" aria-label="Add a new word" className="text-input" autoFocus value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && event.nativeEvent.isComposing) event.preventDefault() }} placeholder="Add a new word" maxLength={100} /><footer className="modal-footer"><button type="button" className="dictionary-import" disabled={busy} title="Use a one-column CSV file with one word per line." onClick={() => void importCsv()}><Icon name="download" />Import CSV</button><button type="button" className="secondary-button" disabled={busy} onClick={closeAdd}>Cancel</button><button className="primary-button" disabled={busy || !draft.trim()}>{busy ? "Adding…" : "Add word"}</button></footer></form>}</Modal></div>}
+    {editing && <div className="dictionary-modal dictionary-add-modal"><Modal title="Edit word" onClose={() => { if (!busy) setEditing(null) }}><form onSubmit={saveEdit}><input className="text-input" aria-label="Edit word" autoFocus value={draft} maxLength={100} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && event.nativeEvent.isComposing) event.preventDefault() }} /><footer className="modal-footer"><button type="button" className="secondary-button" disabled={busy} onClick={() => setEditing(null)}>Cancel</button><button className="primary-button" disabled={busy || !draft.trim()}>{busy ? "Saving…" : "Save"}</button></footer></form></Modal></div>}
+    {deleting.length > 0 && <ConfirmDialog title={multiSelect ? `Delete ${deleting.length} words?` : "Delete word?"} description={multiSelect ? "The words selected will be deleted forever. This can't be undone." : `“${deleting[0].word}” will be permanently deleted. This cannot be undone.`} pending={busy} onClose={() => { setDeleting([]); }} onConfirm={() => void remove()} />}
   </div>
 }

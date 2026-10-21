@@ -78,5 +78,5 @@ function ToastCard({ entry }: { entry: ToastEntry }) {
 
 export function ToastViewport() {
   const snapshot = useSyncExternalStore(subscribe, () => entries)
-  return createPortal(<section className="toast-viewport" aria-label="消息提示">{snapshot.map(entry => <ToastCard entry={entry} key={entry.id} />)}</section>, document.body)
+  return createPortal(<section className="toast-viewport" aria-label="Notifications">{snapshot.map(entry => <ToastCard entry={entry} key={entry.id} />)}</section>, document.body)
 }

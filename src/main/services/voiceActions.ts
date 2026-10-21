@@ -14,7 +14,7 @@ export async function runVoiceAction(input: {
   const { config, mode, transcript, context, signal } = input
   const selection = config.serviceProviders ? selectedProvider(config.serviceProviders, 'refinement') : null
   if (config.serviceProviders ? !selection : config.provider.refinement === 'mock') {
-    throw new Error('问答和翻译需要可用的语言模型服务')
+    throw new Error("Ask anything and translation require an available language model provider")
   }
   const instruction = mode === 'translation'
     ? `Translate the user's dictated text into ${config.translationTargetLanguage}. Preserve names, numbers and meaning. Return only the translation, without commentary.`

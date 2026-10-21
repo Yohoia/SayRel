@@ -72,7 +72,7 @@ export async function startRecorder(opts: {
         source.disconnect()
         if (worklet) {
           await new Promise<void>((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('音频缓冲区停止超时')), 2000)
+            const timeout = setTimeout(() => reject(new Error("Audio buffer stop timed out")), 2000)
             acknowledgeDrain = () => { clearTimeout(timeout); resolve() }
             worklet!.port.postMessage({ type: 'drain' })
           })

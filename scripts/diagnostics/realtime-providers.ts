@@ -244,7 +244,7 @@ for (const mode of ['invalid-length', 'invalid-gzip', 'binary-error']) {
         socket.send(packet)
       }
     })
-  }, async url => { await assert.rejects(transcribeRealtime(profile('volcengine-asr', url), 'bigmodel_nostream', request), /协议|失败/) }); checks++
+  }, async url => { await assert.rejects(transcribeRealtime(profile('volcengine-asr', url), 'bigmodel_nostream', request), /protocol|failed/) }); checks++
 }
 
 await fixture(socket => {
@@ -253,7 +253,7 @@ await fixture(socket => {
   const controller = new AbortController()
   const pending = transcribeRealtime(profile('qwen-asr', url), 'qwen3-asr-flash', { ...request, signal: controller.signal })
   await sleep(65); controller.abort()
-  await assert.rejects(pending, /取消/)
+  await assert.rejects(pending, /cancelled/)
   const count = frames.length; await sleep(220); assert.equal(frames.length, count)
 }); checks++
 for (const mode of ['configuration-timeout', 'result-timeout']) {
@@ -271,7 +271,7 @@ for (const mode of ['configuration-timeout', 'result-timeout']) {
   }, async url => {
     mock.timers.enable({ apis: ['setTimeout'] })
     try {
-      const pending = assert.rejects(transcribeRealtime(profile('qwen-asr', url), 'qwen3-asr-flash', { ...request, pcm: new Float32Array(3200), durationMs: 200 }), mode === 'configuration-timeout' ? /配置确认/ : /超时/)
+      const pending = assert.rejects(transcribeRealtime(profile('qwen-asr', url), 'qwen3-asr-flash', { ...request, pcm: new Float32Array(3200), durationMs: 200 }), mode === 'configuration-timeout' ? /configuration was not confirmed/ : /timed out/)
       await phase
       mock.timers.tick(60_000)
       await pending
@@ -280,5 +280,5 @@ for (const mode of ['configuration-timeout', 'result-timeout']) {
 }
 
 const controller = new AbortController(); controller.abort()
-await assert.rejects(transcribeRealtime(profile('soniox', 'ws://127.0.0.1:1'), 'stt-rt-v5', { ...request, signal: controller.signal }), /取消/); checks++
+await assert.rejects(transcribeRealtime(profile('soniox', 'ws://127.0.0.1:1'), 'stt-rt-v5', { ...request, signal: controller.signal }), /cancelled/); checks++
 console.log(`Realtime provider diagnostics passed: ${checks} local protocol scenarios`)

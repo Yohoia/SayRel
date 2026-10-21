@@ -38,7 +38,7 @@ export class HttpRefinementProvider implements RefinementProvider {
 }
 
 export async function transcribeProfile(profile: ProviderProfile, model: string, req: TranscriptionRequest, allowEmpty = false): Promise<TranscriptionResult> {
-  if (profile.service !== 'transcription') throw new Error('请选择语音识别服务商')
+  if (profile.service !== 'transcription') throw new Error("Select a transcription provider")
   if (profile.protocol === 'local-whisper') return new LocalWhisperProvider(profile.endpoint || 'whisper-cli', model).transcribe(req, allowEmpty)
   if (['qwen-asr', 'volcengine-asr', 'soniox', 'openai-realtime'].includes(profile.protocol) || profile.protocol === 'elevenlabs' && model.includes('realtime')) {
     const decoded = req.pcm?.length ? {} : decodeHistoryAudio(req.audioBuffer?.length ? req.audioBuffer : req.audioPath ? await (await import('node:fs/promises')).readFile(req.audioPath) : Buffer.alloc(0))
@@ -51,7 +51,7 @@ export async function transcribeProfile(profile: ProviderProfile, model: string,
     const decoded = req.pcm?.length ? { pcm: req.pcm, sampleRate: req.sampleRate ?? 16000 }
       : source && (source.subarray(0, 4).toString('ascii') === 'OggS' || req.mimeType?.includes('ogg')) ? decodeHistoryAudio(source) : null
     const audio = decoded ? wavAudio(decoded.pcm, decoded.sampleRate) : source
-    if (!audio?.length) throw new ProviderError('没有可用的录音数据')
+    if (!audio?.length) throw new ProviderError("No audio data is available")
     const mime = decoded ? 'audio/wav' : req.mimeType ?? 'audio/wav'
     const sampleRate = decoded?.sampleRate ?? req.sampleRate ?? 16000
     const extension = mime.includes('wav') ? 'wav' : mime.includes('mpeg') ? 'mp3' : mime.includes('webm') ? 'webm' : mime.includes('mp4') ? 'mp4' : 'ogg'
@@ -93,25 +93,25 @@ export async function transcribeProfile(profile: ProviderProfile, model: string,
         const data = line.slice(5).trim()
         if (!data || data === '[DONE]') continue
         let payload: unknown
-        try { payload = JSON.parse(data) } catch { throw new ProviderError('语音服务返回了无效的流式响应') }
+        try { payload = JSON.parse(data) } catch { throw new ProviderError("The transcription provider returned an invalid streaming response") }
         const event = parsed(eventSchema, payload)
-        if (event.type === 'error') throw new ProviderError('语音服务处理失败，请检查模型和音频格式')
+        if (event.type === 'error') throw new ProviderError("Transcription failed. Check the model and audio format.")
         if (event.type === 'transcript.text.done') finalText = event.text
       }
-      if (finalText === undefined) throw new ProviderError('语音服务在返回完整转写前断开连接')
+      if (finalText === undefined) throw new ProviderError("The transcription provider disconnected before returning the complete transcript")
       const text = normalizeText(finalText, req)
       return { text: allowEmpty ? text : outputText(text), detectedLanguage: req.language ?? null, provider: profile.name }
     } else if (profile.protocol === 'mimo-asr' || profile.protocol === 'audio-chat') {
       url = endpointUrl(profile.endpoint, '/chat/completions')
       headers['content-type'] = 'application/json'
       const encoded = audio.toString('base64')
-      if (profile.protocol === 'mimo-asr' && encoded.length > 10 * 1024 * 1024) throw new ProviderError('MiMo 音频超过 10 MB，请缩短录音后重试')
+      if (profile.protocol === 'mimo-asr' && encoded.length > 10 * 1024 * 1024) throw new ProviderError("MiMo audio exceeds 10 MB. Try a shorter recording.")
       body = JSON.stringify({ model, messages: [{ role: 'user', content: [{ type: 'input_audio', input_audio: { data: `data:${mime};base64,${encoded}` } }] }], asr_options: { language: req.language?.startsWith('zh') ? 'zh' : req.language?.startsWith('en') ? 'en' : 'auto' }, stream: false })
       const data = parsed(z.object({ choices: z.array(z.object({ message: z.object({ content: z.string() }) })).min(1) }), await responseJson(await fetch(url, { method: 'POST', headers, body, signal })))
       const text = normalizeText(data.choices[0].message.content, req)
       return { text: allowEmpty ? text : outputText(text), detectedLanguage: req.language ?? null, provider: profile.name }
     } else {
-      throw new ProviderError('请选择受支持的语音识别协议')
+      throw new ProviderError("Select a supported transcription protocol")
     }
     const data = parsed(z.object({ text: z.string(), language: z.string().optional(), language_code: z.string().optional() }), await responseJson(await fetch(url, { method: 'POST', headers, body, signal })))
     const text = normalizeText(data.text, req)
@@ -158,7 +158,7 @@ export class LocalWhisperProvider implements TranscriptionProvider {
       await promisify(execFile)(this.binary, args, { signal: req.signal, timeout: 120000, maxBuffer: 8 * 1024 * 1024 })
       const text = normalizeText(await fs.readFile(`${output}.txt`, 'utf8'), req)
       return { text: allowEmpty ? text : outputText(text), detectedLanguage: req.language ?? null, provider: this.name }
-    } catch { throw new Error(req.signal?.aborted ? '请求已取消' : '本地 Whisper 执行失败，请检查程序路径和模型文件') }
+    } catch { throw new Error(req.signal?.aborted ? "Request cancelled" : "Local Whisper failed. Check the executable and model file paths.") }
     finally { await fs.rm(temp, { recursive: true, force: true }) }
   }
 }
@@ -169,7 +169,7 @@ export function createProviders(config: ProviderConfig, state?: ServiceProviders
     const refinement = selectedProvider(state, 'refinement')
     return {
       transcription: { name: transcription?.profile.name ?? 'unconfigured', transcribe: req => {
-        if (!transcription) return Promise.reject(new Error('请先在服务商页面配置并选择默认语音识别模型'))
+        if (!transcription) return Promise.reject(new Error("Configure and select a default transcription model in Providers first"))
         return transcribeProfile(transcription.profile, transcription.model, req)
       } },
       refinement: refinement ? { name: refinement.profile.name, refine: req => refineProfile(refinement.profile, refinement.model, req) } : new MockRefinementProvider()
@@ -185,12 +185,12 @@ export function createProviders(config: ProviderConfig, state?: ServiceProviders
 export async function testProvider(profile: ProviderProfile, model: string, signal?: AbortSignal): Promise<ProviderTestResult> {
   const started = Date.now()
   try {
-    if (!profile.models.includes(model)) throw new Error('请先将测试模型加入服务商')
+    if (!profile.models.includes(model)) throw new Error("Add the test model to this provider first")
     if (profile.service === 'refinement') await completeChat(profile, model, [{ role: 'user', content: 'Reply with OK.' }], signal)
     else {
       const pcm = new Float32Array(3200)
       await transcribeProfile(profile, model, { pcm, sampleRate: 16000, audioBuffer: wavAudio(pcm, 16000), mimeType: 'audio/wav', durationMs: 200, mode: 'voice_transcript', signal }, true)
     }
-    return { ok: true, message: '连接成功，模型可用', latencyMs: Date.now() - started }
-  } catch (error) { return { ok: false, message: error instanceof Error ? error.message : '连接失败，请检查配置', latencyMs: Date.now() - started } }
+    return { ok: true, message: "Connected. The model is available.", latencyMs: Date.now() - started }
+  } catch (error) { return { ok: false, message: error instanceof Error ? error.message : "Connection failed. Please check your configuration.", latencyMs: Date.now() - started } }
 }

@@ -14,64 +14,64 @@ export function buildApplicationMenu(): Menu {
           {
             label: PRODUCT.displayName,
             submenu: [
-              { role: 'about' as const, label: `关于 ${PRODUCT.displayName}` },
+              { role: 'about' as const, label: `About ${PRODUCT.displayName}` },
               { type: 'separator' as const },
               {
-                label: '设置…',
+                label: "Settings…",
                 accelerator: 'CmdOrCtrl+,',
                 click: () => openSettings()
               },
               { type: 'separator' as const },
-              { role: 'services' as const },
+              { role: 'services' as const, label: 'Services' },
               { type: 'separator' as const },
-              { role: 'hide' as const },
-              { role: 'hideOthers' as const },
-              { role: 'unhide' as const },
+              { role: 'hide' as const, label: 'Hide Sayrel' },
+              { role: 'hideOthers' as const, label: 'Hide others' },
+              { role: 'unhide' as const, label: 'Show all' },
               { type: 'separator' as const },
-              { role: 'quit' as const, accelerator: 'CmdOrCtrl+Q' }
+              { role: 'quit' as const, label: 'Quit Sayrel', accelerator: 'CmdOrCtrl+Q' }
             ]
           }
         ]
       : []),
     {
-      label: '文件',
+      label: "File",
       submenu: [
-        { label: '首页', click: () => openHub('main') },
-        { label: '历史记录', click: () => openHub('main') },
+        { label: "Home", click: () => openHub('main') },
+        { label: "History", click: () => openHub('main') },
         { type: 'separator' },
-        { label: '打开录音文件夹', click: () => void openRecordings() },
-        ...(isMac ? [] : [{ role: 'quit' as const }])
+        { label: "Open recordings folder", click: () => void openRecordings() },
+        ...(isMac ? [] : [{ role: 'quit' as const, label: 'Quit Sayrel' }])
       ]
     },
     {
-      label: '编辑',
+      label: "Edit",
       submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
+        { role: 'undo', label: 'Undo' },
+        { role: 'redo', label: 'Redo' },
         { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectAll' }
+        { role: 'cut', label: 'Cut' },
+        { role: 'copy', label: 'Copy' },
+        { role: 'paste', label: 'Paste' },
+        { role: 'selectAll', label: 'Select all' }
       ]
     },
     {
-      label: '显示',
+      label: "View",
       submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools' },
+        { role: 'reload', label: 'Reload' },
+        { role: 'forceReload', label: 'Force reload' },
+        { role: 'toggleDevTools', label: 'Toggle developer tools' },
         { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
+        { role: 'resetZoom', label: 'Actual size' },
+        { role: 'zoomIn', label: 'Zoom in' },
+        { role: 'zoomOut', label: 'Zoom out' },
         { type: 'separator' },
-        { role: 'togglefullscreen' }
+        { role: 'togglefullscreen', label: 'Toggle full screen' }
       ]
     },
     {
-      label: '窗口',
-      submenu: [{ role: 'minimize' }, { role: 'zoom' }, { type: 'separator' }, { role: 'front' }]
+      label: "Window",
+      submenu: [{ role: 'minimize', label: 'Minimize' }, { role: 'zoom', label: 'Zoom' }, { type: 'separator' }, { role: 'front', label: 'Bring all to front' }]
     }
   ]
   return Menu.buildFromTemplate(template)
@@ -80,21 +80,21 @@ export function buildApplicationMenu(): Menu {
 export function buildTrayMenu(): Menu {
   const config = settings.get()
   return Menu.buildFromTemplate([
-    { label: '打开首页', click: () => openHub('main') },
-    { label: '查看历史记录', click: () => openHub('main') },
+    { label: "Open home", click: () => openHub('main') },
+    { label: "Show history", click: () => openHub('main') },
     { type: 'separator' },
-    { label: '设置…', click: () => openSettings() },
+    { label: "Settings…", click: () => openSettings() },
     {
-      label: '选择麦克风',
-      submenu: [{ label: config.micDevice ?? '自动检测', enabled: false }]
+      label: "Select microphone",
+      submenu: [{ label: config.micDevice ?? "Auto-detect", enabled: false }]
     },
     { type: 'separator' },
     {
-      label: `版本 ${app.getVersion()}`,
+      label: `Version ${app.getVersion()}`,
       enabled: false
     },
     { type: 'separator' },
-    { label: `退出 ${PRODUCT.displayName}`, click: () => app.quit() }
+    { label: `Quit ${PRODUCT.displayName}`, click: () => app.quit() }
   ])
 }
 

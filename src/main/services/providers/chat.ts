@@ -10,7 +10,7 @@ const ollamaReply = z.object({ message: z.object({ content: z.string() }) })
 const responsesReply = z.object({ output_text: z.string().optional(), output: z.array(z.object({ type: z.string(), content: z.array(z.object({ type: z.string(), text: z.string().optional() })).optional() })).optional() })
 
 export async function completeChat(profile: ProviderProfile, model: string, messages: ChatMessage[], signal?: AbortSignal): Promise<string> {
-  if (profile.service !== 'refinement') throw new Error('请选择语言模型服务商')
+  if (profile.service !== 'refinement') throw new Error("Select a language model provider")
   const protocol = profile.protocol
   return withProviderRequest(signal, async requestSignal => {
     const headers: Record<string, string> = { 'content-type': 'application/json' }
@@ -54,7 +54,7 @@ export async function completeChat(profile: ProviderProfile, model: string, mess
         Object.assign(headers, bearer(profile.apiKey))
         body = { model, messages, temperature: 0.2, stream: false }
         break
-      default: { const exhaustive: never = protocol; throw new Error(`未知协议 ${exhaustive}`) }
+      default: { const exhaustive: never = protocol; throw new Error(`Unknown protocol ${exhaustive}`) }
     }
     const data = await responseJson(await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: requestSignal }))
     switch (protocol) {
@@ -63,7 +63,7 @@ export async function completeChat(profile: ProviderProfile, model: string, mess
       case 'ollama': return outputText(parsed(ollamaReply, data).message.content)
       case 'openai-responses': { const reply = parsed(responsesReply, data); return outputText(reply.output_text ?? reply.output?.flatMap(o => o.content ?? []).filter(c => c.type === 'output_text').map(c => c.text ?? '').join('') ?? '') }
       case 'openai-chat': case 'azure-openai': return outputText(parsed(openaiReply, data).choices[0].message.content)
-      default: { const exhaustive: never = protocol; throw new Error(`未知协议 ${exhaustive}`) }
+      default: { const exhaustive: never = protocol; throw new Error(`Unknown protocol ${exhaustive}`) }
     }
   })
 }
@@ -79,7 +79,7 @@ export async function listProviderModels(profile: ProviderProfile, signal?: Abor
       case 'anthropic': url = endpointUrl(profile.endpoint, '/models'); headers['x-api-key'] = profile.apiKey; headers['anthropic-version'] = '2023-06-01'; break
       case 'ollama': url = endpointUrl(profile.endpoint, new URL(profile.endpoint).pathname.replace(/\/$/, '').endsWith('/api') ? '/tags' : '/api/tags'); Object.assign(headers, bearer(profile.apiKey)); break
       case 'openai-chat': case 'openai-responses': url = endpointUrl(profile.endpoint, '/models'); Object.assign(headers, bearer(profile.apiKey)); break
-      default: { const exhaustive: never = protocol; throw new Error(`未知协议 ${exhaustive}`) }
+      default: { const exhaustive: never = protocol; throw new Error(`Unknown protocol ${exhaustive}`) }
     }
     // Listing always targets the collection, including when a full request URL was entered.
     url.pathname = url.pathname.replace(/\/(chat\/completions|responses|messages)$/, '/models').replace(/\/api\/chat$/, '/api/tags').replace(/\/models\/[^/]+:generateContent$/, '/models')

@@ -32,5 +32,5 @@
 <path d="M389 102l23-23h47M111 396l-23 23H43" stroke-width=".7"/>
 </g>
 <g fill="#0000c2" font-family="monospace" font-size="7.5" letter-spacing=".4"><text x="250.00" y="54.00" text-anchor="middle">000</text><text x="349.50" y="80.66" text-anchor="middle">030</text><text x="422.34" y="153.50" text-anchor="middle">060</text><text x="449.00" y="253.00" text-anchor="middle">090</text><text x="422.34" y="352.50" text-anchor="middle">120</text><text x="349.50" y="425.34" text-anchor="middle">150</text><text x="250.00" y="452.00" text-anchor="middle">180</text><text x="150.50" y="425.34" text-anchor="middle">210</text><text x="77.66" y="352.50" text-anchor="middle">240</text><text x="51.00" y="253.00" text-anchor="middle">270</text><text x="77.66" y="153.50" text-anchor="middle">300</text><text x="150.50" y="80.66" text-anchor="middle">330</text></g>
-<g fill="#0000c2" font-family="PingFang SC,sans-serif" font-size="9"><text x="462" y="72" text-anchor="end">口述 → 文字</text><text x="40" y="432">声音的笔迹</text></g>
+<g fill="#0000c2" font-family="PingFang SC,sans-serif" font-size="9"><text x="462" y="72" text-anchor="end">VOICE → TEXT</text><text x="40" y="432">VOICEPRINT</text></g>
 </svg>

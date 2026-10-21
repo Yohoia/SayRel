@@ -7,22 +7,16 @@
  */
 export const PRODUCT = {
   name: 'Offkey',
-  displayName: 'Offkey',
+  displayName: 'Sayrel',
   bundleId: 'app.offkey.desktop',
   urlScheme: 'offkey',
   version: '1.0.0',
   environment: 'prod'
 } as const
 
-export const ENDPOINTS = {
-  api: 'https://api.offkey.app',
-  web: 'https://www.offkey.app'
-} as const
-
 /** Renderer entry points, one BrowserWindow per page. */
 export const WINDOWS = {
   HUB: 'hub.html',
-  LOGIN: 'login.html',
   FLOATING_BAR: 'floating-bar.html',
   ONBOARDING: 'onboarding.html',
   SIDEBAR: 'sidebar.html',
@@ -63,14 +57,6 @@ export const HISTORY_STATUS = {
 
 export type HistoryStatus = (typeof HISTORY_STATUS)[keyof typeof HISTORY_STATUS]
 
-/** Local-to-cloud sync lifecycle for history rows. */
-export const SYNC_STATUS = {
-  PENDING_UPLOAD: 'pending_upload',
-  UPLOADED: 'uploaded',
-  FAILED: 'failed'
-} as const
-
-export type SyncStatus = (typeof SYNC_STATUS)[keyof typeof SYNC_STATUS]
 
 /** How an AI result reaches the user. */
 export const DELIVERY = {

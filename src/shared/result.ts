@@ -138,12 +138,6 @@ export class NetworkError extends Error {
   }
 }
 
-export class AuthenticationError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'AuthenticationError'
-  }
-}
 
 export class NotFoundError extends Error {
   constructor(
@@ -189,53 +183,3 @@ export async function tryCatchAsync<T>(fn: () => Promise<T>): AsyncResult<T, Err
 }
 
 // ===== Usage Examples =====
-
-/*
-// ✅ Example 1: Basic usage
-function divide(a: number, b: number): Result<number, string> {
-  if (b === 0) {
-    return err('Division by zero')
-  }
-  return ok(a / b)
-}
-
-const result = divide(10, 2)
-if (isOk(result)) {
-  console.log(result.value) // 5
-} else {
-  console.error(result.error)
-}
-
-// ✅ Example 2: Using match
-const message = match(divide(10, 0), {
-  ok: (value) => `Result: ${value}`,
-  err: (error) => `Error: ${error}`
-})
-
-// ✅ Example 3: Chaining operations
-const result = divide(10, 2)
-  .andThen(value => divide(value, 5))
-  .map(value => value * 2)
-
-// ✅ Example 4: Network request
-async function fetchUser(id: string): AsyncResult<User, NetworkError> {
-  return tryCatchAsync(async () => {
-    const response = await fetch(`/api/users/${id}`)
-    if (!response.ok) {
-      throw new NetworkError('Failed to fetch user', response.status)
-    }
-    return response.json()
-  })
-}
-
-const userResult = await fetchUser('123')
-const user = unwrapOr(userResult, { id: '0', name: 'Guest' })
-
-// ✅ Example 5: Validation
-function validateEmail(email: string): Result<string, ValidationError> {
-  if (!email.includes('@')) {
-    return err(new ValidationError('Invalid email format', 'email'))
-  }
-  return ok(email)
-}
-*/

@@ -11,6 +11,6 @@ export function VoiceInstrument() {
       <path d="M105 153v54m-9-42v30m159-42v54m9-42v30" opacity=".65" />
       <circle cx="286" cy="97" r="5" fill="#ffd700" />
     </g>
-    <g fill="currentColor" fontFamily="var(--font-mono)" fontSize="10"><text x="180" y="54" textAnchor="middle">VOICE INPUT</text><text x="180" y="318" textAnchor="middle">OFFKEY / 01</text></g>
+    <g fill="currentColor" fontFamily="var(--font-mono)" fontSize="10"><text x="180" y="54" textAnchor="middle">VOICE INPUT</text><text x="180" y="318" textAnchor="middle">SAYREL / 01</text></g>
   </svg>
 }

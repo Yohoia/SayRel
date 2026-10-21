@@ -48,7 +48,6 @@ export default defineConfig({
       rollupOptions: {
         input: {
           hub: r('src/renderer/hub.html'),
-          login: r('src/renderer/login.html'),
           'floating-bar': r('src/renderer/floating-bar.html'),
           onboarding: r('src/renderer/onboarding.html'),
           sidebar: r('src/renderer/sidebar.html'),

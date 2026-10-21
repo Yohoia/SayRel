@@ -147,35 +147,7 @@ export function getGlobalLogLevel(): LogLevel {
 
 // ===== Usage Examples =====
 
-/*
-// ✅ Basic usage
-const log = createStructuredLogger('auth')
 
-log.info('User login started', { userId: 'user123' })
-// Output: {"timestamp":"2024-10-20T...","level":1,"levelName":"INFO","module":"auth","message":"User login started","context":{"userId":"user123"}}
-
-// ✅ Error logging
-try {
-  throw new Error('Token expired')
-} catch (err) {
-  log.error('Login failed', err as Error, { userId: 'user123' })
-}
-
-// ✅ Performance tracking
-const startTime = Date.now()
-// ... operation
-log.info('Operation completed', {
-  duration: Date.now() - startTime,
-  operation: 'fetch-user'
-})
-
-// ✅ Debug logging (only when DEBUG level enabled)
-log.debug('Request details', {
-  url: '/api/users',
-  method: 'GET',
-  headers: { ... }
-})
-*/
 
 // ===== Migration Helper =====
 

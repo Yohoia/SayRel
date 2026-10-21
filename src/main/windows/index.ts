@@ -5,7 +5,6 @@ import { hubWindow, type HubMode } from './hub'
 import { floatingBar, BAR_HEIGHT, BAR_WIDTH } from './floatingBar'
 import {
   interactiveCardWindow,
-  loginWindow,
   onboardingWindow,
   sidebarWindow
 } from './secondary'
@@ -15,7 +14,6 @@ export {
   floatingBar,
   sidebarWindow,
   onboardingWindow,
-  loginWindow,
   interactiveCardWindow
 }
 
@@ -24,7 +22,6 @@ export const windows = {
   floatingBar,
   sidebarWindow,
   onboardingWindow,
-  loginWindow,
   interactiveCardWindow
 }
 
@@ -42,8 +39,6 @@ export function windowForRoute(route: WindowRoute): BaseWindow | null {
       return sidebarWindow
     case WINDOWS.ONBOARDING:
       return onboardingWindow
-    case WINDOWS.LOGIN:
-      return loginWindow
     case WINDOWS.INTERACTIVE_CARD:
       return interactiveCardWindow
     default:

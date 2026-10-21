@@ -28,20 +28,20 @@ export function decodeHistoryAudio(audio: Buffer): { pcm: Float32Array; sampleRa
   let hasHeader = false
   let endGranule: number | null = null
   while (offset < audio.length) {
-    if (offset + 27 > audio.length || audio.toString('ascii', offset, offset + 4) !== 'OggS') throw new Error('历史录音格式无效，无法读取音频')
+    if (offset + 27 > audio.length || audio.toString('ascii', offset, offset + 4) !== 'OggS') throw new Error("The saved audio format is invalid")
     const count = audio[offset + 26]
-    if (offset + 27 + count > audio.length) throw new Error('历史录音不完整')
+    if (offset + 27 + count > audio.length) throw new Error("The saved audio is incomplete")
     let cursor = offset + 27 + count
     for (let i = 0; i < count; i++) {
       const size = audio[offset + 27 + i]
-      if (cursor + size > audio.length) throw new Error('历史录音不完整')
+      if (cursor + size > audio.length) throw new Error("The saved audio is incomplete")
       chunks.push(audio.subarray(cursor, cursor + size))
       cursor += size
       if (size < 255) {
         const packet = Buffer.concat(chunks)
         chunks = []
         if (packet.subarray(0, 8).toString() === 'OpusHead') {
-          if (packet.length < 19 || packet[9] !== 1) throw new Error('历史录音必须为单声道')
+          if (packet.length < 19 || packet[9] !== 1) throw new Error("Saved audio must be mono")
           preSkip = Math.round(packet.readUInt16LE(10) / 3)
           hasHeader = true
         } else if (packet.subarray(0, 8).toString() !== 'OpusTags') packets.push(packet)
@@ -50,7 +50,7 @@ export function decodeHistoryAudio(audio: Buffer): { pcm: Float32Array; sampleRa
     if (hasHeader && (audio[offset + 5] & 0x04)) endGranule = Number(audio.readBigUInt64LE(offset + 6))
     offset = cursor
   }
-  if (chunks.length || !packets.length) throw new Error('历史录音没有可用的音频数据')
+  if (chunks.length || !packets.length) throw new Error("No usable audio was found in this recording")
   const decoder = new OpusScript(16000, 1, OpusScript.Application.AUDIO)
   try {
     const decoded = Buffer.concat(packets.map(packet => decoder.decode(packet)))
@@ -59,6 +59,6 @@ export function decodeHistoryAudio(audio: Buffer): { pcm: Float32Array; sampleRa
     const pcm = new Float32Array(length)
     for (let i = 0; i < pcm.length; i++) pcm[i] = decoded.readInt16LE((i + preSkip) * 2) / 32768
     return { pcm, sampleRate: 16000 }
-  } catch { throw new Error('无法解码历史录音，请重新录音') }
+  } catch { throw new Error("Could not decode the saved audio. Please record again.") }
   finally { decoder.delete() }
 }

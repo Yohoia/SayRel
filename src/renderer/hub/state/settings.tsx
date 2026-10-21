@@ -34,14 +34,16 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
     try {
       const next = await api.settings.patch(partial)
       if (next) setSettings({ ...DEFAULT_SETTINGS, ...next })
-      toast.success('保存成功')
-    } catch (error) { toast.error('保存失败，请重试'); throw error }
+      toast.success("Saved")
+    } catch (error) { toast.error("Could not save. Please try again."); throw error }
   }, [])
 
   useEffect(() => {
     void reload()
     return bridge.on('store:changed', (next: Settings) => setSettings({ ...DEFAULT_SETTINGS, ...next }))
   }, [reload])
+
+  useEffect(() => { document.documentElement.lang = settings.language ?? 'en' }, [settings.language])
 
   const value = useMemo(() => ({ settings, loaded, patch, reload }), [settings, loaded, patch, reload])
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>

@@ -17,7 +17,7 @@ type RealtimeSession = {
   finish: (send: Send) => void
   result: () => Pick<TranscriptionResult, 'text' | 'detectedLanguage'>
 }
-const malformed = (): ProviderError => new ProviderError('实时转写服务返回了无效的协议消息')
+const malformed = (): ProviderError => new ProviderError("The realtime transcription provider returned an invalid protocol message")
 const eventSchema = z.object({
   type: z.string(), item_id: z.string().optional(), transcript: z.string().optional(),
   language: z.string().optional(), languages: z.array(z.object({ code: z.string() })).optional(),
@@ -25,7 +25,7 @@ const eventSchema = z.object({
 })
 const safeCode = (code: string | number | undefined): string => String(code ?? 'unknown').replace(/[^\w.-]/g, '').slice(0, 60)
 function serviceFailure(code?: string | number): never {
-  throw new ProviderError(`实时转写失败 (${safeCode(code)})，请检查密钥、模型与服务权限`)
+  throw new ProviderError(`Realtime transcription failed (${safeCode(code)}). Check credentials, model, and service permissions.`)
 }
 function jsonMessage(message: string | Buffer): unknown {
   try { return JSON.parse(message.toString()) }
@@ -37,7 +37,7 @@ function sendEvent(send: Send, type: string, data: object = {}): void {
 
 function websocketUrl(endpoint: string, path: string): URL {
   const url = new URL(endpoint)
-  if (url.username || url.password || !['ws:', 'wss:', 'http:', 'https:'].includes(url.protocol)) throw new ProviderError('实时服务地址必须使用 WebSocket 或 HTTP')
+  if (url.username || url.password || !['ws:', 'wss:', 'http:', 'https:'].includes(url.protocol)) throw new ProviderError("The realtime URL must use WebSocket or HTTP")
   url.protocol = ['https:', 'wss:'].includes(url.protocol) ? 'wss:' : 'ws:'
   if (url.pathname === '/' || !url.pathname) url.pathname = path
   return url
@@ -45,8 +45,8 @@ function websocketUrl(endpoint: string, path: string): URL {
 
 function audioSamples(req: TranscriptionRequest, targetRate: number): Buffer {
   const audio = req.pcm && req.sampleRate ? { pcm: req.pcm, sampleRate: req.sampleRate } : req.audioBuffer ? decodeHistoryAudio(req.audioBuffer) : null
-  if (!audio || !audio.pcm.length || !Number.isFinite(audio.sampleRate) || audio.sampleRate <= 0) throw new ProviderError('没有可用于实时转写的 PCM 音频')
-  if (audio.pcm.some(sample => !Number.isFinite(sample))) throw new ProviderError('录音包含无效的音频采样')
+  if (!audio || !audio.pcm.length || !Number.isFinite(audio.sampleRate) || audio.sampleRate <= 0) throw new ProviderError("No PCM audio is available for realtime transcription")
+  if (audio.pcm.some(sample => !Number.isFinite(sample))) throw new ProviderError("The recording contains invalid audio samples")
   if (audio.sampleRate === targetRate) return pcm16(audio.pcm)
   const ratio = audio.sampleRate / targetRate
   const samples = new Float32Array(Math.max(1, Math.round(audio.pcm.length / ratio)))
@@ -228,15 +228,15 @@ function volcSession(req: TranscriptionRequest): RealtimeSession {
 }
 
 async function runSession(options: { url: URL; headers: Record<string, string>; session: RealtimeSession; audio: Buffer; sampleRate: number; readyOnOpen: boolean; signal?: AbortSignal }): Promise<Pick<TranscriptionResult, 'text' | 'detectedLanguage'>> {
-  if (options.signal?.aborted) throw new ProviderError('请求已取消')
+  if (options.signal?.aborted) throw new ProviderError("Request cancelled")
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(options.url, { headers: options.headers })
     socket.binaryType = 'arraybuffer'
     const stop = new AbortController()
     let settled = false, started = false, sealed = false
-    const deadline = setTimeout(() => fail(new ProviderError('实时转写超时，请检查服务地址和网络')), 45_000 + Math.ceil(options.audio.length / (options.sampleRate * 2) * 1000))
-    const connectDeadline = setTimeout(() => fail(new ProviderError('实时服务未完成连接或配置确认，请检查地址、密钥与协议')), 15_000)
-    const onAbort = (): void => fail(new ProviderError('请求已取消'))
+    const deadline = setTimeout(() => fail(new ProviderError("Realtime transcription timed out. Check the URL and network.")), 45_000 + Math.ceil(options.audio.length / (options.sampleRate * 2) * 1000))
+    const connectDeadline = setTimeout(() => fail(new ProviderError("The realtime connection or configuration was not confirmed. Check the URL, credentials, and protocol.")), 15_000)
+    const onAbort = (): void => fail(new ProviderError("Request cancelled"))
     function cleanup(): void {
       clearTimeout(deadline); clearTimeout(connectDeadline); stop.abort()
       options.signal?.removeEventListener('abort', onAbort)
@@ -249,7 +249,7 @@ async function runSession(options: { url: URL; headers: Record<string, string>; 
       reject(error instanceof ProviderError ? error : malformed())
     }
     const send: Send = message => {
-      if (settled || socket.readyState !== WebSocket.OPEN) throw new ProviderError('实时转写连接已断开')
+      if (settled || socket.readyState !== WebSocket.OPEN) throw new ProviderError("The realtime transcription connection was closed")
       socket.send(message)
     }
     async function stream(): Promise<void> {
@@ -279,13 +279,13 @@ async function runSession(options: { url: URL; headers: Record<string, string>; 
         if (typeof data !== 'string' && !(data instanceof ArrayBuffer)) throw malformed()
         const update = options.session.receive(typeof data === 'string' ? data : Buffer.from(data))
         if (update.done) {
-          if (!sealed) throw new ProviderError('服务商在音频发送完成前结束了转写，请重试')
+          if (!sealed) throw new ProviderError("The provider ended transcription before audio upload finished. Please try again.")
           settled = true; cleanup(); resolve(options.session.result())
         } else if (update.ready) void stream()
       } catch (error) { fail(error) }
     }
-    socket.onerror = () => fail(new ProviderError('实时服务连接失败，请检查地址、密钥与网络'))
-    socket.onclose = () => fail(new ProviderError('实时服务在最终结果到达前断开连接，请重试'))
+    socket.onerror = () => fail(new ProviderError("Could not connect to the realtime service. Check the URL, credentials, and network."))
+    socket.onclose = () => fail(new ProviderError("The realtime service disconnected before the final result. Please try again."))
     options.signal?.addEventListener('abort', onAbort, { once: true })
     if (options.signal?.aborted) onAbort()
   })
@@ -294,7 +294,7 @@ async function runSession(options: { url: URL; headers: Record<string, string>; 
 const flashSchema = z.object({ output: z.object({ text: z.string().optional(), output: z.object({ sentence: z.object({ text: z.string() }) }).optional() }) })
 async function funFlash(profile: ProviderProfile, model: string, req: TranscriptionRequest): Promise<TranscriptionResult> {
   const audio = audioSamples(req, 16000)
-  if (audio.length > 16000 * 2 * 300) throw new ProviderError('Fun-ASR Flash 单次录音不能超过 5 分钟')
+  if (audio.length > 16000 * 2 * 300) throw new ProviderError("Fun-ASR Flash recordings cannot exceed 5 minutes")
   const url = websocketUrl(profile.endpoint, '/')
   url.protocol = url.protocol === 'wss:' ? 'https:' : 'http:'
   if (/\/api-ws\/v1\/(realtime|inference)\/?$/.test(url.pathname) || url.pathname === '/') url.pathname = '/api/v1/services/aigc/multimodal-generation/generation'
@@ -348,7 +348,7 @@ export async function transcribeRealtime(profile: ProviderProfile, model: string
       session = elevenSession()
       break
     case 'volcengine-asr': {
-      if (!['bigmodel', 'bigmodel_nostream', 'bigmodel_async'].includes(model)) throw new ProviderError('火山引擎模型须为 bigmodel、bigmodel_nostream 或 bigmodel_async')
+      if (!['bigmodel', 'bigmodel_nostream', 'bigmodel_async'].includes(model)) throw new ProviderError("Volcengine requires bigmodel, bigmodel_nostream, or bigmodel_async")
       url = websocketUrl(profile.endpoint, '/api/v3/sauc/bigmodel_nostream')
       if (/\/api\/v3\/(?:plan\/)?sauc\/bigmodel(?:_nostream|_async)?\/?$/.test(url.pathname)) url.pathname = url.pathname.replace(/bigmodel(?:_nostream|_async)?\/?$/, model)
       readyOnOpen = /\/bigmodel_async\/?$/.test(url.pathname)
@@ -360,7 +360,7 @@ export async function transcribeRealtime(profile: ProviderProfile, model: string
       session = volcSession(req)
       break
     }
-    default: throw new ProviderError('所选协议不支持实时转写')
+    default: throw new ProviderError("This protocol does not support realtime transcription")
   }
   const result = await runSession({ url, headers, session, audio: audioSamples(req, sampleRate), sampleRate, readyOnOpen, signal: req.signal })
   return { ...result, provider: profile.id }

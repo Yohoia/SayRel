@@ -10,8 +10,8 @@ import { HubSelect } from '../components/HubSelect'
 
 import type { HistoryListItem as Item } from '../../../shared/types'
 type Confirmation = { type: 'item'; item: Item } | { type: 'all' } | { type: 'retention'; days: number }
-const FILTERS = [{ id: 'all', label: '全部' }, { id: 'dictations', label: '听写' }, { id: 'ask_anything', label: '问任何问题' }]
-const RETENTION = [{ value: 'never', label: '从不' }, { value: '1', label: '24 小时' }, { value: '7', label: '1 周' }, { value: '30', label: '1 个月' }, { value: '365', label: '1 年' }, { value: '0', label: '永远' }]
+const FILTERS = [{ id: 'all', label: "All" }, { id: 'dictations', label: "Dictations" }, { id: 'ask_anything', label: "Ask anything" }]
+const RETENTION = [{ value: 'never', label: "Never" }, { value: '1', label: "24 hours" }, { value: '7', label: "1 week" }, { value: '30', label: "1 month" }, { value: '365', label: "1 year" }, { value: '0', label: "Forever" }]
 
 export function HistoryPage() {
   const { settings, patch } = useAppSettings()
@@ -36,7 +36,7 @@ export function HistoryPage() {
       const result = await api.history.list({ limit: 50, mode: filter === 'all' ? undefined : filter })
       if (version !== requestVersion.current) return
       setItems(result?.items ?? []); setTotal(result?.total ?? 0); setError('')
-    } catch { if (version === requestVersion.current) setError('历史记录加载失败，请重试。') }
+    } catch { if (version === requestVersion.current) setError("Could not load history. Please try again.") }
     finally { if (version === requestVersion.current) setLoading(false) }
   }, [filter])
   const loadMore = useCallback(async () => {
@@ -48,7 +48,7 @@ export function HistoryPage() {
       if (version !== requestVersion.current) return
       setItems((current) => [...current, ...(result?.items ?? []).filter((item: Item) => !current.some((entry) => entry.id === item.id))])
       setTotal(result?.total ?? 0); setError('')
-    } catch { setError('更多历史记录加载失败，请重试。') }
+    } catch { setError("Could not load more history. Please try again.") }
     finally { setLoadingMore(false) }
   }, [filter, items, total, loading, loadingMore])
   useEffect(() => {
@@ -67,14 +67,14 @@ export function HistoryPage() {
   const retry = async (item: Item) => {
     if (retrying) return
     setMenu(null); setRetrying(item.id); setError('')
-    try { await bridge.invoke('db:history-retry', item.id); await load(); toast.success('已重试') }
-    catch (error) { const message = error instanceof Error ? error.message : '重试失败，请再试一次。'; toast.error(message) }
+    try { await bridge.invoke('db:history-retry', item.id); await load(); toast.success("Retry started") }
+    catch (error) { const message = error instanceof Error ? error.message : "Could not retry. Please try again."; toast.error(message) }
     finally { setRetrying(null) }
   }
   const download = async (item: Item) => {
     setMenu(null)
-    try { const result = await bridge.invoke('db:history-export-audio', item.id); if (!result?.canceled) toast.success('保存成功') }
-    catch { toast.error('录音下载失败，文件可能已被清理') }
+    try { const result = await bridge.invoke('db:history-export-audio', item.id); if (!result?.canceled) toast.success("Saved") }
+    catch { toast.error("Could not download audio. The file may have been removed.") }
   }
   useEffect(() => {
     if (!menu) return
@@ -92,7 +92,7 @@ export function HistoryPage() {
     }
     return [...groups.entries()]
   }, [items, filter])
-  const copy = async (item: Item) => { try { await api.clipboard.writeText(item.refinedText ?? ''); setCopied(item.id); setTimeout(() => setCopied(null), 1500); toast.success('复制成功') } catch { toast.error('复制失败，请重试') } }
+  const copy = async (item: Item) => { try { await api.clipboard.writeText(item.refinedText ?? ''); setCopied(item.id); setTimeout(() => setCopied(null), 1500); toast.success("Copied") } catch { toast.error("Could not copy. Please try again.") } }
   const changeRetention = async (value: string) => {
     if (busy) return
     setBusy(true)
@@ -112,7 +112,7 @@ export function HistoryPage() {
         }
       }
       await patch({ historyEnabled: true, historyRetentionDays: days })
-    } catch { toast.error('保留时间修改失败，请重试') }
+    } catch { toast.error("Could not update retention. Please try again.") }
     finally { setBusy(false) }
   }
   const confirm = async () => {
@@ -125,35 +125,35 @@ export function HistoryPage() {
         await patch({ historyEnabled: true, historyRetentionDays: confirmation.days })
         await bridge.invoke('db:history-delete-by-duration', confirmation.days * 86_400_000)
       }
-      setConfirmation(null); toast.success('删除成功'); await load()
-    } catch { toast.error('操作失败，请重试') }
+      setConfirmation(null); toast.success("Deleted"); await load()
+    } catch { toast.error("Something went wrong. Please try again.") }
     finally { setBusy(false) }
   }
   return <div className="page history-page">
-    <header className="page-heading"><div className="page-heading-copy"><p className="page-index">02 / ARCHIVE</p><h1 className="page-title">历史记录</h1></div><div className="page-actions hub-menu-anchor"><button className="icon-button" title="更多" aria-label="历史记录操作" aria-haspopup="menu" aria-expanded={menu === 'header'} onClick={() => setMenu(menu === 'header' ? null : 'header')}><Icon name="more" /></button>{menu === 'header' && <HubMenu onClose={() => setMenu(null)}><button role="menuitem" className="danger" disabled={!items.length} onClick={() => { setMenu(null); setConfirmation({ type: 'all' }) }}><Icon name="trash" size={14} />删除所有</button></HubMenu>}</div></header>
-    <section className="history-retention" aria-label="保存历史">
-      <div className="history-retention-row"><div><h2><Icon name="history" size={14} />保存历史</h2><p>选择在此设备上保留历史记录的时间。</p></div><HubSelect compact label="保留历史记录的时间" value={settings.historyEnabled ? String(settings.historyRetentionDays) : 'never'} options={RETENTION.some((option) => option.value === String(settings.historyRetentionDays)) ? RETENTION : [...RETENTION, { value: String(settings.historyRetentionDays), label: `${settings.historyRetentionDays} 天` }]} disabled={busy} onChange={(value) => void changeRetention(value)} /></div>
-      <div className="history-retention-row"><div><h2><Icon name="shield" size={14} />您的数据保持私密</h2><p>听写历史记录仅保存在这台设备上。</p></div></div>
+    <header className="page-heading"><div className="page-heading-copy"><p className="page-index">02 / ARCHIVE</p><h1 className="page-title">History</h1></div><div className="page-actions hub-menu-anchor"><button className="icon-button" title="More" aria-label="History actions" aria-haspopup="menu" aria-expanded={menu === 'header'} onClick={() => setMenu(menu === 'header' ? null : 'header')}><Icon name="more" /></button>{menu === 'header' && <HubMenu onClose={() => setMenu(null)}><button role="menuitem" className="danger" disabled={!items.length} onClick={() => { setMenu(null); setConfirmation({ type: 'all' }) }}><Icon name="trash" size={14} />Delete all</button></HubMenu>}</div></header>
+    <section className="history-retention" aria-label="Keep history">
+      <div className="history-retention-row"><div><h2><Icon name="history" size={14} />Keep history</h2><p>Choose how long to keep your history on this device.</p></div><HubSelect compact label="History retention" value={settings.historyEnabled ? String(settings.historyRetentionDays) : 'never'} options={RETENTION.some((option) => option.value === String(settings.historyRetentionDays)) ? RETENTION : [...RETENTION, { value: String(settings.historyRetentionDays), label: `${settings.historyRetentionDays} days` }]} disabled={busy} onChange={(value) => void changeRetention(value)} /></div>
+      <div className="history-retention-row"><div><h2><Icon name="shield" size={14} />Your data stays private</h2><p>Your dictation history stays on this device.</p></div></div>
     </section>
-    <div className="page-toolbar"><div className="segmented-tabs" role="tablist" aria-label="记录类型">{FILTERS.map((item) => <button key={item.id} role="tab" aria-selected={filter === item.id} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div></div>
-    {error && <p role="alert" className="inline-error">{error} <button className="text-button" onClick={() => void load()}>重试</button></p>}
-    {loading ? <div className="hub-loading" role="status" aria-label="正在加载" /> : grouped.length ? <div className="history-list">{grouped.map(([day, group]) => <section className="history-group" key={day}><h2 className="history-date">{day}</h2><div className="history-day-items">{group.map((item) => <article className={`history-item ${menu === item.id ? 'is-menu-open' : ''}`} key={item.id}>
-      <time className="history-item-time">{item.createdAt ? new Date(item.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }) : '—'}</time>
-      <p className={`history-item-text ${item.status === 'failed' ? 'history-item-failed' : ''}`}>{retrying === item.id ? '正在重新处理录音…' : item.refinedText || (item.status === 'failed' ? '您的转录被中断。' : (item.status === 'cancelled' || item.status === 'canceled') ? '转录已被取消。' : '音频无声。')}</p>
-      <div className="history-item-actions">{item.mode === 'ask_anything' && item.refinedText && <button className="history-view-answer" onClick={() => setSelected(item)}>查看答案</button>}<button className="icon-button" title={copied === item.id ? '已复制' : '复制转录'} aria-label="复制转录" disabled={!item.refinedText} onClick={() => void copy(item)}><Icon name={copied === item.id ? 'check' : 'copy'} size={14} /></button><div className="hub-menu-anchor"><button className="icon-button" title="更多" aria-label="转录操作" aria-haspopup="menu" aria-expanded={menu === item.id} onClick={() => setMenu(menu === item.id ? null : item.id)}><Icon name="more" size={14} /></button>{menu === item.id && <HubMenu onClose={() => setMenu(null)}><button role="menuitem" disabled={!item.hasAudio || !!retrying} title={!item.hasAudio ? '此记录没有保存录音' : undefined} onClick={() => void retry(item)}>{retrying === item.id ? '正在重试…' : '重试'}</button><button role="menuitem" disabled={!item.hasAudio} title={!item.hasAudio ? '此记录没有保存录音' : undefined} onClick={() => void download(item)}><Icon name="download" size={14} />下载音频</button><hr /><button role="menuitem" className="danger" onClick={() => { setMenu(null); setConfirmation({ type: 'item', item }) }}><Icon name="trash" size={14} />删除转录</button></HubMenu>}</div></div>
-    </article>)}</div></section>)}</div> : <div className="empty-state history-empty"><h2>尚无口述</h2><p>在其他应用中口述后，历史记录会显示在这里。</p></div>}
-    {!loading && items.length < total && <div ref={sentinel} className="history-load-more"><button className="text-button" disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore ? '正在加载…' : '加载更多'}</button></div>}
-    {selected && <Modal title="回答" onClose={() => setSelected(null)}><div className="detail-transcript">{selected.refinedText}</div><footer className="modal-footer"><button className="primary-button" onClick={() => void copy(selected)}><Icon name={copied === selected.id ? 'check' : 'copy'} />{copied === selected.id ? '已复制' : '复制文字'}</button></footer></Modal>}
-    {confirmation && <ConfirmDialog title={confirmation.type === 'all' ? '删除所有历史记录？' : confirmation.type === 'item' ? '删除此转录？' : '删除旧历史记录？'} description={confirmation.type === 'all' ? '您所有的本地历史记录将被永久删除，无法恢复。' : confirmation.type === 'item' ? '此转录将被永久删除，无法恢复。' : `您所有的本地历史记录早于 ${RETENTION.find((option) => Number(option.value) === confirmation.days)?.label} 将被永久删除，无法恢复。`} subject={confirmation.type === 'item' ? confirmation.item.refinedText ?? '暂无转写文字' : undefined} pending={busy} onClose={() => { setConfirmation(null) }} onConfirm={() => void confirm()} />}
+    <div className="page-toolbar"><div className="segmented-tabs" role="tablist" aria-label="Recording type">{FILTERS.map((item) => <button key={item.id} role="tab" aria-selected={filter === item.id} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div></div>
+    {error && <p role="alert" className="inline-error">{error} <button className="text-button" onClick={() => void load()}>Retry</button></p>}
+    {loading ? <div className="hub-loading" role="status" aria-label="Loading" /> : grouped.length ? <div className="history-list">{grouped.map(([day, group]) => <section className="history-group" key={day}><h2 className="history-date">{day}</h2><div className="history-day-items">{group.map((item) => <article className={`history-item ${menu === item.id ? 'is-menu-open' : ''}`} key={item.id}>
+      <time className="history-item-time">{item.createdAt ? new Date(item.createdAt).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', hour12: false }) : '—'}</time>
+      <p className={`history-item-text ${item.status === 'failed' ? 'history-item-failed' : ''}`}>{retrying === item.id ? "Reprocessing audio…" : item.refinedText || (item.status === 'failed' ? "Your transcription was interrupted." : (item.status === 'cancelled' || item.status === 'canceled') ? "The transcription was dismissed." : "Audio is silent.")}</p>
+      <div className="history-item-actions">{item.mode === 'ask_anything' && item.refinedText && <button className="history-view-answer" onClick={() => setSelected(item)}>View answer</button>}<button className="icon-button" title={copied === item.id ? "Copied" : "Copy transcript"} aria-label="Copy transcript" disabled={!item.refinedText} onClick={() => void copy(item)}><Icon name={copied === item.id ? 'check' : 'copy'} size={14} /></button><div className="hub-menu-anchor"><button className="icon-button" title="More" aria-label="Transcription actions" aria-haspopup="menu" aria-expanded={menu === item.id} onClick={() => setMenu(menu === item.id ? null : item.id)}><Icon name="more" size={14} /></button>{menu === item.id && <HubMenu onClose={() => setMenu(null)}><button role="menuitem" disabled={!item.hasAudio || !!retrying} title={!item.hasAudio ? "No audio was saved for this recording" : undefined} onClick={() => void retry(item)}>{retrying === item.id ? "Retrying…" : "Retry"}</button><button role="menuitem" disabled={!item.hasAudio} title={!item.hasAudio ? "No audio was saved for this recording" : undefined} onClick={() => void download(item)}><Icon name="download" size={14} />Download audio</button><hr /><button role="menuitem" className="danger" onClick={() => { setMenu(null); setConfirmation({ type: 'item', item }) }}><Icon name="trash" size={14} />Delete transcript</button></HubMenu>}</div></div>
+    </article>)}</div></section>)}</div> : <div className="empty-state history-empty"><h2>No dictations yet</h2><p>Your dictations from other apps will appear here.</p></div>}
+    {!loading && items.length < total && <div ref={sentinel} className="history-load-more"><button className="text-button" disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore ? "Loading…" : "Load more"}</button></div>}
+    {selected && <Modal title="Answer" onClose={() => setSelected(null)}><div className="detail-transcript">{selected.refinedText}</div><footer className="modal-footer"><button className="primary-button" onClick={() => void copy(selected)}><Icon name={copied === selected.id ? 'check' : 'copy'} />{copied === selected.id ? "Copied" : "Copy text"}</button></footer></Modal>}
+    {confirmation && <ConfirmDialog title={confirmation.type === 'all' ? "Delete all history?" : confirmation.type === 'item' ? "Delete this transcript?" : "Delete old history?"} description={confirmation.type === 'all' ? "All your local history will be deleted forever. This can't be undone." : confirmation.type === 'item' ? "This transcript will be deleted forever. This can't be undone." : `All local history older than ${RETENTION.find((option) => Number(option.value) === confirmation.days)?.label} will be deleted forever. This can't be undone.`} subject={confirmation.type === 'item' ? confirmation.item.refinedText ?? "No transcript available" : undefined} pending={busy} onClose={() => { setConfirmation(null) }} onConfirm={() => void confirm()} />}
   </div>
 }
 
 function dayLabel(iso: string | null): string {
-  if (!iso) return '日期未知'
+  if (!iso) return "Unknown date"
   const date = new Date(iso)
   const today = new Date()
   const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1)
-  if (date.toDateString() === today.toDateString()) return '今天'
-  if (date.toDateString() === yesterday.toDateString()) return '昨天'
-  return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
+  if (date.toDateString() === today.toDateString()) return "Today"
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday"
+  return date.toLocaleDateString('en', { year: 'numeric', month: 'long', day: 'numeric' })
 }

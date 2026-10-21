@@ -93,3 +93,14 @@ test('only the owning window can end capture; renderer crash restores prior disa
   sender.emit('render-process-gone')
   assert.equal(captureEnabled, false); assert.equal(disabled, true); assert.equal(listeners, 0)
 })
+
+test('saved Fn keycodes migrate across primary and additional bindings', () => {
+  const state = mergeSettings({ shortcut: { ...DEFAULT_SETTINGS.shortcut, accelerator: 'KeyCode179' }, translationShortcut: { ...DEFAULT_SETTINGS.translationShortcut, accelerator: 'Fn+KeyCode179+LeftShift' }, additionalShortcuts: { askAnythingShortcut: [{ accelerator: 'KeyCode63+Space', enabled: true, style: 'toggle' }] } })
+  assert.equal(state.shortcut.accelerator, 'Fn')
+  assert.equal(state.translationShortcut.accelerator, 'Fn+LeftShift')
+  assert.equal(state.additionalShortcuts.askAnythingShortcut[0].accelerator, 'Fn+Space')
+})
+test('shortcuts expose readable key names without symbol glyphs', () => {
+  const { shortcutLabels } = load('src/shared/settingsControls.ts')
+  assert.equal(shortcutLabels('Fn+LeftShift+Space').join(', '), 'Fn, Left Shift, Space')
+})

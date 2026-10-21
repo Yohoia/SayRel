@@ -1,6 +1,6 @@
 # 消息与确认组件
 
-组件直接应用到业务入口。`ToastViewport` 已挂载到主窗口、登录、引导、回答卡和上下文窗口。每个 Electron 窗口内的消息独立显示。
+组件直接应用到业务入口。`ToastViewport` 已挂载到主窗口、引导、回答卡和上下文窗口。每个 Electron 窗口内的消息独立显示。
 
 ## Toast
 
@@ -48,8 +48,8 @@ toast.dismiss(id)
 - 服务商配置保存、验证、模型发现、默认模型与移除配置。
 - 词典添加、编辑、导入和删除。
 - 历史记录复制、重试、下载和删除。
-- 设置保存、检查更新和退出账户。
-- 登录失败、引导权限错误、回答卡与上下文窗口复制。
+- 设置保存、检查更新。
+- 引导权限错误、回答卡与上下文窗口复制。
 
 ## 验证
 
@@ -59,6 +59,6 @@ node scripts/ui-build.mjs
 ./node_modules/.bin/electron scripts/diagnostics/providers-ui.cjs
 ```
 
-验收通过真实页面入口驱动操作，使用临时配置和离线数据。当前截图与检查结果保存于 `docs/ui-evidence/feedback-minimal/`，不验证真实登录、模型服务或更新下载。
+验收通过真实页面入口驱动操作，使用临时配置和离线数据。当前截图与检查结果保存于 `docs/ui-evidence/feedback-minimal/`，不验证模型服务或更新下载。
 
 视觉规则见 [DESIGN.md](../DESIGN.md)。确认弹窗采用灰白面板与蓝色细线，主按钮蓝底灰白字。

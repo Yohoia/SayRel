@@ -83,7 +83,7 @@ export function FloatingBarApp() {
       if (state.phase === 'finishing') setStatus(state.context?.handsFree ? 'hands-free-dictating' : 'recording-dictating')
       if (state.phase === 'idle') setStatus('idle-hidden')
       if (state.phase === 'long_pressing') setStatus('long-pressing')
-      if (state.phase === 'error') { setStatus('error'); setErrorText(state.context?.error || '转录失败，请重试。') }
+      if (state.phase === 'error') { setStatus('error'); setErrorText(state.context?.error || "Transcription failed. Please try again.") }
       const timeout = state.context?.recorderTimeoutState
       if (timeout?.remainingTime > 0 && timeout.timeUntilCountdown <= 0) {
         const total = Math.floor(timeout.remainingTime)
@@ -121,7 +121,7 @@ export function FloatingBarApp() {
 
   const click = (action: 'start' | 'finish' | 'cancel' | 'retry') => {
     void api.page.floatingBarClick(action).catch((error: unknown) => {
-      setErrorText(error instanceof Error ? error.message : '无法更新录音状态，请重试。')
+      setErrorText(error instanceof Error ? error.message : "Could not update the recording status. Please try again.")
       setStatus('error')
     })
   }
@@ -140,7 +140,7 @@ export function FloatingBarApp() {
     if (params.has('state')) show(new CustomEvent('offkey:ui-review-floating-bar', { detail: {
       status: params.get('state'), mode: params.get('mode') ?? 'voice_transcript',
       countdown: params.get('countdown') ?? undefined,
-      error: params.get('state') === 'error' ? '无法访问麦克风，请检查系统权限后重试。' : undefined
+      error: params.get('state') === 'error' ? "Microphone unavailable. Check system permissions and try again." : undefined
     } }))
     window.addEventListener('offkey:ui-review-floating-bar', show)
     return () => window.removeEventListener('offkey:ui-review-floating-bar', show)
@@ -167,7 +167,7 @@ export function FloatingBarApp() {
     <div className="floating-bar-surface">
       <style>{`@keyframes loadingMove { 0% { transform: translateX(-27px); } 100% { transform: translateX(54px); } }`}</style>
       {visibleStatus === 'error' && visibleError && <div style={errorBubbleStyle}>{visibleError}</div>}
-      {visibleStatus === 'long-pressing' && <div role="status" style={errorBubbleStyle}>轻按即可开始，无需长按。再次轻按结束录音。</div>}
+      {visibleStatus === 'long-pressing' && <div role="status" style={errorBubbleStyle}>Tap to start. Tap again to finish recording.</div>}
       <div
         ref={pillRef}
         data-testid="floating-bar"
@@ -178,22 +178,22 @@ export function FloatingBarApp() {
         tabIndex={visibleStatus === 'hover' || visibleStatus === 'error' ? 0 : -1}
         onClick={() => { if (!preview && ['idle-hidden', 'hover', 'error'].includes(status)) click(status === 'error' ? 'retry' : 'start') }}
         onKeyDown={(event) => { if (!preview && (event.key === 'Enter' || event.key === ' ') && ['hover', 'error'].includes(status)) { event.preventDefault(); click(status === 'error' ? 'retry' : 'start') } }}
-        aria-label="录音状态"
+        aria-label="Recording status"
         style={{ ...BASE_STYLE, ...style, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto', cursor: ['idle-hidden', 'hover', 'error'].includes(visibleStatus) ? 'pointer' : undefined }}
       >
         {['voice_command', 'translation'].includes(visibleMode) && <div className={`floating-mode-glow ${visibleMode === 'translation' ? 'is-translation' : ''}`} aria-hidden="true"><div /></div>}
-        {visibleStatus === 'hover' && hover && <span className="floating-tooltip" role="tooltip">点击开始录音</span>}
+        {visibleStatus === 'hover' && hover && <span className="floating-tooltip" role="tooltip">Click to start dictating</span>}
         {(visibleStatus === 'hover' || visibleStatus === 'error') && <StatusIcons status={visibleStatus} />}
         {showWaveform && <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', height: 24, overflow: handsFree ? 'visible' : 'hidden' }}>
-          {handsFree && <button className="floating-action" style={cancelButtonStyle} aria-label="取消听写" onClick={() => { if (!preview) click('cancel') }}><Icon name="close" size={16} /><span className="floating-tooltip" role="tooltip">取消</span></button>}
+          {handsFree && <button className="floating-action" style={cancelButtonStyle} aria-label="Cancel dictation" onClick={() => { if (!preview) click('cancel') }}><Icon name="close" size={16} /><span className="floating-tooltip" role="tooltip">Cancel</span></button>}
           <div style={{ width: 38, flexShrink: 0, margin: '0 8px' }}><Waveform analyser={recorder?.analyser ?? null} active width={38} /></div>
           {visibleCountdown && <span style={{ width: 32, marginRight: 8, flexShrink: 0, fontSize: 12, lineHeight: '16px', fontWeight: 400, color: 'var(--ink)' }}>{visibleCountdown}</span>}
-          {handsFree && <button className="floating-action" style={finishButtonStyle} aria-label="完成听写" onClick={() => { if (!preview) click('finish') }}><Icon name="check" size={16} /><span className="floating-tooltip" role="tooltip">完成 <kbd>{hotkey.shortcutLabel}</kbd></span></button>}
+          {handsFree && <button className="floating-action" style={finishButtonStyle} aria-label="Finish dictation" onClick={() => { if (!preview) click('finish') }}><Icon name="check" size={16} /><span className="floating-tooltip" role="tooltip">Finish <kbd>{hotkey.shortcutLabel}</kbd></span></button>}
         </div>}
         {refining && <RefiningContent />}
         {visibleStatus === 'starting-microphone' && <div style={shimmerOverlayStyle()} />}
       </div>
-      {visibleMode === 'translation' && ['starting-microphone', 'recording', 'hands-free'].includes(visibleStatus) && <div ref={languageChoicesRef} className="floating-language-choices" role="group" aria-label="翻译目标">{settings.translationTargetLanguages.map(code => <button key={code} aria-pressed={settings.translationTargetLanguage === code} onClick={() => { if (!preview) void api.page.floatingBarClick('translation-language', code) }}>{new Intl.DisplayNames([settings.language ?? 'zh-CN'], { type: 'language' }).of(code) ?? code}</button>)}</div>}
+      {visibleMode === 'translation' && ['starting-microphone', 'recording', 'hands-free'].includes(visibleStatus) && <div ref={languageChoicesRef} className="floating-language-choices" role="group" aria-label="Translation targets">{settings.translationTargetLanguages.map(code => <button key={code} aria-pressed={settings.translationTargetLanguage === code} onClick={() => { if (!preview) void api.page.floatingBarClick('translation-language', code) }}>{new Intl.DisplayNames([settings.language ?? 'en'], { type: 'language' }).of(code) ?? code}</button>)}</div>}
       {hotkey.hint && !preview && <div style={hintStyle}>{hotkey.hint}</div>}
     </div>
   )
@@ -238,7 +238,7 @@ function RefiningContent() {
   }, [])
   return <>
     <div aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 8, overflow: 'hidden', pointerEvents: 'none' }}><div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${progress}%`, background: 'var(--fill-selected)' }} /></div>
-    <div style={{ position: 'relative', zIndex: 1, width: 90, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ShimmerText active fontSize={14} fontWeight={450} lineHeight="16px" speed={64} shimmerWidth={24} waitMs={300} angle={90} dim="var(--ink-tertiary)" high="var(--ink)" blur={3.4}>正在思考</ShimmerText></div>
+    <div style={{ position: 'relative', zIndex: 1, width: 90, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ShimmerText active fontSize={14} fontWeight={450} lineHeight="16px" speed={64} shimmerWidth={24} waitMs={300} angle={90} dim="var(--ink-tertiary)" high="var(--ink)" blur={3.4}>Thinking</ShimmerText></div>
   </>
 }
 

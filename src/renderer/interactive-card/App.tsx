@@ -63,9 +63,9 @@ export function CardApp() {
     if (!payload) return
     try {
       await api.clipboard.writeText(payload.answer)
-      setCopied(true); toast.success('复制成功')
+      setCopied(true); toast.success("Copied")
       setTimeout(() => setCopied(false), 3000)
-    } catch { toast.error('复制失败，请重试') }
+    } catch { toast.error("Could not copy. Please try again.") }
   }
 
   if (!payload) return null
@@ -74,13 +74,13 @@ export function CardApp() {
     <main className="secondary-card-shell">
       <section className="secondary-result-card" ref={cardRef}>
         <header className="secondary-result-brandbar drag">
-          <div className="secondary-result-logo"><img className="brand-icon" src="./assets/brand/offkey-icon-128.png" alt="" width={22} height={22} /><span>Offkey</span></div>
-          <button className="secondary-icon-button no-drag" aria-label="关闭回答" title="关闭 · Esc" onClick={() => api.page.closeCard()}><CloseRounded /></button>
+          <div className="secondary-result-logo"><img className="brand-lockup" src="./assets/brand/sayrel-horizontal.svg" alt="Sayrel" width={100} height={33} /></div>
+          <button className="secondary-icon-button no-drag" aria-label="Close answer" title="Close · Esc" onClick={() => api.page.closeCard()}><CloseRounded /></button>
         </header>
         <div className="secondary-result-scroll no-drag">
-          {(payload.userPrompt || payload.title) && <section className="secondary-result-prompt"><div ref={promptRef} className={expanded ? 'is-expanded' : ''}><div className="secondary-prompt-row"><MicRounded /><p>{payload.userPrompt || payload.title}</p><button className={`secondary-icon-button ${promptCopied ? 'is-copied' : ''}`} aria-label="复制问题" title={promptCopied ? '已复制' : '复制'} onClick={async () => { try { await api.clipboard.writeText([payload.userPrompt || payload.title, payload.selectedText].filter(Boolean).join('\n')); setPromptCopied(true); setTimeout(() => setPromptCopied(false), 3000); toast.success('复制成功') } catch { toast.error('复制失败，请重试') } }}>{promptCopied ? <CheckRounded /> : <CopyIcon />}</button></div>{payload.selectedText && <div className="secondary-selected-text">{payload.selectedText}</div>}</div>{collapsible && <button className="secondary-prompt-toggle" onClick={() => setExpanded(!expanded)}>{expanded ? '显示更少' : '...更多'}</button>}</section>}
+          {(payload.userPrompt || payload.title) && <section className="secondary-result-prompt"><div ref={promptRef} className={expanded ? 'is-expanded' : ''}><div className="secondary-prompt-row"><MicRounded /><p>{payload.userPrompt || payload.title}</p><button className={`secondary-icon-button ${promptCopied ? 'is-copied' : ''}`} aria-label="Copy question" title={promptCopied ? "Copied" : "Copy"} onClick={async () => { try { await api.clipboard.writeText([payload.userPrompt || payload.title, payload.selectedText].filter(Boolean).join('\n')); setPromptCopied(true); setTimeout(() => setPromptCopied(false), 3000); toast.success("Copied") } catch { toast.error("Could not copy. Please try again.") } }}>{promptCopied ? <CheckRounded /> : <CopyIcon />}</button></div>{payload.selectedText && <div className="secondary-selected-text">{payload.selectedText}</div>}</div>{collapsible && <button className="secondary-prompt-toggle" onClick={() => setExpanded(!expanded)}>{expanded ? "Show less" : "...more"}</button>}</section>}
           <article className="secondary-answer">
-            <header><h1><AnswerIcon />回答</h1><button className={`secondary-icon-button ${copied ? 'is-copied' : ''}`} aria-label={copied ? "已复制" : "复制回答"} title={copied ? "已复制" : "复制回答"} onClick={copy}>{copied ? <CheckRounded /> : <CopyIcon />}</button></header>
+            <header><h1><AnswerIcon />Answer</h1><button className={`secondary-icon-button ${copied ? 'is-copied' : ''}`} aria-label={copied ? "Copied" : "Copy answer"} title={copied ? "Copied" : "Copy answer"} onClick={copy}>{copied ? <CheckRounded /> : <CopyIcon />}</button></header>
             <div className="secondary-answer-content">{payload.answer}</div>
           </article>
         </div>

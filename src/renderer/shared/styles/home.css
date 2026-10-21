@@ -1,13 +1,13 @@
 .instrument-home { --home-paper:var(--paper); --home-blue:var(--accent); --home-ink:var(--ink-soft); --home-line:var(--line); --home-mono:var(--font-mono); background:var(--home-paper); }
 .instrument-home>.app-titlebar { right:auto; width:105px; }
 .instrument-home>.app-content.is-home { padding:0; }
-.home-canvas { display:grid; grid-template-rows:minmax(min-content,1fr)68px 45px; min-height:max(100%,618px); color:var(--home-blue); background:var(--home-paper); font-family:-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif; -webkit-font-smoothing:antialiased; }
+.home-canvas { display:grid; grid-template-rows:minmax(min-content,1fr)68px 45px; min-height:max(100%,618px); color:var(--home-blue); background:var(--home-paper); font-family:var(--font-sans); -webkit-font-smoothing:antialiased; }
 .home-canvas button,.home-canvas a { color:inherit; }
 .home-canvas :is(button,a):focus-visible { outline:2px solid var(--home-blue); outline-offset:4px; }
 .home-header { height:67px; flex-shrink:0; display:flex; align-items:center; gap:22px; margin:0 30px; padding-left:80px; border-bottom:1px solid var(--home-line); }
 .home-brand { display:flex; align-items:center; gap:8px; color:var(--home-blue); font-size:16px; font-weight:650; letter-spacing:-.4px; text-decoration:none; }
 .home-brand img { display:block; }
-.home-navigation { display:flex; align-self:stretch; align-items:stretch; gap:30px; margin-left:auto; color:var(--ink-soft); font-size:13px; }
+.home-navigation { display:flex; align-self:stretch; align-items:stretch; gap:30px; margin-left:auto; color:var(--ink-soft); font-family:var(--font-condensed); font-stretch:50%; font-size:16px; }
 .home-navigation a { position:relative; display:flex; align-items:center; text-decoration:none; transition:color .16s; white-space:nowrap; }
 .home-navigation a:hover,.home-navigation a[aria-current='page'] { color:var(--home-blue); }
 .home-navigation a[aria-current='page'] { font-weight:600; }
@@ -20,9 +20,9 @@
 .home-canvas button:active { transform:translateY(1px); }
 .home-composition { display:grid; grid-template-columns:minmax(0,470px) minmax(0,1fr); gap:28px; padding:43px 38px 0; width:100%; max-width:1280px; margin:0 auto; }
 .home-manifesto { min-width:0; }
-.home-eyebrow { display:flex; align-items:center; gap:10px; margin:0 0 15px; font:13px/16px var(--home-mono); letter-spacing:1.15px; }
+.home-eyebrow { display:flex; align-items:center; gap:10px; margin:0 0 15px; font:13px/16px var(--home-mono); letter-spacing:1.15px; text-transform:uppercase; }
 .home-eyebrow::before { content:''; width:20px; height:1px; background:var(--home-blue); }
-.home-headline.page-title { margin:0 0 18px; color:var(--home-blue); font-family:var(--font-display); font-stretch:condensed; font-size:78px; line-height:.91; font-weight:700; letter-spacing:-1.8px; }
+.home-headline.page-title { margin:0 0 18px; color:var(--home-blue); font-family:var(--font-display); font-size:100px; line-height:.91; font-weight:400; letter-spacing:-1.8px; }
 .home-headline span { display:block; }
 .home-intro { margin:0 0 24px; font-size:13px; line-height:1.85; letter-spacing:.25px; color:var(--home-ink); }
 .home-shortcuts { position:relative; max-width:438px; border-top:1px dashed var(--line-strong); }
@@ -44,7 +44,7 @@
 .home-status[data-phase='recording'] i { box-shadow:0 0 0 4px var(--fill-selected); }
 .home-status[data-phase='error'] i { border-radius:0; transform:rotate(45deg); }
 .home-instrument figcaption { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 16px; font:13px/20px var(--home-mono); letter-spacing:1.1px; }
-.home-instrument figcaption>span:last-child { font:13px/20px -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif; letter-spacing:.5px; }
+.home-instrument figcaption>span:last-child { font:13px/20px var(--font-sans); letter-spacing:.5px; }
 .home-applications { display:flex; align-items:flex-start; gap:28px; margin:0 38px; padding-top:13px; border-top:1px solid var(--home-line); }
 .home-applications>p { flex-shrink:0; padding-top:6px; font-size:13px; color:var(--home-ink); }
 .home-stamps { display:flex; flex-wrap:wrap; gap:10px; }
@@ -70,11 +70,18 @@
 @keyframes home-enter { from { opacity:0; transform:translateY(9px); } to { opacity:1; transform:none; } }
 @keyframes home-instrument-enter { from { opacity:0; transform:translateY(6px) rotate(-3deg); } to { opacity:1; transform:none; } }
 @keyframes home-listen { from { opacity:.55; transform:translate(-50%,-50%) scale(.75); } to { opacity:0; transform:translate(-50%,-50%) scale(2.2); } }
+@media (min-width:1100px) and (min-height:711px) {
+  .home-composition { grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:center; gap:clamp(28px,4vw,88px); max-width:2400px; padding:clamp(43px,5vh,80px) clamp(38px,4vw,96px) 32px; }
+  .home-headline.page-title { font-size:clamp(100px,9.26vw,176px); }
+  .home-intro { font-size:clamp(13px,1vw,16px); }
+  .home-shortcuts { max-width:none; }
+  .home-instrument { width:min(100%,calc(100vh - 260px),920px); max-width:none; margin:0; align-self:center; justify-self:center; }
+}
 @media (max-width:1040px) {
   .home-header { gap:18px; }
   .home-navigation { gap:24px; }
   .home-composition { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; }
-  .home-headline.page-title { font-size:73px; }
+  .home-headline.page-title { font-size:84px; }
   .home-instrument { margin-top:26px; }
   .home-applications { gap:20px; }
   .home-stamps { gap:8px; }
@@ -83,7 +90,7 @@
 }
 @media (max-height:710px) and (min-width:901px) {
   .home-composition { padding-top:27px; }
-  .home-headline.page-title { font-size:72px; }
+  .home-headline.page-title { font-size:80px; }
   .home-instrument { max-width:445px; margin-top:3px; }
 }
 @media (max-width:900px) {
@@ -92,7 +99,7 @@
   .home-navigation { gap:18px; }
   .home-status { margin-left:0; padding-left:12px; }
   .home-composition { padding:32px 28px 24px; gap:10px; }
-  .home-headline.page-title { font-size:62px; }
+  .home-headline.page-title { font-size:68px; }
   .home-intro { font-size:13px; }
   .home-instrument { align-self:center; margin-top:0; }
   .home-applications { margin:0 28px; gap:16px; }

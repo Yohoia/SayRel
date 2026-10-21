@@ -4,6 +4,5 @@ export const IPC_EXTRA = {
   RECORDING_STATE: 'recording-machine:state',
   DICTIONARY_LIST: 'dictionary:list',
   DICTIONARY_ADD: 'dictionary:add',
-  DICTIONARY_REMOVE: 'dictionary:remove',
-  SYNC_TRIGGER: 'sync:trigger'
+  DICTIONARY_REMOVE: 'dictionary:remove'
 } as const

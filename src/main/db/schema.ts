@@ -1,4 +1,3 @@
-import { sql } from 'drizzle-orm'
 import { blob, index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 /**
@@ -9,7 +8,6 @@ export const historyV2 = sqliteTable(
   'history_v2',
   {
     id: text('id').primaryKey().notNull(),
-    userId: text('user_id'),
     status: text('status'),
     mode: text('mode').default('voice_transcript'),
     refinedText: text('refined_text'),
@@ -25,20 +23,11 @@ export const historyV2 = sqliteTable(
     modeMeta: blob('mode_meta', { mode: 'buffer' }),
     debugInfo: text('debug_info'),
     audioContext: text('audio_context'),
-    serverUpdatedAt: integer('server_updated_at'),
-    syncStatus: text('sync_status').default('pending_upload').notNull(),
-    syncAttemptCount: integer('sync_attempt_count').default(0).notNull(),
-    syncedFromCloud: integer('synced_from_cloud').default(0).notNull()
   },
   (t) => [
-    index('idx_history_v2_user_created_at').on(t.userId, t.createdAt),
+    index('idx_history_v2_created_at').on(t.createdAt),
     index('idx_history_v2_status').on(t.status),
-    index('idx_history_v2_user_status_created_at').on(t.userId, t.status, t.createdAt),
-    index('idx_history_v2_push_candidate_v2')
-      .on(t.userId, t.syncStatus, t.createdAt, t.syncAttemptCount)
-      .where(
-        sql`${t.status} = 'completed' AND ((${t.refinedText} IS NOT NULL AND ${t.refinedText} <> '') OR (${t.mode} = 'voice_command' AND json_extract(${t.modeMeta}, '$.aiResult.delivery') = 'external'))`
-      )
+    index('idx_history_v2_status_created_at').on(t.status, t.createdAt)
   ]
 )
 
@@ -64,7 +53,6 @@ export const history = sqliteTable('history', {
   updatedAt: text('updated_at'),
   debugInfo: text('debug_info'),
   audioLocalPath: text('audio_local_path'),
-  userId: text('user_id'),
   focusedApp: text('focused_app'),
   audioMetadata: text('audio_metadata'),
   focusedAppName: text('focused_app_name'),
@@ -84,7 +72,6 @@ export const dictionary = sqliteTable(
   'dictionary',
   {
     id: text('id').primaryKey().notNull(),
-    userId: text('user_id'),
     word: text('word').notNull(),
     source: text('source').default('manual').notNull(),
     language: text('language'),
@@ -92,7 +79,6 @@ export const dictionary = sqliteTable(
     updatedAt: text('updated_at').notNull()
   },
   (t) => [
-    index('idx_dictionary_user').on(t.userId),
     index('idx_dictionary_word').on(t.word)
   ]
 )

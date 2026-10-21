@@ -6,7 +6,7 @@ export type ProviderPreset = { id: string; name: string; service: ProviderServic
 export const PROVIDER_PRESETS: ProviderPreset[] = [
   {
     "id": "llm-volcengine",
-    "name": "火山引擎",
+    "name": "Volcengine",
     "service": "refinement",
     "protocol": "openai-chat",
     "endpoint": "https://ark.cn-beijing.volces.com/api/v3",
@@ -20,11 +20,11 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-volcengine.svg",
     "helpUrl": "https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey",
     "docsUrl": "https://www.volcengine.com/docs/82379/1298454",
-    "description": "火山引擎 Ark API (豆包)"
+    "description": "Volcengine Ark API (Doubao)"
   },
   {
     "id": "llm-ark_coding",
-    "name": "火山方舟 Agent/Coding Plan",
+    "name": "Volcengine Ark Agent/Coding Plan",
     "service": "refinement",
     "protocol": "openai-chat",
     "endpoint": "https://ark.cn-beijing.volces.com/api/plan/v3",
@@ -36,7 +36,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-ark_coding.svg",
     "helpUrl": "https://console.volcengine.com/ark/region:cn-beijing/subscription/agent-plan?projectName=shandianshuo-member&agentMode=close",
     "docsUrl": "https://www.volcengine.com/docs/82379/2160841",
-    "description": "火山方舟 Agent Plan / Coding Plan（订阅制，默认禁用思考）"
+    "description": "Volcengine Ark Agent / Coding Plan (subscription; thinking disabled by default)"
   },
   {
     "id": "llm-openai",
@@ -52,7 +52,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-openai.svg",
     "helpUrl": "https://platform.openai.com/api-keys",
     "docsUrl": "https://platform.openai.com/docs/models",
-    "description": "OpenAI GPT 系列"
+    "description": "OpenAI GPT models"
   },
   {
     "id": "llm-xai",
@@ -66,11 +66,11 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-xai.svg",
     "helpUrl": "https://console.x.ai/",
     "docsUrl": "https://docs.x.ai/developers/models/grok-4.7",
-    "description": "xAI Grok 4.7（低延迟路径使用最低思考强度）"
+    "description": "xAI Grok 4.7 (minimum reasoning effort for low latency)"
   },
   {
     "id": "llm-zhipu",
-    "name": "智谱",
+    "name": "Zhipu",
     "service": "refinement",
     "protocol": "openai-chat",
     "endpoint": "https://open.bigmodel.cn/api/paas/v4",
@@ -81,7 +81,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-zhipu.svg",
     "helpUrl": "https://open.bigmodel.cn/usercenter/apikeys",
     "docsUrl": "https://docs.bigmodel.cn/cn/guide/start/model-overview",
-    "description": "智谱 GLM 系列"
+    "description": "Zhipu GLM models"
   },
   {
     "id": "llm-deepseek",
@@ -96,11 +96,11 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-deepseek.svg",
     "helpUrl": "https://platform.deepseek.com/api_keys",
     "docsUrl": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
-    "description": "DeepSeek 系列"
+    "description": "DeepSeek models"
   },
   {
     "id": "llm-tencent_tokenhub",
-    "name": "腾讯云 TokenHub",
+    "name": "Tencent Cloud TokenHub",
     "service": "refinement",
     "protocol": "openai-responses",
     "endpoint": "https://tokenhub.tencentmaas.com/v1",
@@ -111,11 +111,11 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-tencent_tokenhub.svg",
     "helpUrl": "https://console.cloud.tencent.com/tokenhub/models",
     "docsUrl": "https://cloud.tencent.com/document/product/1823/130079",
-    "description": "腾讯云 TokenHub 混元模型（Responses API）"
+    "description": "Tencent Cloud TokenHub Hunyuan models (Responses API)"
   },
   {
     "id": "llm-qwen",
-    "name": "通义千问",
+    "name": "Qwen",
     "service": "refinement",
     "protocol": "openai-chat",
     "endpoint": "https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -127,7 +127,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-qwen.svg",
     "helpUrl": "https://bailian.console.aliyun.com/cn-beijing/#/api-key",
     "docsUrl": "https://help.aliyun.com/zh/model-studio/text-generation-model",
-    "description": "阿里云通义千问"
+    "description": "Alibaba Cloud Qwen"
   },
   {
     "id": "llm-kimi",
@@ -141,7 +141,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-kimi.svg",
     "helpUrl": "https://platform.kimi.com/console/api-keys",
     "docsUrl": "https://platform.kimi.com/docs/overview",
-    "description": "月之暗面 Kimi"
+    "description": "Moonshot Kimi"
   },
   {
     "id": "llm-minimax",
@@ -156,7 +156,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-minimax.svg",
     "helpUrl": "https://platform.minimaxi.com/user-center/basic-information/interface-key",
     "docsUrl": "https://platform.minimaxi.com/docs/guides/text-generation",
-    "description": "MiniMax 系列"
+    "description": "MiniMax models"
   },
   {
     "id": "llm-minimax_token_plan",
@@ -171,11 +171,11 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-minimax_token_plan.svg",
     "helpUrl": "https://platform.minimaxi.com/user-center/payment/token-plan",
     "docsUrl": "https://platform.minimaxi.com/docs/token-plan/intro",
-    "description": "MiniMax 包月套餐"
+    "description": "MiniMax monthly plan"
   },
   {
     "id": "llm-siliconflow",
-    "name": "硅基流动",
+    "name": "SiliconFlow",
     "service": "refinement",
     "protocol": "openai-chat",
     "endpoint": "https://api.siliconflow.cn/v1",
@@ -189,7 +189,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
   },
   {
     "id": "llm-mimo",
-    "name": "小米 MiMo",
+    "name": "Xiaomi MiMo",
     "service": "refinement",
     "protocol": "openai-chat",
     "endpoint": "https://api.xiaomimimo.com/v1",
@@ -201,11 +201,11 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-mimo.png",
     "helpUrl": "https://platform.xiaomimimo.com/console/balance",
     "docsUrl": "https://mimo.mi.com/docs/zh-CN/api/chat/openai-api",
-    "description": "小米 MiMo V2.6 全模态大模型"
+    "description": "Xiaomi MiMo V2.6 multimodal model"
   },
   {
     "id": "llm-stepfun",
-    "name": "阶跃星辰",
+    "name": "StepFun",
     "service": "refinement",
     "protocol": "openai-chat",
     "endpoint": "https://api.stepfun.com/v1",
@@ -216,11 +216,11 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-stepfun.svg",
     "helpUrl": "https://platform.stepfun.com/account/apikey",
     "docsUrl": "https://platform.stepfun.com/docs/zh/api-reference/chat/chat-completion-create",
-    "description": "阶跃星辰 StepFun（混合推理，思考无法完全关闭，已固定最低思考强度）"
+    "description": "StepFun (hybrid reasoning; minimum reasoning effort, cannot fully disable thinking)"
   },
   {
     "id": "llm-tokendance",
-    "name": "词元跳动 TokenDance",
+    "name": "TokenDance",
     "service": "refinement",
     "protocol": "openai-chat",
     "endpoint": "https://tokendance.space/gateway/v1",
@@ -231,11 +231,11 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-tokendance.svg",
     "helpUrl": "https://tokendance.space/",
     "docsUrl": "https://tokendance.space/docs/app-attribution",
-    "description": "词元跳动统一大模型 API"
+    "description": "TokenDance unified model API"
   },
   {
     "id": "llm-mimo_token_plan",
-    "name": "小米 MiMo Token Plan",
+    "name": "Xiaomi MiMo Token Plan",
     "service": "refinement",
     "protocol": "openai-chat",
     "endpoint": "https://token-plan-cn.xiaomimimo.com/v1",
@@ -246,11 +246,11 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-mimo_token_plan.png",
     "helpUrl": "https://platform.xiaomimimo.com/console/balance",
     "docsUrl": "https://mimo.mi.com/docs/zh-CN/tokenplan/Token%20Plan/team",
-    "description": "小米 MiMo V2.6 包月套餐"
+    "description": "Xiaomi MiMo V2.6 monthly plan"
   },
   {
     "id": "llm-openai_compatible",
-    "name": "OpenAI 兼容",
+    "name": "OpenAI compatible",
     "service": "refinement",
     "protocol": "openai-chat",
     "endpoint": "",
@@ -258,7 +258,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-openai_compatible.svg",
     "helpUrl": "",
     "docsUrl": "",
-    "description": "Groq 等 OpenAI 兼容 API"
+    "description": "Groq and other OpenAI-compatible APIs"
   },
   {
     "id": "llm-openrouter",
@@ -270,7 +270,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-openrouter.svg",
     "helpUrl": "https://openrouter.ai/keys",
     "docsUrl": "https://openrouter.ai/docs",
-    "description": "OpenRouter 模型聚合平台"
+    "description": "OpenRouter model gateway"
   },
   {
     "id": "llm-ollama",
@@ -282,7 +282,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-ollama.svg",
     "helpUrl": "https://ollama.ai/",
     "docsUrl": "https://ollama.ai/library",
-    "description": "本地 Ollama 模型"
+    "description": "Local Ollama models"
   },
   {
     "id": "llm-lm_studio",
@@ -294,7 +294,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-lm_studio.svg",
     "helpUrl": "https://lmstudio.ai/",
     "docsUrl": "https://lmstudio.ai/docs",
-    "description": "本地 LM Studio 模型"
+    "description": "Local LM Studio models"
   },
   {
     "id": "llm-gemini",
@@ -341,7 +341,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
   },
   {
     "id": "asr-aliyun_qwen",
-    "name": "阿里云",
+    "name": "Alibaba Cloud",
     "service": "transcription",
     "protocol": "qwen-asr",
     "endpoint": "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
@@ -353,11 +353,11 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/asr-aliyun_qwen.svg",
     "helpUrl": "https://bailian.console.aliyun.com/cn-beijing/#/api-key",
     "docsUrl": "https://bailian.console.aliyun.com/#/model-market",
-    "description": "阿里云百炼实时语音识别"
+    "description": "Alibaba Cloud Bailian realtime transcription"
   },
   {
     "id": "asr-stepfun",
-    "name": "阶跃星辰",
+    "name": "StepFun",
     "service": "transcription",
     "protocol": "stepfun-asr",
     "endpoint": "https://api.stepfun.com/v1",
@@ -367,11 +367,11 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/asr-stepfun.svg",
     "helpUrl": "https://platform.stepfun.com/account/apikey",
     "docsUrl": "https://platform.stepfun.com/docs/zh/api-reference/audio/asr-sse",
-    "description": "StepAudio 2.5 非流式输入语音识别"
+    "description": "StepAudio 2.5 non-streaming transcription"
   },
   {
     "id": "asr-mimo",
-    "name": "小米 MiMo",
+    "name": "Xiaomi MiMo",
     "service": "transcription",
     "protocol": "mimo-asr",
     "endpoint": "https://api.xiaomimimo.com/v1",
@@ -381,7 +381,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/asr-mimo.png",
     "helpUrl": "https://platform.xiaomimimo.com",
     "docsUrl": "https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/multimodal-understanding/Speech-Recognition",
-    "description": "MiMo V2.5 ASR 非流式输入语音识别"
+    "description": "MiMo V2.5 ASR non-streaming transcription"
   },
   {
     "id": "asr-soniox",
@@ -395,7 +395,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/asr-soniox.svg",
     "helpUrl": "https://console.soniox.com/",
     "docsUrl": "https://soniox.com/docs/stt/rt/real-time-transcription",
-    "description": "Soniox 实时语音识别"
+    "description": "Soniox realtime transcription"
   },
   {
     "id": "asr-elevenlabs",
@@ -410,7 +410,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/asr-elevenlabs.svg",
     "helpUrl": "https://elevenlabs.io/app/settings/api-keys",
     "docsUrl": "https://elevenlabs.io/docs/api-reference/speech-to-text/convert",
-    "description": "ElevenLabs Scribe 语音识别"
+    "description": "ElevenLabs Scribe transcription"
   },
   {
     "id": "asr-openai_realtime",
@@ -424,11 +424,11 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/asr-openai_realtime.svg",
     "helpUrl": "https://platform.openai.com/api-keys",
     "docsUrl": "https://developers.openai.com/api/docs/models/gpt-realtime-whisper",
-    "description": "OpenAI Realtime 流式语音识别"
+    "description": "OpenAI Realtime streaming transcription"
   },
   {
     "id": "asr-volcengine",
-    "name": "火山引擎",
+    "name": "Volcengine",
     "service": "transcription",
     "protocol": "volcengine-asr",
     "endpoint": "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream",
@@ -438,11 +438,11 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/asr-volcengine.svg",
     "helpUrl": "https://console.volcengine.com/speech/new/setting/apikeys?projectName=default",
     "docsUrl": "https://www.volcengine.com/docs/6561/1354869?lang=zh",
-    "description": "火山引擎大模型语音识别"
+    "description": "Volcengine large-model transcription"
   },
   {
     "id": "asr-openai",
-    "name": "OpenAI 兼容",
+    "name": "OpenAI compatible",
     "service": "transcription",
     "protocol": "openai-transcription",
     "endpoint": "https://api.openai.com/v1",
@@ -454,11 +454,11 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-openai.svg",
     "helpUrl": "https://platform.openai.com/api-keys",
     "docsUrl": "https://developers.openai.com/api/docs/guides/speech-to-text",
-    "description": "Whisper 与兼容的音频转写服务"
+    "description": "Whisper and compatible audio transcription services"
   },
   {
     "id": "asr-audio-chat",
-    "name": "自定义语音服务",
+    "name": "Custom transcription",
     "service": "transcription",
     "protocol": "audio-chat",
     "endpoint": "",
@@ -466,7 +466,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-openai_compatible.svg",
     "helpUrl": "",
     "docsUrl": "",
-    "description": "支持音频消息的 OpenAI 兼容服务"
+    "description": "OpenAI-compatible service with audio messages"
   },
   {
     "id": "asr-local-whisper",
@@ -478,7 +478,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "logo": "./assets/providers/llm-ollama.svg",
     "helpUrl": "",
     "docsUrl": "https://github.com/ggml-org/whisper.cpp",
-    "description": "使用已安装的 whisper.cpp 与本地模型"
+    "description": "Uses an installed whisper.cpp executable and local model"
   }
 ]
 

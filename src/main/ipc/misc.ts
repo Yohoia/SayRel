@@ -1,3 +1,4 @@
+import { onboardingWindow, openHub } from '../windows'
 import { BrowserWindow, globalShortcut, shell } from 'electron'
 import { join } from 'node:path'
 import { settings } from '../lib/settings'
@@ -13,6 +14,11 @@ import type { Handler } from './index'
 const log = createLogger('ipc:misc')
 
 export function registerMiscHandlers(handle: (c: string, f: Handler) => void): void {
+  handle('page:close-onboarding', () => {
+    onboardingWindow.closeWindow()
+    openHub('main')
+    return true
+  })
   // ---- dictionary --------------------------------------------------------
   handle('dictionary:list', () => listDictionary())
   handle('dictionary:add', (_e, word: string, opts?: any) =>
@@ -27,7 +33,7 @@ export function registerMiscHandlers(handle: (c: string, f: Handler) => void): v
   handle('keyboard:begin-shortcut-capture', event => {
     endCapture?.()
     const state = recordingMachine.getState()
-    if (!['idle', 'error'].includes(state.phase)) throw new Error('请先结束当前录音')
+    if (!['idle', 'error'].includes(state.phase)) throw new Error("Finish the current recording first")
     captureOwner = event.sender.id
     const previousDisabled = recordingMachine.isDisabled()
     recordingMachine.setDisabled(true)
@@ -88,7 +94,7 @@ export function registerMiscHandlers(handle: (c: string, f: Handler) => void): v
     if (typeof payload?.sessionId !== 'string') return false
     if (phase === 'started') recordingMachine.markStreaming(payload.sessionId)
     if (phase === 'stopped') recordingMachine.markStopped(payload.sessionId)
-    if (phase === 'error') recordingMachine.reportError(payload.sessionId, payload.message ?? payload.error ?? '麦克风启动失败')
+    if (phase === 'error') recordingMachine.reportError(payload.sessionId, payload.message ?? payload.error ?? "Could not start the microphone")
     if (phase === 'chunk' && payload?.pcm) {
       const pcm = new Float32Array(payload.pcm)
       recordingMachine.pushPcm(pcm, payload.sessionId)

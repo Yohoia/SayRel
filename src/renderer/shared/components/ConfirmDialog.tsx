@@ -13,7 +13,7 @@ export function ConfirmDialog({ title, description, subject, pending = false, on
     <Modal title={title} onClose={onClose} role="alertdialog" descriptionId={subject ? `${descriptionId} ${subjectId}` : descriptionId} dismissible={!pending} showClose={false}>
       <div className="confirmation-description" id={descriptionId}>{description}</div>
       {subject && <p className="confirmation-subject" id={subjectId} title={subject}>{subject}</p>}
-      <footer className="confirmation-actions"><button type="button" className="confirmation-cancel" data-dialog-autofocus disabled={pending} onClick={onClose}>取消</button><button type="button" className="confirmation-submit" disabled={pending} aria-busy={pending} onClick={onConfirm}>{pending && <span className="feedback-spinner" aria-hidden="true" />}{pending ? '处理中…' : '确认'}</button></footer>
+      <footer className="confirmation-actions"><button type="button" className="confirmation-cancel" data-dialog-autofocus disabled={pending} onClick={onClose}>Cancel</button><button type="button" className="confirmation-submit" disabled={pending} aria-busy={pending} onClick={onConfirm}>{pending && <span className="feedback-spinner" aria-hidden="true" />}{pending ? "Processing…" : "Confirm"}</button></footer>
     </Modal>
   </div>, document.body)
 }

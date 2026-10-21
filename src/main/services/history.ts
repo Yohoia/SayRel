@@ -1,10 +1,10 @@
-import { and, asc, count, desc, eq, gte, inArray, isNotNull, like, lt, ne, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gte, inArray, isNotNull, like, lt, ne, or, sql } from 'drizzle-orm'
 import { unlink } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { getDb, getRawDb, schema } from '../db'
 import { createLogger } from '../lib/logger'
 import { paths } from '../lib/paths'
-import { HISTORY_STATUS, SYNC_STATUS } from '../../shared/constants'
+import { HISTORY_STATUS } from '../../shared/constants'
 import type {
   HistoryListQuery,
   HistoryListResult,
@@ -18,7 +18,6 @@ const table = schema.historyV2
 
 export interface UpsertHistoryInput {
   id: string
-  userId?: string | null
   status?: string | null
   mode?: string
   refinedText?: string | null
@@ -67,7 +66,6 @@ export function upsertHistory(input: UpsertHistoryInput): HistoryRecord {
     db.insert(table)
       .values({
         id: input.id,
-        userId: input.userId ?? null,
         status: input.status ?? HISTORY_STATUS.PROCESSING,
         mode: input.mode ?? 'voice_transcript',
         refinedText: input.refinedText ?? null,
@@ -82,8 +80,7 @@ export function upsertHistory(input: UpsertHistoryInput): HistoryRecord {
         clientMetadata: input.clientMetadata ?? null,
         modeMeta,
         debugInfo: input.debugInfo ?? null,
-        audioContext: input.audioContext ?? null,
-        syncStatus: SYNC_STATUS.PENDING_UPLOAD
+        audioContext: input.audioContext ?? null
       })
       .run()
   }
@@ -248,42 +245,6 @@ export async function deleteAudioByDuration(minAgeMs: number): Promise<number> {
   return removed
 }
 
-/** Rows the sync worker should push, cheapest-first. */
-export function pushCandidates(userId: string, limit = 50): HistoryRecord[] {
-  return getDb()
-    .select()
-    .from(table)
-    .where(
-      and(
-        eq(table.userId, userId),
-        eq(table.syncStatus, SYNC_STATUS.PENDING_UPLOAD),
-        lt(table.syncAttemptCount, 5)
-      )
-    )
-    .orderBy(asc(table.createdAt))
-    .limit(limit)
-    .all() as HistoryRecord[]
-}
-
-export function markSynced(id: string): void {
-  getDb()
-    .update(table)
-    .set({ syncStatus: SYNC_STATUS.UPLOADED, serverUpdatedAt: Date.now(), updatedAt: new Date().toISOString() })
-    .where(eq(table.id, id))
-    .run()
-}
-
-export function markSyncFailed(id: string): void {
-  getRawDb()
-    .prepare(
-      `UPDATE history_v2
-       SET sync_attempt_count = sync_attempt_count + 1,
-           sync_status = CASE WHEN sync_attempt_count + 1 >= 5 THEN 'failed' ELSE sync_status END
-       WHERE id = ?`
-    )
-    .run(id)
-}
-
 export function upsertClientMetadata(id: string, metadata: object): void {
   getDb()
     .update(table)
@@ -333,7 +294,7 @@ export function diskUsage(): { bytes: number; files: number } {
   return { bytes: (row?.bytes ?? 0) + audioBytes, files: row?.files ?? 0 }
 }
 
-/** One-time migration from the v1 table, preserving ids so sync stays stable. */
+/** One-time migration from the v1 table, preserving recording ids. */
 export function migrateFromV1(): number {
   const db = getDb()
   // The legacy table only exists on installs upgraded from the v1 schema.
@@ -350,7 +311,6 @@ export function migrateFromV1(): number {
     db.insert(table)
       .values({
         id: row.id,
-        userId: row.userId ?? null,
         status: row.status ?? HISTORY_STATUS.COMPLETED,
         mode: row.mode ?? 'voice_transcript',
         refinedText: row.refinedText ?? null,
@@ -365,8 +325,7 @@ export function migrateFromV1(): number {
         clientMetadata: row.clientMetadata ?? null,
         modeMeta: row.modeMeta ? Buffer.from(row.modeMeta, 'utf8') : null,
         debugInfo: row.debugInfo ?? null,
-        audioContext: row.audioContext ?? null,
-        syncStatus: SYNC_STATUS.PENDING_UPLOAD
+        audioContext: row.audioContext ?? null
       })
       .run()
     migrated++

@@ -1,25 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import AccountCircleOutlined from '@mui/icons-material/AccountCircleOutlined'
 import InfoOutlined from '@mui/icons-material/InfoOutlined'
 import ArrowOutward from '@mui/icons-material/ArrowOutward'
 import { api } from '../../shared/utils/bridge'
 import { checkForUpdates } from '../../shared/utils/checkForUpdates'
-import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
-import { toast } from '../../shared/components/Toast'
 import { useAppSettings } from '../state/settings'
 import { ShortcutEditor, TranslationTargets, LanguageVariants, MicrophonePicker, FeatureTour } from './SettingsControls'
 import { interfaceLanguages, useSettingsText, type SettingsTextKey } from './settingsText'
 import '../../shared/styles/settings.css'
 import { HubSelect } from './HubSelect'
 
-const SECTIONS = ['account', 'settings', 'writing', 'about', 'help'] as const
+const SECTIONS = ['settings', 'writing', 'about', 'help'] as const
 type Section = (typeof SECTIONS)[number]
 const TITLES = {
-  account: { text: '账户', key: 'hub__account__title' },
-  settings: { text: '设置', key: 'hub__settings__title' },
-  writing: { text: '个性化', key: 'hub__settings__personal__title' },
-  about: { text: '关于', key: 'hub__about__title' },
-  help: { text: '帮助', key: 'hub__help__title' }
+  settings: { text: "Settings", key: 'hub__settings__title' },
+  writing: { text: "Personalization", key: 'hub__settings__personal__title' },
+  about: { text: "About", key: 'hub__about__title' },
+  help: { text: "Help", key: 'hub__help__title' }
 } satisfies Record<Section, { text: string; key: SettingsTextKey }>
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   shortcuts: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M15.75 6.90015C15.75 6.46773 15.7491 6.18834 15.7317 5.97583C15.715 5.77214 15.6869 5.69651 15.668 5.65943C15.5961 5.51845 15.4816 5.40391 15.3406 5.33203C15.3035 5.31314 15.2279 5.28496 15.0242 5.26831C14.8117 5.25095 14.5323 5.25 14.0999 5.25H3.90015C3.46773 5.25 3.18834 5.25095 2.97583 5.26831C2.77214 5.28496 2.69651 5.31314 2.65943 5.33203C2.51845 5.40391 2.40391 5.51845 2.33203 5.65943C2.31314 5.69651 2.28496 5.77214 2.26831 5.97583C2.25095 6.18834 2.25 6.46773 2.25 6.90015V11.0999C2.25 11.5323 2.25095 11.8117 2.26831 12.0242C2.28496 12.2279 2.31314 12.3035 2.33203 12.3406C2.40391 12.4816 2.51845 12.5961 2.65943 12.668C2.69651 12.6869 2.77214 12.715 2.97583 12.7317C3.18834 12.7491 3.46773 12.75 3.90015 12.75H14.0999C14.5323 12.75 14.8117 12.7491 15.0242 12.7317C15.2279 12.715 15.3035 12.6869 15.3406 12.668C15.4816 12.5961 15.5961 12.4816 15.668 12.3406C15.6869 12.3035 15.715 12.2279 15.7317 12.0242C15.7491 11.8117 15.75 11.5323 15.75 11.0999V6.90015ZM6.00733 9.75C6.42154 9.75 6.75733 10.0858 6.75733 10.5C6.75733 10.9142 6.42154 11.25 6.00733 11.25H6C5.58579 11.25 5.25 10.9142 5.25 10.5C5.25 10.0858 5.58579 9.75 6 9.75H6.00733ZM9.00733 9.75C9.42154 9.75 9.75733 10.0858 9.75733 10.5C9.75733 10.9142 9.42154 11.25 9.00733 11.25H9C8.58579 11.25 8.25 10.9142 8.25 10.5C8.25 10.0858 8.58579 9.75 9 9.75H9.00733ZM12.0073 9.75C12.4215 9.75 12.7573 10.0858 12.7573 10.5C12.7573 10.9142 12.4215 11.25 12.0073 11.25H12C11.5858 11.25 11.25 10.9142 11.25 10.5C11.25 10.0858 11.5858 9.75 12 9.75H12.0073ZM4.50733 6.75C4.92154 6.75 5.25733 7.08579 5.25733 7.5C5.25733 7.91422 4.92154 8.25 4.50733 8.25H4.5C4.08579 8.25 3.75 7.91422 3.75 7.5C3.75 7.08579 4.08579 6.75 4.5 6.75H4.50733ZM7.50733 6.75C7.92154 6.75 8.25733 7.08579 8.25733 7.5C8.25733 7.91422 7.92154 8.25 7.50733 8.25H7.5C7.08579 8.25 6.75 7.91422 6.75 7.5C6.75 7.08579 7.08579 6.75 7.5 6.75H7.50733ZM10.5073 6.75C10.9215 6.75 11.2573 7.08579 11.2573 7.5C11.2573 7.91422 10.9215 8.25 10.5073 8.25H10.5C10.0858 8.25 9.75 7.91422 9.75 7.5C9.75 7.08579 10.0858 6.75 10.5 6.75H10.5073ZM13.5073 6.75C13.9215 6.75 14.2573 7.08579 14.2573 7.5C14.2573 7.91422 13.9215 8.25 13.5073 8.25H13.5C13.0858 8.25 12.75 7.91422 12.75 7.5C12.75 7.08579 13.0858 6.75 13.5 6.75H13.5073ZM17.25 11.0999C17.25 11.5075 17.2508 11.8587 17.2273 12.1465C17.2031 12.4429 17.1492 12.738 17.0046 13.0217C16.789 13.4449 16.4449 13.789 16.0217 14.0046C15.738 14.1492 15.4429 14.2031 15.1465 14.2273C14.8587 14.2508 14.5075 14.25 14.0999 14.25H3.90015C3.49249 14.25 3.14127 14.2508 2.85352 14.2273C2.55708 14.2031 2.262 14.1492 1.97827 14.0046C1.55511 13.789 1.21105 13.4449 0.995365 13.0217C0.850801 12.738 0.796942 12.4429 0.772708 12.1465C0.749198 11.8587 0.750003 11.5075 0.750003 11.0999V6.90015C0.750003 6.49249 0.749198 6.14127 0.772708 5.85352C0.796942 5.55708 0.850801 5.262 0.995365 4.97827C1.21105 4.55511 1.55511 4.21105 1.97827 3.99536C2.262 3.8508 2.55708 3.79694 2.85352 3.77271C3.14127 3.7492 3.49249 3.75 3.90015 3.75H14.0999C14.5075 3.75 14.8587 3.7492 15.1465 3.77271C15.4429 3.79694 15.738 3.8508 16.0217 3.99536C16.4449 4.21105 16.789 4.55511 17.0046 4.97827C17.1492 5.262 17.2031 5.55708 17.2273 5.85352C17.2508 6.14127 17.25 6.49249 17.25 6.90015V11.0999Z" fill="currentColor" /></svg>,
@@ -34,7 +30,6 @@ function CategoryIcon({ name }: { name: string }) {
 }
 
 function NavigationIcon({ section }: { section: Section }) {
-  if (section === "account") return <AccountCircleOutlined className="settings-icon" />
   if (section === "help") return <span className="settings-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path fillRule="evenodd" clipRule="evenodd" d="M13.543 7.99999C13.543 4.93936 11.0614 2.45777 8.00073 2.45777C4.94009 2.45777 2.4585 4.93936 2.4585 7.99999C2.4585 11.0606 4.94009 13.5422 8.00073 13.5422C11.0614 13.5422 13.543 11.0606 13.543 7.99999ZM8.00654 10.4138C8.40146 10.4138 8.72231 10.7335 8.72231 11.1284C8.72231 11.5233 8.40146 11.843 8.00654 11.843H8.00073C7.6058 11.843 7.28613 11.5233 7.28612 11.1284C7.28612 10.7335 7.6058 10.4138 8.00073 10.4138H8.00654ZM6.63786 4.51079C7.1655 4.20087 7.78632 4.08728 8.38945 4.19073C8.9926 4.29431 9.53975 4.60823 9.93387 5.07642C10.3279 5.54451 10.5433 6.13702 10.5426 6.74886L10.5344 6.93275C10.4509 7.83455 9.76609 8.43152 9.28561 8.75184C9.00801 8.93686 8.73537 9.0724 8.53493 9.16151C8.43362 9.20653 8.34763 9.24156 8.28587 9.26509C8.25509 9.27682 8.22979 9.28531 8.21138 9.29186C8.20241 9.29505 8.19499 9.29804 8.18927 9.30001C8.18637 9.301 8.18311 9.30166 8.18112 9.30233L8.17879 9.3035H8.17647C7.80187 9.42828 7.39706 9.22649 7.27216 8.85193C7.14737 8.47755 7.34961 8.07283 7.72373 7.94762L7.73188 7.94413C7.74091 7.94092 7.75688 7.9356 7.77727 7.92783C7.8181 7.91227 7.8788 7.88749 7.95301 7.85451C8.10437 7.78724 8.30176 7.68874 8.49303 7.56122C8.91867 7.27736 9.11207 6.9948 9.1122 6.74886C9.11261 6.47445 9.01658 6.20695 8.83986 5.99702C8.66318 5.78722 8.41769 5.64656 8.14737 5.60015C7.87691 5.55375 7.59836 5.60542 7.36177 5.74446C7.12534 5.88351 6.94537 6.10139 6.85434 6.36014C6.72333 6.73255 6.31549 6.92852 5.94305 6.79774C5.57051 6.66669 5.37439 6.25783 5.50544 5.88529C5.70862 5.30797 6.11021 4.8209 6.63786 4.51079ZM14.9722 7.99999C14.9722 11.8505 11.8512 14.9714 8.00073 14.9714C4.15025 14.9714 1.0293 11.8505 1.0293 7.99999C1.0293 4.14952 4.15025 1.02856 8.00073 1.02856C11.8512 1.02856 14.9722 4.14952 14.9722 7.99999Z" fill="currentColor" /></svg></span>
   if (section === "about") return <InfoOutlined className="settings-icon" />
   if (section === "writing") return <span className="settings-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6.23237 1.74895C7.13952 1.28237 8.09383 1.31361 8.87188 1.72886C10.4407 2.56617 11.0363 4.75369 9.72232 6.82261C8.84822 8.19872 7.73994 9.72344 6.4433 11.1206C6.92144 11.6316 7.45948 11.9119 8.00022 11.9119C8.60048 11.9119 9.14177 11.6135 9.62857 11.0603C9.64978 11.0362 9.668 11.0093 9.68884 10.9844C9.70979 10.8346 9.74611 10.6809 9.79821 10.5246C10.0962 9.63065 10.4155 9.01719 10.6777 8.67975C10.7435 8.59502 10.8246 8.50399 10.9187 8.42863C10.9654 8.39132 11.0355 8.34117 11.1263 8.30252C11.2104 8.26678 11.3781 8.21243 11.5828 8.25899C11.8212 8.31322 11.9831 8.47406 12.0661 8.63957C12.1369 8.78094 12.146 8.91353 12.1464 8.98555C12.1472 9.13229 12.1103 9.26699 12.0795 9.35944C11.842 10.0719 11.5029 10.8098 11.056 11.4521C11.1037 11.7492 11.2915 12.0161 11.6096 12.2322C12.1156 12.5758 12.8539 12.7069 13.498 12.4922C13.8572 12.3727 14.2455 12.5672 14.3652 12.9264C14.4847 13.2856 14.2902 13.6739 13.931 13.7936C12.861 14.1501 11.6804 13.9382 10.8395 13.3672C10.5235 13.1526 10.2447 12.876 10.0382 12.5525C9.47539 12.9908 8.79588 13.2835 8.00022 13.2835C6.99259 13.2835 6.15047 12.8011 5.48125 12.0949C4.60213 12.9324 3.65263 13.694 2.63862 14.3025C2.31393 14.4972 1.8926 14.3917 1.69777 14.067C1.50304 13.7423 1.60861 13.321 1.93326 13.1262C2.89832 12.547 3.80998 11.8073 4.65871 10.9844C4.461 10.6457 4.28987 10.2908 4.14866 9.93421C3.46545 8.20889 3.27469 6.05509 3.94219 4.50787C4.54015 3.12204 5.33818 2.20894 6.23237 1.74895ZM8.22679 2.93868C7.8545 2.73999 7.37541 2.70351 6.8596 2.96881C6.33112 3.24077 5.71591 3.8582 5.20112 5.0514C4.7258 6.15316 4.82081 7.90864 5.42321 9.42975C5.49571 9.61281 5.57352 9.787 5.65536 9.95207C6.77908 8.70669 7.76186 7.3497 8.56384 6.08711C9.53502 4.55807 8.95826 3.32948 8.22679 2.93868Z" fill="currentColor" /></svg></span>
@@ -58,7 +53,7 @@ export function SettingsPanel({ section: initialSection = 'settings', onSectionC
   useEffect(() => { contentRef.current?.scrollTo({ top: 0 }) }, [section])
   return (
     <div className="settings-shell">
-      <nav className="settings-nav" aria-label="设置导航"><div className="settings-nav-brand"><img className="brand-icon" src="./assets/brand/offkey-icon-128.png" alt="" width={24} height={24} /><span>Offkey</span><small>PREFERENCES</small></div>
+      <nav className="settings-nav" aria-label="Settings navigation"><div className="settings-nav-brand"><img className="brand-lockup" src="./assets/brand/sayrel-horizontal.svg" alt="Sayrel" width={100} height={33} /><small>PREFERENCES</small></div>
         {SECTIONS.map((id) => <button key={id} type="button" aria-current={section === id ? 'page' : undefined}
           className={`settings-nav-item ${section === id ? 'is-selected' : ''}`}
           onClick={() => { setSection(id); onSectionChange?.(id) }}>
@@ -67,14 +62,13 @@ export function SettingsPanel({ section: initialSection = 'settings', onSectionC
         </button>)}
       </nav>
       <div ref={contentRef} className="settings-content">
-        <h1 className={`settings-title ${section !== 'settings' ? 'settings-title-secondary' : ''}`}>{t(TITLES[section].text, TITLES[section].key)}{section === 'writing' && <span className="settings-info" title={t("Offkey学习您独特的写作风格和语气，并调整您的口述表达方式。")}>ⓘ</span>}</h1>
+        <h1 className={`settings-title ${section !== 'settings' ? 'settings-title-secondary' : ''}`}>{t(TITLES[section].text, TITLES[section].key)}{section === 'writing' && <span className="settings-info" title={t("Sayrel learns your unique writing style and tone and adapts how your dictation is phrased.")}>ⓘ</span>}</h1>
         {section === 'settings' && <div className="settings-groups">
-          <Group title="快捷键" icon="shortcuts"><DictationSection /></Group>
-          <Group title="语言" icon="language"><LanguageSection /></Group>
-          <Group title="音频" icon="audio"><AudioSection autoOpen={initialSection === 'microphone'} /></Group>
-          <Group title="常规" icon="general"><GeneralSection /></Group>
+          <Group title="Shortcuts" icon="shortcuts"><DictationSection /></Group>
+          <Group title="Language" icon="language"><LanguageSection /></Group>
+          <Group title="Audio" icon="audio"><AudioSection autoOpen={initialSection === 'microphone'} /></Group>
+          <Group title="General" icon="general"><GeneralSection /></Group>
         </div>}
-        {section === 'account' && <AccountSection />}
         {section === 'writing' && <PersonalizationSection />}
         {section === 'about' && <AboutSection />}
         {section === 'help' && <HelpSection />}
@@ -92,11 +86,11 @@ function LanguageSection() {
   const { settings, patch } = useAppSettings()
   const t = useSettingsText()
   return <>
-    <Row label="界面语言" hint="选择用户界面使用的语言。">
-      <HubSelect label={t('界面语言')} value={settings.language ?? 'zh-CN'} options={interfaceLanguages} onChange={async value => { await api.i18n.setLanguage(value); await patch({ language: value }) }} />
+    <Row label="Interface language" hint="Choose the language used in the user interface.">
+      <HubSelect label={t("Interface language")} value={settings.language ?? 'en'} options={interfaceLanguages} onChange={async value => { await api.i18n.setLanguage(value); await patch({ language: value }) }} />
     </Row>
-    <Row label="翻译目标" hint="在翻译模式中最多选择3种目标语言进行听写。"><TranslationTargets /></Row>
-    <Row label="语言变体" hint="选择您首选的语言变体，以获得最佳体验。"><LanguageVariants /></Row>
+    <Row label="Translation targets" hint="Choose up to 3 target languages for your dictation in translation mode."><TranslationTargets /></Row>
+    <Row label="Language variants" hint="Choose your preferred language variants for the best experience."><LanguageVariants /></Row>
   </>
 }
 
@@ -104,13 +98,13 @@ function GeneralSection() {
   const { settings, patch } = useAppSettings()
   return (
     <>
-      <Row label="外观" hint="选择明亮模式或黑暗模式。">
+      <Row label="Appearance" hint="Choose between light and dark modes.">
         <Choice
           value={settings.appearancePreference}
           options={[
-            { value: 'system', label: "系统" },
-            { value: 'light', label: "明亮" },
-            { value: 'dark', label: "黑暗" }
+            { value: 'system', label: "System" },
+            { value: 'light', label: "Light" },
+            { value: 'dark', label: "Dark" }
           ]}
           onChange={(v) => {
             void patch({ appearancePreference: v as any })
@@ -118,7 +112,7 @@ function GeneralSection() {
           }}
         />
       </Row>
-      <Row label="登录时启动应用" hint="当您的计算机启动时自动打开Offkey。">
+      <Row label="Launch at startup" hint="Open Sayrel automatically when your computer starts.">
         <Toggle
           value={settings.launchAtLogin}
           onChange={(v) => {
@@ -127,7 +121,7 @@ function GeneralSection() {
           }}
         />
       </Row>
-      <Row label="在Dock中显示应用" hint="在您的Mac Dock中显示Offkey以便快速访问。">
+      <Row label="Show app in dock" hint="Display Sayrel in your Mac dock for quick access.">
         <Toggle
           value={settings.showInDock}
           onChange={(v) => {
@@ -142,42 +136,24 @@ function GeneralSection() {
 
 function DictationSection() {
   return <>
-    <Row label="语音输入" hint="按下开始和停止语音输入。"><ShortcutEditor settingKey="shortcut" /></Row>
-    <Row label="翻译" hint="按下开始和停止翻译。"><ShortcutEditor settingKey="translationShortcut" /></Row>
-    <Row label="随便问" hint="按下开始和停止随便提问。"><ShortcutEditor settingKey="askAnythingShortcut" /></Row>
+    <Row label="Dictate" hint="Press to start and stop dictation."><ShortcutEditor settingKey="shortcut" /></Row>
+    <Row label="Translate" hint="Press to start and stop translation."><ShortcutEditor settingKey="translationShortcut" /></Row>
+    <Row label="Ask anything" hint="Press to start and stop asking anything."><ShortcutEditor settingKey="askAnythingShortcut" /></Row>
   </>
 }
 
 function AudioSection({ autoOpen }: { autoOpen: boolean }) {
   const { settings, patch } = useAppSettings()
   return <>
-    <Row label="麦克风" hint="选择您首选的麦克风，以便Offkey捕捉您的声音。"><MicrophonePicker autoOpen={autoOpen} /></Row>
-    <Row label="交互声音" hint="为开始/停止等关键操作播放声音。"><Toggle value={settings.playSoundOnRecord} onChange={value => void patch({ playSoundOnRecord: value })} /></Row>
-    <Row label="语音输入时静音" hint="在语音输入时自动静音其他活动音频。"><Toggle value={settings.muteWhileDictating} onChange={value => void patch({ muteWhileDictating: value })} /></Row>
+    <Row label="Microphone" hint="Choose your preferred microphone for Sayrel to capture your voice."><MicrophonePicker autoOpen={autoOpen} /></Row>
+    <Row label="Interaction sounds" hint="Play sounds for key actions like start/stop."><Toggle value={settings.playSoundOnRecord} onChange={value => void patch({ playSoundOnRecord: value })} /></Row>
+    <Row label="Mute when dictating" hint="Automatically silence other active audio during dictation."><Toggle value={settings.muteWhileDictating} onChange={value => void patch({ muteWhileDictating: value })} /></Row>
   </>
-}
-
-// Original layouts: CHQBpmae D6 / A51 / T51 / I51 / HP. Unavailable service data is never fabricated.
-function AccountSection() {
-  const t = useSettingsText()
-  const [user, setUser] = useState<{ email?: string; plan?: string } | null>(null)
-  const [confirm, setConfirm] = useState(false)
-  const [busy, setBusy] = useState(true)
-  const refresh = async () => { setBusy(true); try { setUser(await window.offkey.invoke('auth:get-current')) } catch { toast.error('无法加载账户信息，请重试') } finally { setBusy(false) } }
-  useEffect(() => { void refresh() }, [])
-  return <div className="settings-account">
-    <div><Row label="电子邮件" hint={user?.email ?? '—'}>{null}</Row>
-    <Row label="订阅" hint={user?.plan ?? '—'}><button className="settings-refresh" aria-label="刷新订阅" title="刷新" disabled={busy} onClick={() => void refresh()}>↻</button>{user?.plan?.toLowerCase().includes('pro') && <button className="settings-pill" disabled title="订阅服务尚未接入">{t('管理')}</button>}<button className="settings-pill is-primary" disabled title="订阅服务尚未接入">{t('升级')}</button></Row>
-    <Row label="礼品卡"><button className="settings-pill" disabled title="礼品卡服务尚未接入">{t('购买')}</button></Row>
-    </div>
-    <div className="settings-account-footer"><button className="settings-pill" disabled={busy} onClick={() => { setConfirm(true) }}>{t('退出')}</button></div>
-    {confirm && <ConfirmDialog title={t('要退出 Offkey 吗？')} description={t('您可以随时重新登录。')} pending={busy} onClose={() => { setConfirm(false) }} onConfirm={() => { if (busy) return; setBusy(true); void window.offkey.invoke('auth:logout').then(() => { setUser(null); setConfirm(false); toast.success('已退出账户') }).catch(() => toast.error('退出失败，请重试')).finally(() => setBusy(false)) }} />}
-  </div>
 }
 
 function PersonalizationSection() {
   const t = useSettingsText()
-  return <><div className="settings-personal-card"><div className="settings-personal-heading"><span>{t('整体个性化：')}</span><strong>--</strong><button className="settings-pill" disabled title="个性化学习服务尚未接入">{t('启用个性化')}</button></div><div className="settings-personal-empty"><div className="settings-personal-chart" /><span>{t('数据不足')}</span></div></div></>
+  return <><div className="settings-personal-card"><div className="settings-personal-heading"><span>{t("Overall personalization:")}</span><strong>--</strong><button className="settings-pill" disabled title="Personalization is not available yet">{t("Enable personalization")}</button></div><div className="settings-personal-empty"><div className="settings-personal-chart" /><span>{t("Not Enough Data")}</span></div></div></>
 }
 
 function ExternalRow({ label, url }: { label: string; url: string }) {
@@ -189,7 +165,7 @@ function HelpSection() {
   const t = useSettingsText()
   const [tour, setTour] = useState(false)
   const { settings } = useAppSettings()
-  return <><Row label="探索关键功能" hint="关于口述、翻译和提问的指导示例。"><button className="settings-pill" onClick={() => setTour(true)}>{t('开始')}</button></Row><ExternalRow label="帮助中心" url="https://www.typeless.com/help" /><ExternalRow label="版本说明" url={`https://www.typeless.com/help/release-notes/macos?lang=${settings.language ?? 'zh-CN'}`} />{tour && <FeatureTour onClose={() => setTour(false)} />}</>
+  return <><Row label="Explore key features" hint="Guided examples for Dictate, Translate, and Ask anything."><button className="settings-pill" onClick={() => setTour(true)}>{t("Start")}</button></Row><ExternalRow label="Help center" url="https://www.typeless.com/help" /><ExternalRow label="Release notes" url={`https://www.typeless.com/help/release-notes/macos?lang=${settings.language ?? 'en'}`} />{tour && <FeatureTour onClose={() => setTour(false)} />}</>
 }
 
 function AboutSection() {
@@ -197,10 +173,10 @@ function AboutSection() {
   const [version, setVersion] = useState('')
   useEffect(() => { api.app.systemInfo().then((info: { appVersion?: string }) => { if (info?.appVersion) setVersion(info.appVersion) }).catch(() => undefined) }, [])
   const [checking, setChecking] = useState(false)
-  return <><Row label="版本" hint={version ? `v${version}` : '—'}><button className="settings-pill" disabled={checking} onClick={async () => {
+  return <><Row label="Version" hint={version ? `v${version}` : '—'}><button className="settings-pill" disabled={checking} onClick={async () => {
     setChecking(true)
     try { await checkForUpdates(version) } finally { setChecking(false) }
-  }}>{t(checking ? '正在检查更新...' : '检查更新')}</button></Row><ExternalRow label="隐私政策" url="https://www.typeless.com/privacy" /><ExternalRow label="服务条款" url="https://www.typeless.com/terms" /></>
+  }}>{t(checking ? "Checking for updates..." : "Check for updates")}</button></Row><ExternalRow label="Privacy Policy" url="https://www.typeless.com/privacy" /><ExternalRow label="Terms of Service" url="https://www.typeless.com/terms" /></>
 }
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -214,6 +190,6 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 
 function Choice({ value, options, onChange }: { value: string; options: { value: string; label: string }[]; onChange: (v: string) => void }) {
   const t = useSettingsText()
-  return <HubSelect label={t("外观")} value={value} options={options.map(option => ({ ...option, label: t(option.label) }))} onChange={onChange} />
+  return <HubSelect label={t("Appearance")} value={value} options={options.map(option => ({ ...option, label: t(option.label) }))} onChange={onChange} />
 }
 

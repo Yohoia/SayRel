@@ -29,9 +29,9 @@ export function registerSystemHandlers(handle: (c: string, f: Handler) => void):
 
   // ---- appearance --------------------------------------------------------
   handle('appearance:get-color-mode', () => getAppearanceState().colorMode)
-  handle('appearance:get-state', (_e, userId?: string) => getAppearanceState(userId))
-  handle('appearance:set-preference', (_e, mode: any, userId?: string) =>
-    setPreference(mode, userId)
+  handle('appearance:get-state', () => getAppearanceState())
+  handle('appearance:set-preference', (_e, mode: any) =>
+    setPreference(mode)
   )
 
   // ---- settings ----------------------------------------------------------

@@ -44,9 +44,8 @@ const api = {
   // ---- appearance --------------------------------------------------------
   appearance: {
     getColorMode: () => invoke('appearance:get-color-mode'),
-    getState: (userId?: string) => invoke('appearance:get-state', userId),
-    setPreference: (mode: string, userId?: string) =>
-      invoke('appearance:set-preference', mode, userId),
+    getState: () => invoke('appearance:get-state'),
+    setPreference: (mode: string) => invoke('appearance:set-preference', mode),
     onColorModeChanged: (cb: Listener) => subscribe('appearance:color-mode-changed', cb)
   },
 
@@ -78,18 +77,6 @@ const api = {
     aiVoiceFlow: (payload: unknown) => invoke('audio:ai-voice-flow', payload),
     abortAiVoiceFlow: (id: string) => invoke('audio:abort-ai-voice-flow-request', id),
     onAiVoiceFlowStatus: (cb: Listener) => subscribe('audio:ai-voice-flow', cb)
-  },
-
-  // ---- auth --------------------------------------------------------------
-  auth: {
-    getAccessToken: () => invoke('auth:get-access-token'),
-    getCurrent: () => invoke('auth:get-current'),
-    isLoggedIn: () => invoke('auth:is-logged-in'),
-    login: (payload?: unknown) => invoke('auth:login', payload),
-    logout: () => invoke('auth:logout'),
-    startAppLogin: () => invoke('auth:start-app-login'),
-    onLoginLoadingChanged: (cb: Listener) => subscribe('auth:app-login-loading-changed', cb),
-    onLoginFailed: (cb: Listener) => subscribe('auth:app-login-failed', cb)
   },
 
   // ---- clipboard ---------------------------------------------------------
@@ -173,12 +160,6 @@ const api = {
       invoke('mixpanel:track-event', event, props)
   },
 
-  // ---- onboarding --------------------------------------------------------
-  onboarding: {
-    getSurveys: () => invoke('onboarding:get-user-profile-surveys'),
-    submitSurvey: (payload: unknown) => invoke('onboarding:submit-user-profile-survey', payload)
-  },
-
   // ---- pages / windows ---------------------------------------------------
   page: {
     changeHubRoute: (route: string) => invoke('page:change-hub-route', route),
@@ -247,14 +228,6 @@ const api = {
     getConfig: () => invoke('rsa:get-config'),
     isEnabled: () => invoke('rsa:is-enabled'),
     setConfig: (config: unknown) => invoke('rsa:set-config', config)
-  },
-
-  // ---- sync --------------------------------------------------------------
-  sync: {
-    onStateChanged: (cb: Listener) => subscribe('sync:state-changed', cb),
-    onError: (cb: Listener) => subscribe('sync:error', cb),
-    onPullDone: (cb: Listener) => subscribe('sync:channel-pull-done', cb),
-    trigger: () => invoke('sync:trigger')
   },
 
   // ---- updater -----------------------------------------------------------

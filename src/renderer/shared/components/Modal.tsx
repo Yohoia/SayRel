@@ -34,5 +34,5 @@ export function Modal({ title, onClose, children, role = 'dialog', descriptionId
     window.addEventListener('keydown', key)
     return () => { stack.splice(stack.indexOf(id), 1); window.removeEventListener('keydown', key); if (previous instanceof HTMLElement && previous.isConnected) previous.focus() }
   }, [])
-  return <div className="modal-backdrop" onMouseDown={(event) => { if (dismissible && event.target === event.currentTarget) onClose() }}><div className="modal-card" role={role} aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} ref={ref} tabIndex={-1}><h2 id={titleId}>{title}</h2>{showClose && <button type="button" className="icon-button modal-close" aria-label="关闭弹窗" disabled={!dismissible} onClick={onClose}><Icon name="close" /></button>}{children}</div></div>
+  return <div className="modal-backdrop" onMouseDown={(event) => { if (dismissible && event.target === event.currentTarget) onClose() }}><div className="modal-card" role={role} aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} ref={ref} tabIndex={-1}><h2 id={titleId}>{title}</h2>{showClose && <button type="button" className="icon-button modal-close" aria-label="Close dialog" disabled={!dismissible} onClick={onClose}><Icon name="close" /></button>}{children}</div></div>
 }

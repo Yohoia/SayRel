@@ -7,7 +7,7 @@ export class SidebarWindow extends BaseWindow {
     return WINDOWS.SIDEBAR
   }
   getWindowTitle(): string {
-    return 'Offkey 侧栏'
+    return "Sayrel context"
   }
   getWindowOptions() {
     const area = screen.getPrimaryDisplay().workArea
@@ -38,7 +38,7 @@ export class OnboardingWindow extends BaseWindow {
     return WINDOWS.ONBOARDING
   }
   getWindowTitle(): string {
-    return '欢迎使用 Offkey'
+    return "Welcome to Sayrel"
   }
   getWindowOptions() {
     return {
@@ -57,30 +57,6 @@ export class OnboardingWindow extends BaseWindow {
   }
 }
 
-export class LoginWindow extends BaseWindow {
-  getWindowRoute(): WindowRoute {
-    return WINDOWS.LOGIN
-  }
-  getWindowTitle(): string {
-    return '登录 Offkey'
-  }
-  getWindowOptions() {
-    return {
-      width: 1080,
-      height: 750,
-      minWidth: 988,
-      minHeight: 685,
-      resizable: true,
-      transparent: true,
-      vibrancy: 'sidebar' as const,
-      titleBarStyle: 'hidden' as const,
-      titleBarOverlay: true,
-      trafficLightPosition: { x: 26, y: 24 },
-      backgroundColor: '#00000000'
-    }
-  }
-}
-
 export class InteractiveCardWindow extends BaseWindow {
   private payload: unknown = null
   private mouseTracker: NodeJS.Timeout | null = null
@@ -93,7 +69,7 @@ export class InteractiveCardWindow extends BaseWindow {
     return WINDOWS.INTERACTIVE_CARD
   }
   getWindowTitle(): string {
-    return 'AI 回答'
+    return "AI answer"
   }
   getWindowOptions() {
     const bounds = this.anchor ?? this.computeInitialBounds()
@@ -207,5 +183,4 @@ export class InteractiveCardWindow extends BaseWindow {
 
 export const sidebarWindow = new SidebarWindow()
 export const onboardingWindow = new OnboardingWindow()
-export const loginWindow = new LoginWindow()
 export const interactiveCardWindow = new InteractiveCardWindow()

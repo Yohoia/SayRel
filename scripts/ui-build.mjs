@@ -14,5 +14,5 @@ await build({
       return [{ tag: 'script', attrs: { type: 'module', src: '/@fs/' + resolve(root, 'scripts/ui-fixture.ts') }, injectTo: 'head-prepend' }]
     } }
   }],
-  build: { outDir: resolve(root, '.build/ui-review'), emptyOutDir: true, rollupOptions: { input: Object.fromEntries(['hub', 'floating-bar', 'interactive-card', 'onboarding', 'login', 'sidebar'].map(name => [name, resolve(root, 'src/renderer', `${name}.html`)])) } }
+  build: { outDir: resolve(root, '.build/ui-review'), emptyOutDir: true, rollupOptions: { input: Object.fromEntries(['hub', 'floating-bar', 'interactive-card', 'onboarding', 'sidebar'].map(name => [name, resolve(root, 'src/renderer', `${name}.html`)])) } }
 })

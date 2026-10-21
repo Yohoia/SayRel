@@ -5,13 +5,13 @@ import { toast } from '../components/Toast'
 const updateResult = z.object({ version: z.string().nullable().optional(), skipped: z.string().optional(), error: z.string().optional() })
 
 export async function checkForUpdates(currentVersion: string): Promise<void> {
-  const id = toast.loading('正在检查更新')
+  const id = toast.loading("Checking for updates")
   try {
     const result = updateResult.parse(await api.updater.check())
-    if (result.skipped === 'dev-build') toast.update(id, { tone: 'info', message: '开发模式暂不支持自动更新' })
-    else if (result.error) toast.update(id, { tone: 'error', message: '检查更新失败，请稍后重试' })
-    else if (result.version === currentVersion) toast.update(id, { tone: 'success', message: '已是最新版本' })
-    else if (result.version) toast.update(id, { tone: 'info', message: `发现新版本 v${result.version}` })
-    else toast.update(id, { tone: 'info', message: '暂时无法确认最新版本' })
-  } catch { toast.update(id, { tone: 'error', message: '检查更新失败，请检查网络' }) }
+    if (result.skipped === 'dev-build') toast.update(id, { tone: 'info', message: "Automatic updates are unavailable in development mode" })
+    else if (result.error) toast.update(id, { tone: 'error', message: "Could not check for updates. Please try again later." })
+    else if (result.version === currentVersion) toast.update(id, { tone: 'success', message: "You’re up to date" })
+    else if (result.version) toast.update(id, { tone: 'info', message: `New version available: v${result.version}` })
+    else toast.update(id, { tone: 'info', message: "Could not confirm the latest version" })
+  } catch { toast.update(id, { tone: 'error', message: "Could not check for updates. Please check your connection." }) }
 }

@@ -6,9 +6,7 @@ import { registerAudioHandlers } from './audio'
 import { registerHistoryHandlers } from './history'
 import { registerWindowHandlers } from './windows'
 import { registerSystemHandlers } from './system'
-import { registerAuthHandlers } from './auth'
 import { registerUpdaterHandlers } from './updater'
-import { registerSyncHandlers } from './sync'
 import { registerMiscHandlers } from './misc'
 import { registerProviderHandlers } from './providers'
 import { createLogger } from '../lib/logger'
@@ -27,8 +25,8 @@ const registered = new Set<string>()
  * Register a type-safe IPC handler.
  *
  * @example
- * registerHandler('auth:login', async (event) => {
- *   return { url: '...', state: '...' }
+ * registerHandler('audio:is-muted', async (event) => {
+ *   return false
  * })
  */
 export function registerHandler<C extends keyof IpcChannels>(
@@ -75,9 +73,7 @@ export function registerIpc(): void {
   registerHistoryHandlers(handle)
   registerWindowHandlers(handle)
   registerSystemHandlers(handle)
-  registerAuthHandlers(handle)
   registerUpdaterHandlers(handle)
-  registerSyncHandlers(handle)
   registerMiscHandlers(handle)
   registerProviderHandlers(handle)
   log.info(`registered ${registered.size} invoke channels`)

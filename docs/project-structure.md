@@ -18,7 +18,6 @@ offkey/
 │   │   ├── index.ts         # 应用入口
 │   │   ├── services/        # 业务逻辑层
 │   │   │   ├── providers/   # 服务提供商模块
-│   │   │   ├── auth.ts
 │   │   │   ├── transcription.ts
 │   │   │   └── ...
 │   │   ├── ipc/             # IPC 处理器
@@ -68,7 +67,6 @@ offkey/
 │   │   │   ├── main.tsx
 │   │   │   └── styles.css
 │   │   │
-│   │   ├── login/           # 登录窗口
 │   │   │   ├── components/
 │   │   │   ├── App.tsx
 │   │   │   └── main.tsx
@@ -139,7 +137,6 @@ OffKey 使用多窗口架构，每个窗口都是独立的 React 应用：
 |------|------|----------|
 | hub | 主界面（仪表板、历史、词典、设置） | `hub.html` |
 | floating-bar | 浮动录音条 | `floating-bar.html` |
-| login | 登录界面 | `login.html` |
 | onboarding | 首次使用引导 | `onboarding.html` |
 | sidebar | 侧边栏 | `sidebar.html` |
 | interactive-card | 交互卡片 | `interactive-card.html` |

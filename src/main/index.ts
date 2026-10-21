@@ -11,7 +11,6 @@ import { setPreloadPath } from './windows/base'
 import { allBaseWindows, broadcast, hubWindow, openHub, windows } from './windows'
 import { registerIpc } from './ipc'
 import { wireUpdater } from './ipc/updater'
-import { startSyncSchedule, stopSyncSchedule } from './ipc/sync'
 import { applyTheme, watchSystemTheme } from './services/appearance'
 import { getLanguage } from './services/i18n'
 import { keyboard, nativeStatus } from './lib/native'
@@ -51,10 +50,13 @@ function configureSession(): void {
 }
 
 function setupTray(): void {
+  const isMac = process.platform === 'darwin'
+  const filename = isMac ? 'tray.png' : process.platform === 'win32' ? 'tray-win32.png' : 'tray-linux.png'
   const icon = nativeImage.createFromPath(
-    join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'build', 'tray.png')
+    join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'build', filename)
   )
-  tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon.resize({ width: 22, height: 22 }))
+  if (isMac) icon.setTemplateImage(true)
+  tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon)
   tray.setToolTip(PRODUCT.displayName)
   tray.setContextMenu(buildTrayMenu())
   tray.on('click', () => openHub('main'))
@@ -62,7 +64,7 @@ function setupTray(): void {
 
 async function bootstrap(): Promise<void> {
   if (process.platform === 'darwin') {
-    app.dock?.setIcon(join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'build', 'icon.png'))
+    app.dock?.setIcon(join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'build', 'mac-icon.png'))
   }
   getDb()
   migrateFromV1()
@@ -84,7 +86,6 @@ async function bootstrap(): Promise<void> {
   if (started !== 0) log.warn(`keyboard monitor unavailable (code ${started})`)
   refreshShortcutRegistrations()
 
-  startSyncSchedule()
   startCleanupSchedule()
   await getLanguage()
 
@@ -122,7 +123,6 @@ app.on('before-quit', async (event) => {
   quitting = true
   log.info('shutting down')
   globalShortcut.unregisterAll()
-  stopSyncSchedule()
   keyboard.stop()
   await workerThreads.shutdown()
   closeDb()
@@ -138,12 +138,6 @@ function handleDeepLink(raw: string): void {
   try {
     const url = new URL(raw)
     if (url.protocol !== `${PRODUCT.urlScheme}:`) return
-    const code = url.searchParams.get('code')
-    const state = url.searchParams.get('state')
-    if (code && state) {
-      import('./services/auth').then((auth) => auth.completeAppLogin(code, state))
-      return
-    }
     const route = url.searchParams.get('route')
     if (route) openHub('main')
   } catch (err) {

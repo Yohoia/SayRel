@@ -6,8 +6,6 @@
  */
 
 import type {
-  AuthSession,
-  UserInfo,
   AudioDeviceInfo,
   MicDeviceInfo,
   FocusedAppInfo,
@@ -28,32 +26,6 @@ import type { Mode } from './constants'
  * - Renderer: Import Bridge type that derives from this
  */
 export interface IpcChannels {
-  // Auth
-  'auth:get-current': {
-    request: void
-    response: UserInfo | null
-  }
-  'auth:get-access-token': {
-    request: void
-    response: string | null
-  }
-  'auth:is-logged-in': {
-    request: void
-    response: boolean
-  }
-  'auth:login': {
-    request: void
-    response: { url: string; state: string }
-  }
-  'auth:start-app-login': {
-    request: void
-    response: { url: string; state: string }
-  }
-  'auth:logout': {
-    request: void
-    response: boolean
-  }
-
   // Audio
   'audio:get-devices-async': {
     request: void
@@ -89,7 +61,6 @@ export interface IpcChannels {
   // History
   'history:query': {
     request: {
-      userId?: string
       mode?: Mode
       limit?: number
       offset?: number
@@ -176,8 +147,8 @@ export interface IpcChannels {
  *
  * Usage in main process:
  * ```typescript
- * const handler: TypedHandler<'auth:login'> = async (event) => {
- *   return { url: '...', state: '...' }
+ * const handler: TypedHandler<'audio:is-muted'> = async (event) => {
+ *   return false
  * }
  * ```
  */

@@ -62,7 +62,6 @@ export const api = {
     resetAccessibility: () => bridge.invoke('permission:reset-accessibility-permission')
   },
   page: {
-    openLogin: () => bridge.invoke('page:open-login'),
     openHub: (route?: string) => bridge.invoke('page:open-hub', route),
     openSidebar: () => bridge.invoke('page:open-sidebar'),
     closeSidebar: () => bridge.invoke('page:close-sidebar'),

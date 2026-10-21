@@ -1,4 +1,12 @@
-@font-face { font-family:'Offkey Mono'; src:url('/fonts/home-mono.woff2') format('woff2'); font-display:swap; font-weight:100 900; }
+@font-face { font-family:'Rules Variable'; src:url('/fonts/hermes/RulesVariable.woff2') format('woff2'); font-display:swap; font-weight:100 900; font-stretch:25% 200%; }
+@font-face { font-family:'Rules Gothic Condensed'; src:url('/fonts/hermes/RulesGothicCnd-Light.woff2') format('woff2'); font-display:swap; font-weight:300; }
+@font-face { font-family:'Rules Gothic Condensed'; src:url('/fonts/hermes/RulesGothicCnd-Regular.woff2') format('woff2'); font-display:swap; font-weight:400; }
+@font-face { font-family:'Rules Gothic Condensed'; src:url('/fonts/hermes/RulesGothicCnd-Medium.woff2') format('woff2'); font-display:swap; font-weight:500; }
+@font-face { font-family:'Rules Gothic Compressed'; src:url('/fonts/hermes/RulesGothicCmp-Regular.woff2') format('woff2'); font-display:swap; font-weight:400; }
+@font-face { font-family:'Rules Gothic Compressed'; src:url('/fonts/hermes/RulesGothicCmp-Medium.woff2') format('woff2'); font-display:swap; font-weight:500; }
+@font-face { font-family:'Rules Gothic Compressed'; src:url('/fonts/hermes/RulesGothicCmp-Semibold.woff2') format('woff2'); font-display:swap; font-weight:600; }
+@font-face { font-family:'Inter'; src:url('/fonts/hermes/Inter-latin-variable.woff2') format('woff2'); font-display:swap; font-weight:100 900; }
+@font-face { font-family:'JetBrains Mono'; src:url('/fonts/home-mono.woff2') format('woff2'); font-display:swap; font-weight:100 900; }
 /* User-selected paper background and Hermes blue ink, independent of system appearance. */
 :root {
   --ink:#0000c2;
@@ -21,9 +29,11 @@
   --error:#b52249;
   --success:#08775f;
   --mask:#00005e66;
-  --font-sans:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
-  --font-display:'Arial Narrow','DIN Condensed',var(--font-sans);
-  --font-mono:'Offkey Mono',monospace;
+  --font-sans:'Inter',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+  --font-display:'Rules Gothic Condensed',var(--font-sans);
+  --font-compressed:'Rules Gothic Compressed',var(--font-display);
+  --font-condensed:'Rules Variable',var(--font-sans);
+  --font-mono:'JetBrains Mono',monospace;
   --radius-control:3px;
   --radius-panel:5px;
   --radius-floating:8px;
@@ -58,6 +68,6 @@ input:focus-visible,textarea:focus-visible,select:focus-visible { outline:2px so
 :root[data-color-mode='dark'] .light-art { display:none; }
 :root[data-color-mode='dark'] .dark-art { display:block; }
 
-/* Preserve the original mark and its consistent inset. */
+/* App icons and vector wordmarks have separate sizing roles. */
 .brand-icon { flex-shrink:0; object-fit:contain; padding:3px; border-radius:3px; background:#f2f2f2; }
-.secondary-login-heading .brand-icon { padding:6px; }
+.brand-lockup { display:block; width:100px; height:auto; flex-shrink:0; }

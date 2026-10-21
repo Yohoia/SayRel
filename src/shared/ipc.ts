@@ -28,17 +28,6 @@ export const IPC = {
   AUDIO_AI_VOICE_FLOW: 'audio:ai-voice-flow',
   AUDIO_ABORT_AI_VOICE_FLOW_REQUEST: 'audio:abort-ai-voice-flow-request',
 
-  // auth
-  AUTH_GET_ACCESS_TOKEN: 'auth:get-access-token',
-  AUTH_GET_CURRENT: 'auth:get-current',
-  AUTH_IS_LOGGED_IN: 'auth:is-logged-in',
-  AUTH_LOGIN: 'auth:login',
-  AUTH_LOGOUT: 'auth:logout',
-  AUTH_START_APP_LOGIN: 'auth:start-app-login',
-  AUTH_APP_LOGIN_LOADING_CHANGED: 'auth:app-login-loading-changed',
-  AUTH_APP_LOGIN_FAILED: 'auth:app-login-failed',
-  AUTH_APP_LOGIN_CONNECTIVITY_FAILED: 'auth:app-login-connectivity-failed',
-
   // clipboard
   CLIPBOARD_WRITE_IMAGE: 'clipboard:write-image',
   CLIPBOARD_WRITE_TEXT: 'clipboard:write-text',
@@ -100,8 +89,6 @@ export const IPC = {
   MIXPANEL_TRACK_EVENT: 'mixpanel:track-event',
 
   // onboarding
-  ONBOARDING_GET_USER_PROFILE_SURVEYS: 'onboarding:get-user-profile-surveys',
-  ONBOARDING_SUBMIT_USER_PROFILE_SURVEY: 'onboarding:submit-user-profile-survey',
 
   // windows / pages
   PAGE_CHANGE_HUB_ROUTE: 'page:change-hub-route',
@@ -155,10 +142,6 @@ export const IPC = {
   // store
   STORE_USE: 'store:use',
 
-  // sync
-  SYNC_CHANNEL_PULL_DONE: 'sync:channel-pull-done',
-  SYNC_ERROR: 'sync:error',
-  SYNC_STATE_CHANGED: 'sync:state-changed',
 
   // troubleshooting
   TROUBLESHOOTING_GET_SYSTEM_INFO: 'troubleshooting:get-system-info',

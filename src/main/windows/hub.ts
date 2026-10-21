@@ -21,7 +21,7 @@ export class HubWindow extends BaseWindow {
   }
 
   getWindowTitle(): string {
-    return 'Offkey'
+    return 'Sayrel'
   }
 
   setMode(mode: HubMode): void {

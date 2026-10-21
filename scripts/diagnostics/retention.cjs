@@ -19,7 +19,7 @@ function load(file, imports = {}) {
 }
 const schema = load('src/main/db/schema.ts')
 const raw = new Database(':memory:')
-raw.exec(fs.readFileSync(path.join(root, 'src/main/db/sql/0000_init.sql'), 'utf8'))
+for (const file of fs.readdirSync(path.join(root, 'src/main/db/sql')).filter(file => file.endsWith('.sql')).sort()) raw.exec(fs.readFileSync(path.join(root, 'src/main/db/sql', file), 'utf8'))
 const db = drizzle(raw, { schema })
 const history = load('src/main/services/history.ts', {
   '../db': { getDb: () => db, getRawDb: () => raw, schema },

@@ -16,14 +16,14 @@ import { HubSelect } from '../components/HubSelect'
 import '../../shared/styles/providers.css'
 
 const services: ProviderService[] = ['transcription', 'refinement']
-const serviceLabels = { transcription: '语音转写', refinement: '文本润色' }
+const serviceLabels = { transcription: "Transcription", refinement: "Text refinement" }
 type Draft = Omit<ProviderProfile, 'protocol'> & { protocol: string }
 const messageOf = (error: unknown) => error instanceof Error ? error.message : String(error)
 const presetFor = (profile: Pick<ProviderProfile, 'presetId'>) => PROVIDER_PRESETS.find(preset => preset.id === profile.presetId)
 const canDiscover = (protocol: string) => ['openai-chat', 'openai-responses', 'anthropic', 'gemini', 'ollama'].includes(protocol)
 
 function blankProfile(service: ProviderService): Draft {
-  return { id: `custom-${crypto.randomUUID()}`, presetId: 'custom', name: '自定义服务商', service,
+  return { id: `custom-${crypto.randomUUID()}`, presetId: 'custom', name: "Custom provider", service,
     protocol: service === 'transcription' ? 'openai-transcription' : 'openai-chat', enabled: false,
     endpoint: '', apiKey: '', models: [], appId: '', accessToken: '', resourceId: 'volc.bigasr.sauc.duration', apiVersion: '2024-10-21' }
 }
@@ -101,10 +101,10 @@ export function ProvidersPage() {
   useEffect(() => { void reload(); const off = bridge.on('store:changed', () => { void reload() }); return () => { ++loadVersion.current; off?.() } }, [reload])
   const apply = (next: ServiceProviders) => { ++loadVersion.current; setState(next); setError('') }
   return <div className="page providers-page">
-    <header className="page-heading"><div className="page-heading-copy"><p className="page-index">04 / CONNECTIONS</p><h1 className="page-title">服务商</h1></div></header>
-    {error && <div className="providers-page-error" role="alert"><span>{error}</span><button className="text-button" onClick={() => void reload()}>重新加载</button></div>}
-    {loading ? <div className="hub-loading" role="status" aria-label="正在加载服务商" /> : <>
-      <div className="segmented-tabs providers-tabs" role="tablist" aria-label="服务类型">{services.map(service => <button type="button" key={service} id={`provider-tab-${service}`} role="tab" aria-selected={activeService === service} aria-controls={`provider-panel-${service}`} tabIndex={activeService === service ? 0 : -1} onClick={() => setActiveService(service)} onKeyDown={event => {
+    <header className="page-heading"><div className="page-heading-copy"><p className="page-index">04 / CONNECTIONS</p><h1 className="page-title">Providers</h1></div></header>
+    {error && <div className="providers-page-error" role="alert"><span>{error}</span><button className="text-button" onClick={() => void reload()}>Reload</button></div>}
+    {loading ? <div className="hub-loading" role="status" aria-label="Loading providers" /> : <>
+      <div className="segmented-tabs providers-tabs" role="tablist" aria-label="Service type">{services.map(service => <button type="button" key={service} id={`provider-tab-${service}`} role="tab" aria-selected={activeService === service} aria-controls={`provider-panel-${service}`} tabIndex={activeService === service ? 0 : -1} onClick={() => setActiveService(service)} onKeyDown={event => {
         const next = event.key === 'Home' ? services[0] : event.key === 'End' ? services[services.length - 1] : event.key === 'ArrowLeft' || event.key === 'ArrowRight' ? services.find(value => value !== service) : undefined
         if (next) { event.preventDefault(); setActiveService(next); document.getElementById(`provider-tab-${next}`)?.focus() }
       }}>{serviceLabels[service]}</button>)}</div>
@@ -113,15 +113,15 @@ export function ProvidersPage() {
         const presetIds = new Set(presets.map(preset => preset.id))
         const custom = state.profiles.filter(profile => profile.service === service && !presetIds.has(profile.id))
         return <section key={service} id={`provider-panel-${service}`} className="providers-group" role="tabpanel" aria-labelledby={`provider-tab-${service}`} hidden={activeService !== service}>
-          <div className="providers-group-heading"><h2>{serviceLabels[service]}服务商</h2><button type="button" className="secondary-button providers-add-button" onClick={() => setDraft(blankProfile(service))}><Icon name="plus" />添加</button></div>
+          <div className="providers-group-heading"><h2>{serviceLabels[service]} providers</h2><button type="button" className="secondary-button providers-add-button" onClick={() => setDraft(blankProfile(service))}><Icon name="plus" />Add</button></div>
           <div className="providers-cards">{[...presets.map(preset => ({ profile: state.profiles.find(profile => profile.id === preset.id) ?? createProviderProfile(preset), saved: state.profiles.some(profile => profile.id === preset.id) })), ...custom.map(profile => ({ profile, saved: true }))].map(({ profile, saved }) => {
             const preset = presetFor(profile)
             const selected = state[service]?.providerId === profile.id
             const configured = saved && !providerConfigurationIssue(profile)
             const enabled = saved && profile.enabled
             return <button type="button" className={`provider-card ${selected ? 'is-current' : ''}`} key={profile.id} data-provider-id={profile.id} onClick={() => setDraft({ ...profile, models: [...profile.models] })}>
-              <span className="provider-card-main">{preset?.logo ? <img className="provider-logo" src={preset.logo} alt="" /> : <span className="provider-avatar">{profile.name.slice(0, 1).toUpperCase()}</span>}<span className="provider-card-name">{profile.name}</span><span className={`provider-status ${enabled ? 'is-ready' : ''}`} role="img" aria-label={enabled ? '已启用' : saved ? '已停用' : '未配置'} title={enabled ? '已启用' : saved ? '已停用' : '未配置'} /></span>
-              <span className="provider-card-bottom"><span>{selected ? `正在使用 · ${state[service]?.model}` : configured ? '已配置' : saved && !profile.enabled ? '已停用' : '点击配置'}</span><span aria-hidden="true">›</span></span>
+              <span className="provider-card-main">{preset?.logo ? <img className="provider-logo" src={preset.logo} alt="" /> : <span className="provider-avatar">{profile.name.slice(0, 1).toUpperCase()}</span>}<span className="provider-card-name">{profile.name}</span><span className={`provider-status ${enabled ? 'is-ready' : ''}`} role="img" aria-label={enabled ? "Enabled" : saved ? "Disabled" : "Not configured"} title={enabled ? "Enabled" : saved ? "Disabled" : "Not configured"} /></span>
+              <span className="provider-card-bottom"><span>{selected ? `In use · ${state[service]?.model}` : configured ? "Configured" : saved && !profile.enabled ? "Disabled" : "Click to configure"}</span><span aria-hidden="true">›</span></span>
             </button>
           })}</div>
         </section>
@@ -149,7 +149,7 @@ function ProviderEditor({ initial, saved, selection, onClose, onUpdated }: {
   const alive = useRef(true)
   useEffect(() => { alive.current = true; return () => { alive.current = false; ++version.current } }, [])
   const preset = presetFor(draft)
-  const providerName = preset ? preset.name.replace(/^小米 MiMo/, 'MIMO') : draft.name
+  const providerName = preset?.name ?? draft.name
   const editableProtocol = !preset || draft.id !== preset.id || ['asr-openai', 'asr-audio-chat', 'llm-openai_compatible'].includes(preset.id)
   const baselineVolcMode = baseline.apiKey || !baseline.appId ? 'api-key' : 'legacy'
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline) || !!modelInput.trim() || draft.protocol === 'volcengine-asr' && volcMode !== baselineVolcMode
@@ -167,7 +167,7 @@ function ProviderEditor({ initial, saved, selection, onClose, onUpdated }: {
   const validate = (requireModel = true): ProviderProfile | null => {
     const parsed = providerProfileSchema.safeParse({ ...effectiveDraft, preferredModel: selectedModel })
     if (!parsed.success) { toast.error(parsed.error.issues.map(issue => issue.message).join('；')); return null }
-    if (requireModel && !parsed.data.models.length) { toast.error('请至少添加一个模型'); return null }
+    if (requireModel && !parsed.data.models.length) { toast.error("Add at least one model"); return null }
     return parsed.data
   }
   const save = async () => {
@@ -179,7 +179,7 @@ function ProviderEditor({ initial, saved, selection, onClose, onUpdated }: {
       const next = await providerApi.save(profile, activateModel)
       if (!alive.current) return
       onUpdated(next)
-      toast.success('保存成功')
+      toast.success("Saved")
       onClose()
     } catch (error) { if (alive.current) toast.error(messageOf(error)) }
     finally { if (alive.current) { setBusy(null); setTesting(null) } }
@@ -209,7 +209,7 @@ function ProviderEditor({ initial, saved, selection, onClose, onUpdated }: {
     try {
       const result = await providerApi.test(profile, model)
       if (alive.current && requestVersion === version.current) {
-        if (result.ok) toast.success('验证通过')
+        if (result.ok) toast.success("Connection verified")
         else toast.error(result.message)
       }
     } catch (error) {
@@ -230,53 +230,53 @@ function ProviderEditor({ initial, saved, selection, onClose, onUpdated }: {
       if (alive.current && requestVersion === version.current) {
         const next = [...new Set([...draft.models, ...models])]
         edit({ models: next.slice(0, 200) })
-        if (models.length) toast.success(next.length > 200 ? '模型列表已获取，仅保留前 200 个' : '模型列表已获取')
-        else toast.info('服务未返回可用模型')
+        if (models.length) toast.success(next.length > 200 ? "Models loaded. Showing the first 200." : "Models loaded")
+        else toast.info("The provider returned no available models")
       }
     } catch (error) { if (alive.current && requestVersion === version.current) { toast.error(messageOf(error)) } }
     finally { if (alive.current) setBusy(null) }
   }
   const addModel = () => {
     const model = modelInput.trim()
-    if (!model || model.length > 200) { toast.error('请输入 1–200 个字符的模型 ID'); return }
-    if (draft.models.includes(model)) { toast.error('该模型 ID 已存在'); return }
-    if (draft.models.length >= 200) { toast.error('最多添加 200 个模型'); return }
+    if (!model || model.length > 200) { toast.error("Enter a model ID of 1–200 characters"); return }
+    if (draft.models.includes(model)) { toast.error("This model ID already exists"); return }
+    if (draft.models.length >= 200) { toast.error("You can add up to 200 models"); return }
     edit({ models: [...draft.models, model] }); setModelInput('')
   }
   const remove = async () => {
     setBusy('remove')
-    try { onUpdated(await providerApi.remove(draft.id)); toast.success('删除成功'); onClose() }
+    try { onUpdated(await providerApi.remove(draft.id)); toast.success("Deleted"); onClose() }
     catch (error) { toast.error(messageOf(error)) }
     finally { if (alive.current) setBusy(null) }
   }
   const protocols = draft.service === 'transcription' ? transcriptionProtocols : refinementProtocols
   const local = draft.protocol === 'local-whisper'
   const readyDraft = providerProfileSchema.safeParse(effectiveDraft)
-  const issue = readyDraft.success ? providerConfigurationIssue(readyDraft.data) : '请先填写有效的服务地址和模型'
+  const issue = readyDraft.success ? providerConfigurationIssue(readyDraft.data) : "Enter a valid API base URL and model first"
   const selectedModel = draft.preferredModel ?? (selection?.providerId === draft.id && draft.models.includes(selection.model) ? selection.model : draft.models[0])
   const preview = requestPreview(draft, selectedModel)
   const secretField = (label: string, field: 'apiKey' | 'accessToken') => <div className="provider-field">
-    <div className="provider-field-heading"><label htmlFor={`provider-${draft.id}-${field}`}>{label}</label>{preset?.helpUrl && <button type="button" className="provider-inline-link" onClick={() => void api.page.openUrl(preset.helpUrl)}>获取 API Key ↗</button>}</div>
-    <div className="provider-secret"><input id={`provider-${draft.id}-${field}`} className="text-input" name={field} type={showSecrets ? 'text' : 'password'} autoComplete="off" spellCheck={false} value={draft[field]} onChange={event => edit({ [field]: event.target.value })} /><button type="button" className="provider-reveal" aria-label={showSecrets ? '隐藏密钥' : '显示密钥'} aria-pressed={showSecrets} title={showSecrets ? '隐藏密钥' : '显示密钥'} onClick={() => setShowSecrets(value => !value)}>{showSecrets ? <VisibilityOffOutlined fontSize="inherit" /> : <VisibilityOutlined fontSize="inherit" />}</button></div>
-    {!preset?.helpUrl && <span className="provider-help">无需认证的本地服务可留空</span>}
+    <div className="provider-field-heading"><label htmlFor={`provider-${draft.id}-${field}`}>{label}</label>{preset?.helpUrl && <button type="button" className="provider-inline-link" onClick={() => void api.page.openUrl(preset.helpUrl)}>Get API key ↗</button>}</div>
+    <div className="provider-secret"><input id={`provider-${draft.id}-${field}`} className="text-input" name={field} type={showSecrets ? 'text' : 'password'} autoComplete="off" spellCheck={false} value={draft[field]} onChange={event => edit({ [field]: event.target.value })} /><button type="button" className="provider-reveal" aria-label={showSecrets ? "Hide credentials" : "Show credentials"} aria-pressed={showSecrets} title={showSecrets ? "Hide credentials" : "Show credentials"} onClick={() => setShowSecrets(value => !value)}>{showSecrets ? <VisibilityOffOutlined fontSize="inherit" /> : <VisibilityOutlined fontSize="inherit" />}</button></div>
+    {!preset?.helpUrl && <span className="provider-help">Leave blank for local services without authentication</span>}
   </div>
-  return <div className="provider-dialog"><Modal title={!saved && initial.id.startsWith('custom-') ? '添加服务商' : '配置服务商'} onClose={close}>
+  return <div className="provider-dialog"><Modal title={!saved && initial.id.startsWith('custom-') ? "Add provider" : "Configure provider"} onClose={close}>
     <form onSubmit={event => { event.preventDefault(); void save() }}>
-      <div className="provider-editor-heading">{preset?.logo ? <img className="provider-logo" src={preset.logo} alt="" /> : <span className="provider-avatar">{draft.name.slice(0, 1)}</span>}<div className="provider-editor-identity"><span className="provider-editor-name">{providerName}</span>{preview && <p className="provider-request-preview" aria-label="完整请求地址"><code title={preview}>{preview}</code></p>}</div><label className="provider-enabled"><span>{draft.enabled ? '已启用' : '已停用'}</span><button type="button" role="switch" aria-label="启用服务商" aria-checked={draft.enabled} disabled={locked} className={`provider-switch ${draft.enabled ? 'is-on' : ''}`} aria-busy={busy === 'enabled'} onClick={() => void toggleEnabled()}><span /></button></label></div>
+      <div className="provider-editor-heading">{preset?.logo ? <img className="provider-logo" src={preset.logo} alt="" /> : <span className="provider-avatar">{draft.name.slice(0, 1)}</span>}<div className="provider-editor-identity"><span className="provider-editor-name">{providerName}</span>{preview && <p className="provider-request-preview" aria-label="Full request URL"><code title={preview}>{preview}</code></p>}</div><label className="provider-enabled"><span>{draft.enabled ? "Enabled" : "Disabled"}</span><button type="button" role="switch" aria-label="Enable provider" aria-checked={draft.enabled} disabled={locked} className={`provider-switch ${draft.enabled ? 'is-on' : ''}`} aria-busy={busy === 'enabled'} onClick={() => void toggleEnabled()}><span /></button></label></div>
       <fieldset disabled={locked} className="provider-editor-fields">
-        <div className={editableProtocol ? 'provider-field-pair' : undefined}><label className="provider-field"><span>名称</span><input className="text-input" name="name" value={draft.name} maxLength={80} onChange={event => edit({ name: event.target.value })} /></label>{editableProtocol && <div className="provider-field"><span>请求协议</span><HubSelect label="请求协议" value={draft.protocol} options={protocols.map(protocol => ({ value: protocol, label: protocolLabels[protocol] }))} onChange={value => edit({ protocol: value })} /></div>}</div>
+        <div className={editableProtocol ? 'provider-field-pair' : undefined}><label className="provider-field"><span>Name</span><input className="text-input" name="name" value={draft.name} maxLength={80} onChange={event => edit({ name: event.target.value })} /></label>{editableProtocol && <div className="provider-field"><span>Protocol</span><HubSelect label="Protocol" value={draft.protocol} options={protocols.map(protocol => ({ value: protocol, label: protocolLabels[protocol] }))} onChange={value => edit({ protocol: value })} /></div>}</div>
         {!local && <>
-          {draft.protocol === 'volcengine-asr' && <div className="provider-field"><span>认证方式</span><HubSelect label="认证方式" value={volcMode} options={[{ value: 'api-key', label: 'API Key' }, { value: 'legacy', label: 'App ID + Access Token' }]} onChange={value => { setVolcMode(value); edit({}) }} /></div>}
+          {draft.protocol === 'volcengine-asr' && <div className="provider-field"><span>Authentication</span><HubSelect label="Authentication" value={volcMode} options={[{ value: 'api-key', label: 'API Key' }, { value: 'legacy', label: 'App ID + Access Token' }]} onChange={value => { setVolcMode(value); edit({}) }} /></div>}
           {draft.protocol === 'volcengine-asr' && volcMode === 'legacy' ? <><label className="provider-field"><span>App ID</span><input className="text-input" name="appId" value={draft.appId} onChange={event => edit({ appId: event.target.value })} /></label>{secretField('Access Token', 'accessToken')}</> : secretField('API Key / Access Token', 'apiKey')}
-          {draft.protocol === 'volcengine-asr' && <label className="provider-field"><span>资源 ID</span><input className="text-input" name="resourceId" value={draft.resourceId} onChange={event => edit({ resourceId: event.target.value })} /></label>}
+          {draft.protocol === 'volcengine-asr' && <label className="provider-field"><span>Resource ID</span><input className="text-input" name="resourceId" value={draft.resourceId} onChange={event => edit({ resourceId: event.target.value })} /></label>}
         </>}
-        <label className="provider-field"><span>{local ? 'whisper-cli 可执行文件' : '服务地址 · API Base URL'}</span><input className="text-input" name="endpoint" value={draft.endpoint} placeholder={local ? '/usr/local/bin/whisper-cli' : 'https://api.example.com/v1'} autoComplete="off" spellCheck={false} onChange={event => edit({ endpoint: event.target.value })} /></label>
-        {draft.protocol === 'azure-openai' && <label className="provider-field"><span>API 版本</span><input className="text-input" name="apiVersion" value={draft.apiVersion} onChange={event => edit({ apiVersion: event.target.value })} /></label>}
-        <section className="provider-model-section" aria-label="模型列表"><div className="provider-model-heading"><h3>{local ? '本地模型文件路径' : draft.protocol === 'azure-openai' ? '模型部署名称' : '模型'}</h3><div className="provider-model-heading-actions">{canDiscover(draft.protocol) && <button type="button" className="text-button" disabled={!!busy || !!testing} onClick={() => void discover()}>{busy === 'models' ? '正在获取…' : '获取模型列表'}</button>}{preset?.docsUrl && <button type="button" className="provider-inline-link" onClick={() => void api.page.openUrl(preset.docsUrl)}>查看模型文档 ↗</button>}</div></div>
-          <div className="provider-model-list" role="radiogroup" aria-label="当前模型">{draft.models.map(model => {
+        <label className="provider-field"><span>{local ? "whisper-cli executable" : "API base URL"}</span><input className="text-input" name="endpoint" value={draft.endpoint} placeholder={local ? '/usr/local/bin/whisper-cli' : 'https://api.example.com/v1'} autoComplete="off" spellCheck={false} onChange={event => edit({ endpoint: event.target.value })} /></label>
+        {draft.protocol === 'azure-openai' && <label className="provider-field"><span>API version</span><input className="text-input" name="apiVersion" value={draft.apiVersion} onChange={event => edit({ apiVersion: event.target.value })} /></label>}
+        <section className="provider-model-section" aria-label="Model list"><div className="provider-model-heading"><h3>{local ? "Local model file path" : draft.protocol === 'azure-openai' ? "Model deployment name" : "Models"}</h3><div className="provider-model-heading-actions">{canDiscover(draft.protocol) && <button type="button" className="text-button" disabled={!!busy || !!testing} onClick={() => void discover()}>{busy === 'models' ? "Fetching…" : "Fetch models"}</button>}{preset?.docsUrl && <button type="button" className="provider-inline-link" onClick={() => void api.page.openUrl(preset.docsUrl)}>Model docs ↗</button>}</div></div>
+          <div className="provider-model-list" role="radiogroup" aria-label="Current model">{draft.models.map(model => {
             const current = selectedModel === model
             return <div className={`provider-model ${current ? 'is-current' : ''}`} key={model}>
-              <button type="button" className="provider-model-select" role="radio" aria-checked={current} tabIndex={selectedModel === model ? 0 : -1} aria-label={`选择模型 ${model}`} disabled={!!busy || !!testing} onClick={() => { if (!current) edit({ preferredModel: model }) }} onKeyDown={event => {
+              <button type="button" className="provider-model-select" role="radio" aria-checked={current} tabIndex={selectedModel === model ? 0 : -1} aria-label={`Select model ${model}`} disabled={!!busy || !!testing} onClick={() => { if (!current) edit({ preferredModel: model }) }} onKeyDown={event => {
                 if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
                 event.preventDefault()
                 const controls = Array.from(event.currentTarget.closest('[role="radiogroup"]')?.querySelectorAll<HTMLButtonElement>('[role="radio"]') ?? [])
@@ -284,13 +284,13 @@ function ProviderEditor({ initial, saved, selection, onClose, onUpdated }: {
                 const next = event.key === 'Home' ? 0 : event.key === 'End' ? controls.length - 1 : (index + (event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? controls.length - 1 : 1)) % controls.length
                 controls[next]?.focus(); controls[next]?.click()
               }}><span className="provider-model-indicator" aria-hidden="true" /><span className="provider-model-name">{model}</span></button>
-              <button type="button" className="icon-button provider-model-remove" aria-label={`移除模型 ${model}`} disabled={!!busy || !!testing} onClick={() => edit({ models: draft.models.filter(value => value !== model) })}><Icon name="close" size={14} /></button>
+              <button type="button" className="icon-button provider-model-remove" aria-label={`Remove model ${model}`} disabled={!!busy || !!testing} onClick={() => edit({ models: draft.models.filter(value => value !== model) })}><Icon name="close" size={14} /></button>
             </div>
-          })}{!draft.models.length && <p className="provider-model-empty">添加模型 ID 后，点击模型即可选用。</p>}</div>
-          <div className="provider-add-model"><input className="text-input" name="model" aria-label={local ? '模型文件路径' : '模型 ID'} value={modelInput} placeholder={local ? '/path/to/ggml-model.bin' : '输入模型 ID'} onChange={event => { ++version.current; setTesting(null); setModelInput(event.target.value); setDiscard(false) }} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); addModel() } }} /><button type="button" className="secondary-button" onClick={addModel}>添加模型</button></div>
+          })}{!draft.models.length && <p className="provider-model-empty">Add a model ID, then select it to use it.</p>}</div>
+          <div className="provider-add-model"><input className="text-input" name="model" aria-label={local ? "Model file path" : "Model ID"} value={modelInput} placeholder={local ? '/path/to/ggml-model.bin' : "Enter model ID"} onChange={event => { ++version.current; setTesting(null); setModelInput(event.target.value); setDiscard(false) }} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); addModel() } }} /><button type="button" className="secondary-button" onClick={addModel}>Add model</button></div>
         </section>
       </fieldset>
-      <footer className="provider-editor-footer"><div className="provider-footer-leading">{!local && <button type="button" className="secondary-button provider-test-connection" title={issue ?? undefined} disabled={!!testing || !!busy} onClick={() => void test(selectedModel)}>{testing ? '正在验证…' : '验证连接'}</button>}{saved && <button type="button" className="text-button provider-danger" disabled={!!busy} onClick={() => { setDiscard(false); setRemoveConfirm(true) }}>{draft.id === draft.presetId ? '移除配置' : '删除服务商'}</button>}</div><div className="provider-footer-actions"><button type="button" className="secondary-button" disabled={locked} onClick={close}>取消</button><button type="submit" className="primary-button" disabled={!!busy}>{busy === 'save' ? '正在保存…' : '保存配置'}</button></div></footer>
+      <footer className="provider-editor-footer"><div className="provider-footer-leading">{!local && <button type="button" className="secondary-button provider-test-connection" title={issue ?? undefined} disabled={!!testing || !!busy} onClick={() => void test(selectedModel)}>{testing ? "Testing…" : "Test connection"}</button>}{saved && <button type="button" className="text-button provider-danger" disabled={!!busy} onClick={() => { setDiscard(false); setRemoveConfirm(true) }}>{draft.id === draft.presetId ? "Remove configuration" : "Delete provider"}</button>}</div><div className="provider-footer-actions"><button type="button" className="secondary-button" disabled={locked} onClick={close}>Cancel</button><button type="submit" className="primary-button" disabled={!!busy}>{busy === 'save' ? "Saving…" : "Save configuration"}</button></div></footer>
     </form>
-  </Modal>{discard && <ConfirmDialog title="放弃尚未保存的修改？" description="有尚未保存的修改，放弃后将无法恢复。" onClose={() => setDiscard(false)} onConfirm={onClose} />}{removeConfirm && <ConfirmDialog title={draft.id === draft.presetId ? '移除此服务商配置？' : '删除此服务商？'} description="此服务商的已保存配置及密钥将被移除，默认模型会同步取消。" subject={draft.name} pending={busy === 'remove'} onClose={() => setRemoveConfirm(false)} onConfirm={() => void remove()} />}</div>
+  </Modal>{discard && <ConfirmDialog title="Discard unsaved changes?" description="Your unsaved changes will be lost." onClose={() => setDiscard(false)} onConfirm={onClose} />}{removeConfirm && <ConfirmDialog title={draft.id === draft.presetId ? "Remove this provider configuration?" : "Delete this provider?"} description="The saved configuration and credentials will be removed. Its default model will also be cleared." subject={draft.name} pending={busy === 'remove'} onClose={() => setRemoveConfirm(false)} onConfirm={() => void remove()} />}</div>
 }

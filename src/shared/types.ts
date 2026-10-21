@@ -1,4 +1,4 @@
-import type { Delivery, HistoryStatus, Mode, SyncStatus } from './constants'
+import type { Delivery, HistoryStatus, Mode } from './constants'
 
 export interface FocusedAppInfo {
   appName: string | null
@@ -57,7 +57,6 @@ export interface AiResult {
 
 export interface HistoryRecord {
   id: string
-  userId: string | null
   status: HistoryStatus | string | null
   mode: Mode | string
   refinedText: string | null
@@ -73,10 +72,6 @@ export interface HistoryRecord {
   modeMeta: string | null
   debugInfo: string | null
   audioContext: string | null
-  serverUpdatedAt: number | null
-  syncStatus: SyncStatus | string
-  syncAttemptCount: number
-  syncedFromCloud: number
 }
 
 export interface HistoryListItem {
@@ -94,7 +89,6 @@ export interface HistoryListItem {
 }
 
 export interface HistoryListQuery {
-  userId?: string | null
   limit?: number
   offset?: number
   cursor?: string | null
@@ -112,28 +106,9 @@ export interface HistoryListResult {
   nextCursor: string | null
 }
 
-export interface UserInfo {
-  id: string
-  email: string | null
-  name: string | null
-  avatarUrl: string | null
-  plan: string | null
-  locale: string | null
-  createdAt?: string | null
-}
-
-export interface AuthSession {
-  userId: string
-  accessToken: string
-  refreshToken: string | null
-  expiresAt: number | null
-  user: UserInfo | null
-}
-
 export interface AppearanceState {
   colorMode: 'light' | 'dark' | 'system'
   resolved: 'light' | 'dark'
-  preferenceByUserId: Record<string, string>
 }
 
 export interface DeviceInfo {
@@ -209,13 +184,6 @@ export interface PermissionState {
   microphone: boolean
   accessibility: boolean
   screenRecording: boolean
-}
-
-export interface SyncState {
-  phase: 'idle' | 'pulling' | 'pushing' | 'error'
-  lastSyncedAt: number | null
-  pending: number
-  error?: string | null
 }
 
 export interface SystemInfo {

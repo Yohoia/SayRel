@@ -61,7 +61,7 @@ try {
   page.write('OggS'); page[26] = 1; page[27] = packet.length; packet.copy(page, 28)
   const decoded = decodeHistoryAudio(page)
   assert.equal(decoded.pcm.length, 320); assert.equal(decoded.sampleRate, 16000)
-  assert(decoded.pcm.every(Number.isFinite)); assert.throws(() => decodeHistoryAudio(Buffer.from('invalid')), /格式无效/); checks++
+  assert(decoded.pcm.every(Number.isFinite)); assert.throws(() => decodeHistoryAudio(Buffer.from('invalid')), /format is invalid/); checks++
   const pcm = new Float32Array(3200)
   const audio = wavAudio(pcm, 16000)
   const input = { pcm, sampleRate: 16000, audioBuffer: audio, mimeType: 'audio/wav', durationMs: 200, mode: 'voice_transcript' } satisfies Parameters<typeof transcribeProfile>[2]
@@ -119,28 +119,28 @@ try {
   }
   json({ text: '' })
   assert.equal((await testProvider(profile('openai-transcription'), 'probe-model')).ok, true)
-  await assert.rejects(transcribeProfile(profile('openai-transcription'), 'probe-model', input), /空结果/); checks++
+  await assert.rejects(transcribeProfile(profile('openai-transcription'), 'probe-model', input), /empty result/); checks++
   json({ invalid: 'local-test-secret' })
-  await assert.rejects(completeChat(profile('openai-chat'), 'probe-model', messages), /响应格式/); checks++
+  await assert.rejects(completeChat(profile('openai-chat'), 'probe-model', messages), /response does not match/); checks++
   reply = res => { res.statusCode = 401; res.end('local-test-secret server internal response') }
   await assert.rejects(completeChat(profile('openai-chat'), 'probe-model', messages), error => error instanceof Error && error.message.includes('401') && !error.message.includes('secret')); checks++
   reply = res => { res.setHeader('content-type', 'application/json'); res.end('{invalid') }
-  await assert.rejects(completeChat(profile('openai-chat'), 'probe-model', messages), /无效的 JSON/); checks++
+  await assert.rejects(completeChat(profile('openai-chat'), 'probe-model', messages), /invalid JSON/); checks++
   json({ choices: [{ message: { content: '' } }] })
-  await assert.rejects(completeChat(profile('openai-chat'), 'probe-model', messages), /空结果/); checks++
+  await assert.rejects(completeChat(profile('openai-chat'), 'probe-model', messages), /empty result/); checks++
   const selectedRefinement = profile('openai-chat')
   const config = { ...DEFAULT_SETTINGS, serviceProviders: { profiles: [selectedRefinement], transcription: null, refinement: { providerId: selectedRefinement.id, model: 'probe-model' } } }
   json({ choices: [{ message: { content: 'translated' } }] })
   assert.equal(await runVoiceAction({ transcript: 'hello', mode: 'translation', context: null, config, signal: new AbortController().signal }), 'translated')
   assert.match(JSON.stringify(body().messages), /Translate the user's dictated text/)
-  await assert.rejects(runVoiceAction({ transcript: 'hello', mode: 'ask_anything', context: null, config: { ...DEFAULT_SETTINGS, serviceProviders: EMPTY_SERVICE_PROVIDERS }, signal: new AbortController().signal }), /语言模型服务/); checks++
+  await assert.rejects(runVoiceAction({ transcript: 'hello', mode: 'ask_anything', context: null, config: { ...DEFAULT_SETTINGS, serviceProviders: EMPTY_SERVICE_PROVIDERS }, signal: new AbortController().signal }), /language model provider/); checks++
   reply = res => { res.setHeader('content-type', 'text/event-stream'); res.end('data: {"type":"transcript.text.delta","delta":"partial"}\n\n') }
-  await assert.rejects(transcribeProfile(profile('stepfun-asr'), 'probe-model', input), /完整转写前断开/); checks++
+  await assert.rejects(transcribeProfile(profile('stepfun-asr'), 'probe-model', input), /disconnected before returning the complete transcript/); checks++
   reply = () => {}
-  await assert.rejects(completeChat(profile('openai-chat'), 'probe-model', messages, AbortSignal.timeout(30)), /取消/); checks++
+  await assert.rejects(completeChat(profile('openai-chat'), 'probe-model', messages, AbortSignal.timeout(30)), /cancelled/); checks++
   const legacy = { transcription: 'mock', refinement: 'mock', baseUrl: null, apiKey: null, model: null, refinementModel: null } satisfies Parameters<typeof createProviders>[0]
   const unconfigured = createProviders(legacy, EMPTY_SERVICE_PROVIDERS)
-  await assert.rejects(unconfigured.transcription.transcribe(input), /服务商页面配置/)
+  await assert.rejects(unconfigured.transcription.transcribe(input), /Configure and select/)
   assert.equal((await unconfigured.refinement.refine({ transcript: ' raw ', mode: 'voice_transcript' })).text, 'raw')
   assert.match((await createProviders(legacy).transcription.transcribe(input)).text, /mock transcript/); checks++
   const whisperDir = await mkdtemp(join(tmpdir(), 'offkey-whisper-probe-'))

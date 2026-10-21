@@ -7,7 +7,7 @@ const listeners = new Map<string, Set<(...args: any[]) => void>>()
 const emit = (channel: string, ...args: any[]) => listeners.get(channel)?.forEach((cb) => cb(...args))
 let settings = mergeSettings(JSON.parse(localStorage.getItem('offkey-ui-settings') || 'null') ?? DEFAULT_SETTINGS)
 let words = JSON.parse(localStorage.getItem('offkey-ui-words') || 'null') ?? (empty ? [] : [
-  { id: 'word-1', word: 'Offkey', source: 'manual', language: 'en', createdAt: '2026-10-19' },
+  { id: 'word-1', word: 'Sayrel', source: 'manual', language: 'en', createdAt: '2026-10-19' },
   { id: 'word-2', word: 'Figma', source: 'auto', language: 'en', createdAt: '2026-10-19' },
   { id: 'word-3', word: 'TypeScript', source: 'manual', language: 'en', createdAt: '2026-10-19' }
 ])
@@ -46,11 +46,11 @@ const bridge = {
       const action = providerActionSchema.parse(args[0])
       if (action.action === 'test') {
         await new Promise(resolve => setTimeout(resolve, 120))
-        if (params.get('fail') === 'test') return { ok: false, message: '离线测试：模型验证失败，请检查模型权限', latencyMs: 120 }
-        return { ok: true, message: '离线界面验证通过（未连接真实服务）', latencyMs: 120 }
+        if (params.get('fail') === 'test') return { ok: false, message: "Model verification failed. Check model permissions.", latencyMs: 120 }
+        return { ok: true, message: "Connection verified", latencyMs: 120 }
       }
       if (action.action === 'models') return ['fixture-discovered-model']
-      if (params.get('fail') === 'save') throw new Error('离线测试：保存失败，请重试')
+      if (params.get('fail') === 'save') throw new Error("Could not save. Please try again.")
       await new Promise(resolve => setTimeout(resolve, 180))
       settings = { ...settings, serviceProviders: updateProviderState(settings.serviceProviders, action) }
       localStorage.setItem('offkey-ui-settings', JSON.stringify(settings)); emit('store:changed', settings)
@@ -77,11 +77,11 @@ const bridge = {
     if (channel === 'db:history-clear') { history = []; return true }
     if (channel === 'dictionary:list') return words
     if (channel === 'dictionary:add') { if (params.get('fail') === 'save') throw new Error('UI fixture save failure'); words.push({ id: crypto.randomUUID(), word: args[0], source: 'manual', createdAt: new Date().toISOString() }); localStorage.setItem('offkey-ui-words', JSON.stringify(words)); return words.at(-1) }
-    if (channel === 'dictionary:remove') { await new Promise(resolve => setTimeout(resolve, 180)); if (params.get('fail') === 'delete') throw new Error('离线测试：删除失败'); words = words.filter((item: any) => item.id !== args[0]); localStorage.setItem('offkey-ui-words', JSON.stringify(words)); return true }
+    if (channel === 'dictionary:remove') { await new Promise(resolve => setTimeout(resolve, 180)); if (params.get('fail') === 'delete') throw new Error("Could not delete"); words = words.filter((item: any) => item.id !== args[0]); localStorage.setItem('offkey-ui-words', JSON.stringify(words)); return true }
     if (channel === 'dictionary:update') {
       if (params.get('fail') === 'save') throw new Error('UI fixture save failure')
       const entry = words.find((item: any) => item.id === args[0])
-      if (!entry) throw new Error('词汇不存在')
+      if (!entry) throw new Error("Word not found")
       entry.word = args[1]; localStorage.setItem('offkey-ui-words', JSON.stringify(words)); return entry
     }
     if (channel === 'appearance:get-state') return { resolved: settings.appearancePreference === 'dark' ? 'dark' : 'light' }
@@ -89,19 +89,16 @@ const bridge = {
     if (channel === 'i18n:get-language') return settings.language
     if (channel === 'i18n:set-language') { settings.language = args[0]; emit('store:changed', settings); emit('i18n:language-changed', args[0]); return args[0] }
     if (channel === 'page:floating-bar-click' && args[0] === 'translation-language') { settings.translationTargetLanguage = args[1]; emit('store:changed', settings); return true }
-    if (channel.startsWith('permission:')) { if (params.get('fail') === 'permission') { if (channel === 'permission:check-with-child-process') return false; throw new Error('离线测试：权限请求失败') }; return true }
+    if (channel.startsWith('permission:')) { if (params.get('fail') === 'permission') { if (channel === 'permission:check-with-child-process') return false; throw new Error('Could not request permission') }; return true }
+    if (channel === 'keyboard:begin-shortcut-capture') return { native: false }
     if (channel === 'audio:get-devices-async') return [{ deviceId: 'default', label: 'MacBook Pro Microphone', isDefault: true }]
     if (channel === 'troubleshooting:get-system-info') return { appVersion: '1.0.0', platform: 'darwin', arch: 'arm64' }
-    if (channel === 'page:get-interactive-card-payload') return { title: '帮我整理这段想法', answer: '清晰的表达，从一句简单的话开始。\n\n自然地说出想法，不必急着组织措辞，让文字随着你的思路慢慢成形。', createdAt: Date.now() }
-    if (channel === 'auth:get-current') return null
-    if (channel === 'auth:is-logged-in') return false
+    if (channel === 'page:get-interactive-card-payload') return { title:'Help me organize this idea', answer:'Clear writing starts with one simple sentence.\n\nSpeak naturally and let the words take shape as you think.', createdAt:Date.now() }
     if (channel === 'updater:check-for-update') { await new Promise(resolve => setTimeout(resolve, 700)); return { skipped: 'dev-build' } }
-    if (channel === 'auth:start-app-login' && params.get('fail') === 'login') throw new Error('离线测试：登录失败')
-    if (channel === 'clipboard:write-text' && params.get('fail') === 'clipboard') throw new Error('离线测试：复制失败')
+    if (channel === 'clipboard:write-text' && params.get('fail') === 'clipboard') throw new Error('Could not copy')
     if (channel === 'recording-machine:state') return { phase: 'idle', context: { handsFree: false } }
     if (channel === 'page:open-settings-modal') emit('page:open-settings-modal', args[0] ?? 'general')
     if (channel === 'file:pick-and-parse-dictionary-csv') return { canceled: true }
-    if (channel === 'sync:state') return { phase: 'idle', pending: 0 }
     return true
   },
   send() {},

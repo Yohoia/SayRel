@@ -20,7 +20,7 @@ export function useHotkeyState(mode = 'voice_transcript') {
         : mode === 'ask_anything' ? config?.askAnythingShortcut
         : mode === 'voice_command' ? config?.commandShortcut : config?.shortcut
       setShortcutLabel(binding?.enabled ? binding.accelerator : '')
-      setHint(config?.onboardingCompleted && config?.shortcut?.enabled === false ? '未设置快捷键，点击这里开始' : null)
+      setHint(config?.onboardingCompleted && config?.shortcut?.enabled === false ? "No shortcut set. Click here to start" : null)
     }
     const off = window.offkey?.on('store:changed', update)
     api.settings

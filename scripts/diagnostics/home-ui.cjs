@@ -8,7 +8,7 @@ const root = resolve(__dirname, '../..')
 const output = join(root, 'docs/ui-evidence/home')
 const profile = mkdtempSync(join(tmpdir(), 'offkey-home-'))
 const reports = [], errors = []
-let win
+let win, loadNumber=0
 app.setPath('userData', profile)
 app.commandLine.appendSwitch('disable-background-networking')
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -19,17 +19,20 @@ async function until(expression) {
 const js = code => win.webContents.executeJavaScript(code)
 async function shot(name) {
   await wait(300)
+  await js("Promise.all(document.getAnimations().filter(animation => Number.isFinite(animation.effect?.getComputedTiming().iterations)).map(animation => animation.finished.catch(() => null))).then(() => true)")
   const state = await js(`({width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth>innerWidth,missing:[...document.images].filter(i=>!i.complete||!i.naturalWidth).map(i=>i.src),text:document.querySelector('.home-canvas')?.innerText})`)
   assert.equal(state.overflow, false, name)
   assert.equal(await js(`(() => { const composition=document.querySelector('.home-composition'),apps=document.querySelector('.home-applications');return !composition||!apps||composition.getBoundingClientRect().bottom<=apps.getBoundingClientRect().top+1 })()`),true,name+' overlapping sections')
   assert.deepEqual(state.missing, [], name)
+  assert.equal(await js("!!document.querySelector('.settings-modal')"), ['shortcut-settings','native-fn-capture','settings-modal-narrow'].includes(name), name+' correct surface')
+  if (!['shortcut-settings','native-fn-capture','settings-modal-narrow'].includes(name)) assert.equal(await js("(() => {const span=document.querySelector('.home-headline span');return Math.abs(span.getBoundingClientRect().height-parseFloat(getComputedStyle(span).lineHeight))<2})()"),true,name+' headline remains two lines')
   writeFileSync(join(output, name + '.png'), (await win.webContents.capturePage()).toPNG())
   reports.push({ name, ...state })
   console.log('PASS ' + name)
 }
 async function load(query = {}) {
-  console.log('LOAD',query); await win.loadFile(join(root, '.build/ui-review/hub.html'), { query, hash: '/dashboard' })
-  await until("document.querySelector('.home-usage')?.innerText.includes('分钟')")
+  console.log('LOAD',query); await win.loadFile(join(root, '.build/ui-review/hub.html'), { query:{...query,load:String(++loadNumber)}, hash: '/dashboard' })
+  await until("document.querySelector('.home-usage')?.innerText.includes(' min')")
 }
 app.whenReady().then(async () => {
   mkdirSync(output, { recursive: true })
@@ -42,16 +45,26 @@ app.whenReady().then(async () => {
     window.__homeCalls = []; window.__homeSubscribers = new Map(); window.__homeFail = false;
     Object.defineProperty(window, 'offkey', { configurable:true, get(){return this.__homeBridge}, set(value){
       const invoke=value.invoke.bind(value), on=value.on.bind(value);
-      value.invoke=async(channel,...args)=>{window.__homeCalls.push([channel,...args]);if(channel==='db:history-list'&&window.__homeFail)throw new Error('fixture history failure');return invoke(channel,...args)};
+      value.invoke=async(channel,...args)=>{window.__homeCalls.push([channel,...args]);if(channel==='keyboard:begin-shortcut-capture'&&window.__homeNative)return {native:true};if(channel==='db:history-list'&&window.__homeFail)throw new Error('fixture history failure');return invoke(channel,...args)};
       value.on=(channel,cb)=>{const listeners=window.__homeSubscribers.get(channel)||new Set();listeners.add(cb);window.__homeSubscribers.set(channel,listeners);const off=on(channel,cb);return()=>{listeners.delete(cb);off()}};
       this.__homeBridge=value;
     }});
   ` })
   console.log('hook ready'); await load()
+  const fontStatus = await js(`(async () => {
+    const families = ['Inter', 'Rules Variable', 'Rules Gothic Condensed', 'Rules Gothic Compressed', 'JetBrains Mono'];
+    return Promise.all(families.map(async family => ({ family, count:(await document.fonts.load('400 24px "' + family + '"', 'Sayrel')).length })));
+  })()`)
+  assert.ok(fontStatus.every(font => font.count > 0), 'all five local font families load with the network blocked')
+  assert.equal(await js('document.documentElement.lang'), 'en')
+  assert.equal(await js("getComputedStyle(document.querySelector('.home-headline span')).fontFamily.split(',')[0].replaceAll('\"','').trim()"), 'Rules Gothic Condensed')
+  assert.match(await js("document.querySelector('.home-brand img').getAttribute('src')"), /sayrel-horizontal\.svg$/)
+  assert.equal(await js("/\\p{Script=Han}/u.test(document.body.innerText)"), false, 'English initial screen')
+  console.log('PASS local fonts, English initial screen, and Sayrel wordmark')
   await shot('home-default')
   const usage = await js("document.querySelector('.home-usage').innerText")
-  assert.match(usage, /2.*分钟/s)
-  assert.match(usage, /56.*字/s)
+  assert.match(usage, /2.* min/s)
+  assert.match(usage, /56.* words/s)
   for (const phase of ['recording','finishing','error','unavailable','idle']) {
     await js(`window.__homeSubscribers.get('recording-machine:state').forEach(cb=>cb({phase:${JSON.stringify(phase)}}))`)
     await until(`document.querySelector('.home-canvas').dataset.recordingPhase===${JSON.stringify(phase)}`)
@@ -60,11 +73,25 @@ app.whenReady().then(async () => {
   await js("document.querySelectorAll('.home-shortcut')[1].focus(); document.querySelectorAll('.home-shortcut')[1].click()")
   await until("!!document.querySelector('.settings-modal')")
   await shot('shortcut-settings')
+  await js("window.__homeNative=true; document.querySelectorAll('.settings-shortcut-key')[2].click()")
+  await until("window.__homeCalls.some(c=>c[0]==='keyboard:begin-shortcut-capture') && !!document.querySelector('.is-recording')")
+  await js("(() => { const button=document.querySelector('.is-recording');button.dispatchEvent(new KeyboardEvent('keydown',{key:'Unidentified',bubbles:true}));button.dispatchEvent(new KeyboardEvent('keyup',{key:'Unidentified',bubbles:true}));window.__homeSubscribers.get('keyboard:shortcut-captured').forEach(cb=>cb({combination:'Fn+RightShift',pressed:true}));window.__homeSubscribers.get('keyboard:shortcut-captured').forEach(cb=>cb({combination:'Fn+RightShift',pressed:false})); })()")
+  await until("!document.querySelector('.is-recording') && document.querySelectorAll('.settings-shortcuts')[2].innerText.includes('Right Shift')")
+  assert.equal((await js("window.offkey.invoke('store:use','get')")).askAnythingShortcut.accelerator,'Fn+RightShift')
+  await js("window.offkey.invoke('store:use','patch',{askAnythingShortcut:{accelerator:'Fn+Space'}})")
+  await js("window.offkey.invoke('store:use','patch',{shortcut:{enabled:false}})")
+  await js("document.querySelector('.settings-shortcuts .settings-add').click()")
+  await until("!!document.querySelector('.is-recording')")
+  await js("(() => {const button=document.querySelector('.is-recording');button.dispatchEvent(new KeyboardEvent('keydown',{key:'Unidentified',bubbles:true}));button.dispatchEvent(new KeyboardEvent('keyup',{key:'Unidentified',bubbles:true}));window.__homeSubscribers.get('keyboard:shortcut-captured').forEach(cb=>cb({combination:'Fn',pressed:true}));window.__homeSubscribers.get('keyboard:shortcut-captured').forEach(cb=>cb({combination:'Fn',pressed:false}));})()")
+  await until("!document.querySelector('.is-recording') && document.querySelectorAll('.settings-shortcut-key')[0].innerText==='Fn'")
+  assert.equal((await js("window.offkey.invoke('store:use','get')")).shortcut.accelerator,'Fn')
+  await shot('native-fn-capture')
+  console.log('PASS native Fn capture ignores DOM unidentified events and preserves modifier sides')
   await js("document.querySelector('.settings-modal-close').click()")
   await until("!document.querySelector('.settings-modal')")
   assert.equal(await js("document.activeElement.classList.contains('home-shortcut')"), true, 'settings restores focus')
   await js("window.offkey.invoke('store:use','patch',{shortcut:{accelerator:'Control+K',enabled:true},translationShortcut:{accelerator:'Shift+Fn',enabled:false}})")
-  await until("document.querySelectorAll('.home-shortcut')[0].innerText.includes('Control') && document.querySelectorAll('.home-shortcut')[1].innerText.includes('已停用')")
+  await until("document.querySelectorAll('.home-shortcut')[0].innerText.includes('Control') && document.querySelectorAll('.home-shortcut')[1].innerText.includes('Disabled')")
   await shot('changed-shortcuts')
   await js("document.querySelectorAll('.home-stamp')[2].click()")
   await until("window.__homeCalls.some(c=>c[0]==='page:open-url' && c[1]==='https://chatgpt.com/')")
@@ -76,10 +103,10 @@ app.whenReady().then(async () => {
     assert.equal(await js("!!document.querySelector('.app-sidebar')"), false)
   }
   await js("window.__homeFail=true; window.dispatchEvent(new Event('focus'))")
-  await until("document.querySelector('.home-usage').innerText.includes('统计暂不可用')")
+  await until("document.querySelector('.home-usage').innerText.includes('Stats unavailable')")
   await shot('usage-error')
   await js("window.__homeFail=false; document.querySelector('.home-usage button').click()")
-  await until("document.querySelector('.home-usage').innerText.includes('分钟')")
+  await until("document.querySelector('.home-usage').innerText.includes(' min')")
   await shot('usage-recovered')
   await js("document.querySelector('.home-version button').click()")
   await until("document.querySelector('.home-version button').disabled")
@@ -88,7 +115,7 @@ app.whenReady().then(async () => {
   await js("window.offkey.invoke('store:use','patch',{shortcut:{accelerator:'Fn',enabled:true},translationShortcut:{accelerator:'Fn+Shift',enabled:true}})")
   await load({state:'empty'})
   await shot('home-empty')
-  assert.match(await js("document.querySelector('.home-usage').innerText"), /0.*分钟.*0.*字.*从一次口述开始/s)
+  assert.match(await js("document.querySelector('.home-usage').innerText"), /0.* min.*0.* words.*Start with your first dictation/s)
   await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features:[{name:'prefers-reduced-motion',value:'reduce'}] })
   await js("window.__homeSubscribers.get('recording-machine:state').forEach(cb=>cb({phase:'recording'}))")
   assert.equal(await js("getComputedStyle(document.querySelector('.home-listening-ring')).animationName"), 'none')
@@ -98,10 +125,43 @@ app.whenReady().then(async () => {
   assert.equal(await js("getComputedStyle(document.querySelector('.home-canvas')).backgroundColor"), 'rgb(242, 242, 242)')
   await shot('paper-in-dark-preference')
   await js("window.offkey.invoke('appearance:set-preference','light')")
+  const baseGeometry = await js("({instrument:document.querySelector('.home-instrument').getBoundingClientRect().width,headline:parseFloat(getComputedStyle(document.querySelector('.home-headline')).fontSize)})")
+  for (const [width,height,name] of [[1440,900,'large-window'],[1920,1080,'fullscreen-window'],[2560,1440,'wide-window'],[1440,1200,'tall-window']]) {
+    win.setContentSize(width,height)
+    await shot(name)
+    const geometry = await js("({instrument:document.querySelector('.home-instrument').getBoundingClientRect().width,headline:parseFloat(getComputedStyle(document.querySelector('.home-headline')).fontSize)})")
+    assert.ok(geometry.instrument > baseGeometry.instrument, name+' instrument grows')
+    assert.ok(geometry.headline > baseGeometry.headline, name+' headline grows')
+  }
+  for (const [width,height] of [[1440,900],[1920,1080],[2560,1440],[840,560]]) {
+    win.setContentSize(width,height)
+    for (const route of ['history','dictionary','providers','settings']) {
+      await win.loadFile(join(root,'.build/ui-review/hub.html'),{hash:'/'+route,query:{load:String(++loadNumber)}})
+      await until("!!document.querySelector('.page,.settings-page')")
+      const geometry = await js(`(() => {const r=document.querySelector('.page,.settings-page').getBoundingClientRect();return {left:r.left,right:innerWidth-r.right,overflow:document.documentElement.scrollWidth>innerWidth};})()`)
+      assert.ok(Math.abs(geometry.left-geometry.right)<2,route+' centered at '+width)
+      assert.equal(geometry.overflow,false,route+' overflow at '+width)
+      writeFileSync(join(output,route+'-'+width+'.png'),(await win.webContents.capturePage()).toPNG())
+    }
+    await js("window.offkey.invoke('page:open-settings-modal','settings')")
+    await until("!!document.querySelector('.settings-modal')")
+    const centered = await js("(() => {const r=document.querySelector('.settings-modal').getBoundingClientRect();return Math.abs(r.left-(innerWidth-r.right))<2 && Math.abs(r.top-(innerHeight-r.bottom))<2;})()")
+    assert.equal(centered,true,'settings modal centers at '+width)
+    assert.equal(await js("document.querySelectorAll('.settings-modal .settings-nav-item').length"),4,'four sections without account')
+    assert.equal(await js("/[⇧␣]/u.test(document.querySelector('.settings-shortcuts').parentElement.parentElement.innerText)"),false)
+    assert.equal(await js("document.querySelectorAll('.settings-shortcuts')[2].innerText.includes('Space')"),true)
+    await js("document.querySelector('.settings-modal-close').click()")
+    await until("!document.querySelector('.settings-modal')")
+  }
+  await load()
   win.setContentSize(988,685); await shot('minimum-window')
   win.setContentSize(840,560); await shot('small-window')
   win.setContentSize(600,750); await shot('narrow-window')
+  await js("window.offkey.invoke('page:open-settings-modal','settings')")
+  await until("!!document.querySelector('.settings-modal')")
+  assert.equal(await js("(() => { const label=document.querySelectorAll('.settings-modal .settings-nav-item>span:last-child')[1];const range=document.createRange();range.selectNodeContents(label);return range.getBoundingClientRect().right<=document.querySelector('.settings-modal .settings-nav').getBoundingClientRect().right; })()"),true,'narrow settings labels fit navigation')
+  await shot('settings-modal-narrow')
   assert.deepEqual(errors, [])
-  writeFileSync(join(output,'report.json'), JSON.stringify({reports,errors,checks:['actual navigation and return','settings open and focus return','live shortcut changes and disabled state','application URL forwarding','recording state updates','history failure and retry','empty history','updater pending state','reduced motion','paper in dark preference','1080 / 988 / 840 / 600 widths'],scope:'Offline fixture, temporary profile, network blocked'},null,2))
+  writeFileSync(join(output,'report.json'), JSON.stringify({reports,errors,checks:['actual navigation and return','settings open and focus return','live shortcut changes and disabled state','application URL forwarding','recording state updates','history failure and retry','empty history','updater pending state','reduced motion','paper in dark preference','600–2560 widths; large/tall windows; centered history/dictionary/providers/settings and settings modal'],scope:'Offline fixture, temporary profile, network blocked'},null,2))
 }).catch(error=>{console.error(error);process.exitCode=1}).finally(()=>{win?.destroy();app.exit(process.exitCode||0)})
 app.on('quit',()=>rmSync(profile,{recursive:true,force:true}))

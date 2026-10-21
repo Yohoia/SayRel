@@ -24,9 +24,9 @@ export function SettingsModalHost({ open, section, onClose }: { open: boolean; s
   }, [open, onClose])
   if (!open) return null
   return <div className="settings-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
-    <div className="settings-modal" role="dialog" aria-modal="true" aria-label="设置" tabIndex={-1} ref={dialogRef}>
+    <div className="settings-modal" role="dialog" aria-modal="true" aria-label="Settings" tabIndex={-1} ref={dialogRef}>
       <SettingsPanel section={section} />
-      <button type="button" className="settings-modal-close" onClick={onClose} aria-label="关闭设置">
+      <button type="button" className="settings-modal-close" onClick={onClose} aria-label="Close settings">
         <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M18.3 5.71a.996.996 0 0 0-1.41 0L12 10.59 7.11 5.7A.996.996 0 1 0 5.7 7.11L10.59 12l-4.89 4.89a.996.996 0 1 0 1.41 1.41L12 13.41l4.89 4.89a.996.996 0 1 0 1.41-1.41L13.41 12l4.89-4.89c.38-.38.38-1.02 0-1.4" /></svg>
       </button>
     </div>

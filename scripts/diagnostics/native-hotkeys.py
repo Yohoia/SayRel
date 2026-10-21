@@ -87,7 +87,37 @@ check("shortcut editor captures a new Fn chord on first release", ["Fn down", "F
     _ = replay(.keyUp, 40, .maskSecondaryFn)
     _ = replay(.flagsChanged, 63, [])
 }
+for code in [Int64(63), Int64(179)] {
+    check("Fn keydown/up code \(code)", ["Fn down", "Fn up"]) {
+        _ = replay(.keyDown, code, [])
+        _ = replay(.keyUp, code, [])
+    }
+    check("Fn chord with omitted flags code \(code)", ["Fn down", "Fn+Space down", "Fn+Space up"]) {
+        _ = replay(.keyDown, code, [])
+        _ = replay(.keyDown, 49, [])
+        _ = replay(.keyUp, 49, [])
+        _ = replay(.keyUp, code, [])
+    }
+}
+check("Fn duplicate Globe and modifier events", ["Fn down", "Fn up"]) {
+    _ = replay(.flagsChanged, 63, .maskSecondaryFn)
+    _ = replay(.keyDown, 179, .maskSecondaryFn)
+    _ = replay(.keyUp, 179, [])
+    _ = replay(.flagsChanged, 63, [])
+}
+check("capture retains left Shift", ["LeftShift down", "LeftShift up"]) {
+    _ = replay(.flagsChanged, 56, CGEventFlags(rawValue: CGEventFlags.maskShift.rawValue | 0x2))
+    _ = replay(.flagsChanged, 56, [])
+}
+check("capture retains right Shift", ["RightShift down", "RightShift up"]) {
+    _ = replay(.flagsChanged, 60, CGEventFlags(rawValue: CGEventFlags.maskShift.rawValue | 0x4))
+    _ = replay(.flagsChanged, 60, [])
+}
 _ = setShortcutCaptureEnabled(0)
+check("Globe keydown works after capturing", ["Fn down", "Fn up"]) {
+    _ = replay(.keyDown, 179, [])
+    _ = replay(.keyUp, 179, [])
+}
 check("leaving shortcut editor restores normal shortcut matching", ["Fn down", "Fn up"]) {
     _ = replay(.flagsChanged, 63, .maskSecondaryFn)
     _ = replay(.flagsChanged, 63, [])

@@ -167,6 +167,7 @@ public func processEvents() -> Int32 {
 private var pressingKeys: Set<String> = []
 private var activeCombination: String?
 private var blockedKeycodes: Set<Int64> = []
+private var pressingFnKeycodes: Set<Int64> = []
 
 private let modifierGroups: [(CGEventFlags, String, String, Int64, Int64, UInt64, UInt64)] = [
     (.maskShift, "LeftShift", "RightShift", 56, 60, 0x2, 0x4),
@@ -176,7 +177,7 @@ private let modifierGroups: [(CGEventFlags, String, String, Int64, Int64, UInt64
 ]
 
 private func updateModifiers(_ flags: CGEventFlags, changedKey: Int64?) {
-    if flags.contains(.maskSecondaryFn) { pressingKeys.insert("Fn") }
+    if flags.contains(.maskSecondaryFn) || !pressingFnKeycodes.isEmpty { pressingKeys.insert("Fn") }
     else { pressingKeys.remove("Fn") }
     for (mask, left, right, leftCode, rightCode, leftBit, rightBit) in modifierGroups {
         if !flags.contains(mask) {
@@ -241,7 +242,7 @@ private let keyNames: [Int64: String] = [
     22:"6", 23:"5", 24:"=", 25:"9", 26:"7", 27:"-", 28:"8", 29:"0", 30:"]", 31:"O",
     32:"U", 33:"[", 34:"I", 35:"P", 36:"Enter", 37:"L", 38:"J", 39:"'", 40:"K",
     41:";", 42:"\\", 43:",", 44:"/", 45:"N", 46:"M", 47:".", 48:"Tab", 49:"Space",
-    50:"`", 51:"Backspace", 53:"Escape", 65:"Decimal", 67:"Multiply", 69:"Add",
+    50:"`", 51:"Backspace", 53:"Escape", 63:"Fn", 179:"Fn", 65:"Decimal", 67:"Multiply", 69:"Add",
     71:"Clear", 75:"Divide", 76:"Enter", 78:"Subtract", 81:"=", 82:"0", 83:"1",
     84:"2", 85:"3", 86:"4", 87:"5", 88:"6", 89:"7", 91:"8", 92:"9",
     96:"F5", 97:"F6", 98:"F7", 99:"F3", 100:"F8", 101:"F9", 103:"F11", 109:"F10",
@@ -255,6 +256,7 @@ private func resetGesture(cancelled: Bool) {
     activeCombination = nil
     pressingKeys.removeAll()
     blockedKeycodes.removeAll()
+    pressingFnKeycodes.removeAll()
 }
 
 @discardableResult
@@ -270,8 +272,12 @@ private func handle(type: CGEventType, event: CGEvent) -> Bool {
     let wasBlocked = blockedKeycodes.contains(code)
     if type == .keyDown && repeated { return wasBlocked }
     let previousKeys = pressingKeys
+    if code == 63 || code == 179 {
+        if type == .keyDown { pressingFnKeycodes.insert(code) }
+        else if type == .keyUp { pressingFnKeycodes.remove(code) }
+    }
     updateModifiers(event.flags, changedKey: type == .flagsChanged ? code : nil)
-    if type != .flagsChanged {
+    if type != .flagsChanged && !((code == 63 || code == 179) && (type == .keyDown || type == .keyUp)) {
         let name = (type == .otherMouseDown || type == .otherMouseUp) ? "Mouse\(event.getIntegerValueField(.mouseEventButtonNumber) + 1)" : (keyNames[code] ?? "KeyCode\(code)")
         if type == .keyDown || type == .otherMouseDown { pressingKeys.insert(name) }
         else { pressingKeys.remove(name); blockedKeycodes.remove(code) }
@@ -286,11 +292,8 @@ private func handle(type: CGEventType, event: CGEvent) -> Bool {
             capturedCombination = nil
         } else if pressingKeys.count > previousKeys.count {
             let order = ["Fn", "Command", "Control", "Alt", "Shift"]
-            let keys = pressingKeys.map { key -> String in
-                for modifier in order where key == "Left" + modifier || key == "Right" + modifier { return modifier }
-                return key
-            }.sorted { left, right in
-                let l = order.firstIndex(of: left) ?? 99, r = order.firstIndex(of: right) ?? 99
+            let keys = pressingKeys.sorted { left, right in
+                let l = order.firstIndex(of: generic(left)) ?? 99, r = order.firstIndex(of: generic(right)) ?? 99
                 return l == r ? left < right : l < r
             }
             capturedCombination = keys.joined(separator: "+")
@@ -318,7 +321,7 @@ private func handle(type: CGEventType, event: CGEvent) -> Bool {
     }
     let shouldBlock = (type == .keyDown || type == .otherMouseDown) && candidate != nil
     if shouldBlock { blockedKeycodes.insert(code) }
-    return wasBlocked || shouldBlock || (type == .flagsChanged && code == 63 && candidate != nil)
+    return wasBlocked || shouldBlock || (type == .flagsChanged && (code == 63 || code == 179) && candidate != nil)
 }
 
 private func emit(key: String, pressed: Bool, combination: String,

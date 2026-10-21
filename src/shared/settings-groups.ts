@@ -29,7 +29,6 @@ export interface GeneralSettings {
 
 export interface AppearanceSettings {
   appearancePreference: ColorMode
-  appearancePreferenceByUserId: Record<string, ColorMode>
 }
 
 export interface DictationSettings {
@@ -89,7 +88,6 @@ export interface Settings {
 
   // Appearance
   appearancePreference: ColorMode
-  appearancePreferenceByUserId: Record<string, ColorMode>
 
   // Dictation
   dictationMode: Mode
@@ -148,7 +146,6 @@ export const SettingsGroups = {
   appearance(settings: Settings): AppearanceSettings {
     return {
       appearancePreference: settings.appearancePreference,
-      appearancePreferenceByUserId: settings.appearancePreferenceByUserId
     }
   },
 

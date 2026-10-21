@@ -14,7 +14,7 @@ export function registerProviderHandlers(handle: (channel: string, fn: Handler) 
       const issue = providerConfigurationIssue(action.profile, action.action !== 'models')
       if (issue) throw new Error(issue)
       if (action.action === 'models') return listProviderModels(action.profile)
-      if (!action.profile.models.includes(action.model)) throw new Error('请选择此服务商的模型')
+      if (!action.profile.models.includes(action.model)) throw new Error("Select a model for this provider")
       return testProvider(action.profile, action.model)
     }
     const state = updateProviderState(settings.get().serviceProviders, action)

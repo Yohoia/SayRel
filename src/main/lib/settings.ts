@@ -6,7 +6,7 @@ import { serviceProvidersSchema } from '../../shared/providers'
 import { createLogger } from './logger'
 
 const log = createLogger('settings')
-type Persisted = { settings: Settings; deviceId?: string; encryptedApiKey?: string; encryptedProviderSecrets?: string }
+type Persisted = { settings: Settings; deviceId?: string; encryptedApiKey?: string; encryptedProviderSecrets?: string; interfaceLanguageVersion?: number }
 const store = new Store<Persisted>({ name: 'settings', defaults: { settings: DEFAULT_SETTINGS } })
 const secretsSchema = z.record(z.string(), z.object({ apiKey: z.string(), accessToken: z.string() }))
 let cache: Settings | null = null
@@ -25,14 +25,14 @@ function persist(next: Settings): Settings {
   }
   if (next.provider.apiKey) secrets.__legacy = { apiKey: next.provider.apiKey, accessToken: '' }
   const hasSecrets = Object.keys(secrets).length > 0
-  if (hasSecrets && !safeStorage.isEncryptionAvailable()) throw new Error('系统密钥加密不可用，服务商配置未保存，请解锁系统钥匙串后重试。')
+  if (hasSecrets && !safeStorage.isEncryptionAvailable()) throw new Error("System credential encryption is unavailable. Unlock your keychain and try saving again.")
   const encryptedProviderSecrets = hasSecrets ? safeStorage.encryptString(JSON.stringify(secrets)).toString('base64') : undefined
   const sanitized: Settings = {
     ...next,
     provider: { ...next.provider, apiKey: null },
     serviceProviders: { ...next.serviceProviders, profiles: next.serviceProviders.profiles.map(p => ({ ...p, apiKey: '', accessToken: '' })) }
   }
-  const saved: Persisted = { settings: sanitized, deviceId: store.get('deviceId'), ...(encryptedProviderSecrets ? { encryptedProviderSecrets } : {}) }
+  const saved: Persisted = { settings: sanitized, deviceId: store.get('deviceId'), interfaceLanguageVersion: 1, ...(encryptedProviderSecrets ? { encryptedProviderSecrets } : {}) }
   store.store = saved
   cache = next
   return next
@@ -44,6 +44,12 @@ export const settings = {
   get(): Settings {
     if (cache) return cache
     const persisted = store.get('settings')
+    // Apply the English-first release once; later language choices remain user-controlled.
+    if (store.get('interfaceLanguageVersion') !== 1) {
+      persisted.language = 'en'
+      store.set('settings', persisted)
+      store.set('interfaceLanguageVersion', 1)
+    }
     const legacyKey = decrypt(store.get('encryptedApiKey'))
     const decodedSecrets = decrypt(store.get('encryptedProviderSecrets'))
     let secrets: z.infer<typeof secretsSchema> = {}

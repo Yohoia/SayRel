@@ -21,12 +21,12 @@ export function registerHistoryHandlers(handle: (c: string, f: Handler) => void)
   })
   handle('db:history-export-audio', async (_e, id: string) => {
     const record = history.getHistory(id)
-    if (!record?.audioLocalPath) throw new Error('此记录没有保存录音。')
+    if (!record?.audioLocalPath) throw new Error("No audio was saved for this recording.")
     await stat(record.audioLocalPath)
     const extension = extname(record.audioLocalPath).slice(1) || 'ogg'
     const result = await dialog.showSaveDialog({
       defaultPath: join(app.getPath('downloads'), `Offkey-${(record.createdAt ?? id).replace(/[:/]/g, '-')}.${extension}`),
-      filters: [{ name: '录音', extensions: [extension] }]
+      filters: [{ name: "Audio", extensions: [extension] }]
     })
     if (result.canceled || !result.filePath) return { canceled: true }
     await copyFile(record.audioLocalPath, result.filePath)

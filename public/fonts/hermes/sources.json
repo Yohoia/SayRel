@@ -1,0 +1,56 @@
+[
+  {
+    "file": "RulesGothicCmp-Medium.woff2",
+    "source": "https://web-assets.nousresearch.com/marketing/a936e0efdf9c094a32e6bc92544b7fef3f074717/font/Rules/RulesGothicCmp-Medium.woff2",
+    "bytes": 56360,
+    "sha256": "fcdd84577193c2f5138719adec75e743c405925e26e45264b8168ce33850f9a1"
+  },
+  {
+    "file": "RulesGothicCmp-Regular.woff2",
+    "source": "https://web-assets.nousresearch.com/marketing/a936e0efdf9c094a32e6bc92544b7fef3f074717/font/Rules/RulesGothicCmp-Regular.woff2",
+    "bytes": 53808,
+    "sha256": "710fd432859ce7cce2d0aa35ab2bfa1b39783d27602faa074d523d4b92890d80"
+  },
+  {
+    "file": "RulesGothicCmp-Semibold.woff2",
+    "source": "https://web-assets.nousresearch.com/marketing/a936e0efdf9c094a32e6bc92544b7fef3f074717/font/Rules/RulesGothicCmp-Semibold.woff2",
+    "bytes": 57212,
+    "sha256": "dce200b7d110c2584b0a1fca243b182c65bb61bd17022f64e6c0b1803329e29c"
+  },
+  {
+    "file": "RulesGothicCnd-Light.woff2",
+    "source": "https://web-assets.nousresearch.com/marketing/a936e0efdf9c094a32e6bc92544b7fef3f074717/font/Rules/RulesGothicCnd-Light.woff2",
+    "bytes": 57880,
+    "sha256": "5882f945f2d7771d629dcc8ac220d4ee0673b6abb3d2f58478f6d564bd976cc0"
+  },
+  {
+    "file": "RulesGothicCnd-Medium.woff2",
+    "source": "https://web-assets.nousresearch.com/marketing/a936e0efdf9c094a32e6bc92544b7fef3f074717/font/Rules/RulesGothicCnd-Medium.woff2",
+    "bytes": 59440,
+    "sha256": "c2ef3adf45e7bb37d22b62e3b66d9ac20fcd41e11e0668981d010408a7490a45"
+  },
+  {
+    "file": "RulesGothicCnd-Regular.woff2",
+    "source": "https://web-assets.nousresearch.com/marketing/a936e0efdf9c094a32e6bc92544b7fef3f074717/font/Rules/RulesGothicCnd-Regular.woff2",
+    "bytes": 58204,
+    "sha256": "be952f3dde1eb6b156784f5cd8dfe78a541d6bca660f6dacb3e312f49732f3f9"
+  },
+  {
+    "file": "RulesVariable.woff2",
+    "source": "https://web-assets.nousresearch.com/marketing/a936e0efdf9c094a32e6bc92544b7fef3f074717/font/Rules/RulesVariable.woff2",
+    "bytes": 397872,
+    "sha256": "b8dd2e9fe84f80ecfdc631de540e60de16f6619df60f146b7a43f0979dbcb70f"
+  },
+  {
+    "file": "Inter-latin-variable.woff2",
+    "source": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2",
+    "bytes": 48432,
+    "sha256": "c940764593d0fe5d596be327ca7558855e018039fb78509aa21921fd3644c3e4"
+  },
+  {
+    "file": "Inter-OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/OFL.txt",
+    "bytes": 4377,
+    "sha256": "5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57"
+  }
+]

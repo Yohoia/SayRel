@@ -1,5 +1,5 @@
 import { EMPTY_SERVICE_PROVIDERS, providerConfigurationIssue, serviceProvidersSchema, type ServiceProviders, type ProviderProfile } from './providers'
-import { normalizeTranslationTargets } from './settingsControls'
+import { normalizeShortcut, normalizeTranslationTargets } from './settingsControls'
 import { MODES, type Mode } from './constants'
 
 export type ColorMode = 'light' | 'dark' | 'system'
@@ -22,7 +22,6 @@ export interface Settings {
 
   // Appearance
   appearancePreference: ColorMode
-  appearancePreferenceByUserId: Record<string, ColorMode>
 
   // Dictation
   dictationMode: Mode
@@ -59,10 +58,6 @@ export interface Settings {
   sendFocusedAppContext: boolean
   telemetryEnabled: boolean
 
-  // Sync
-  syncEnabled: boolean
-  syncIntervalMs: number
-
   // Advanced
   provider: {
     transcription: 'offkey-cloud' | 'openai-compatible' | 'local-whisper' | 'mock'
@@ -84,11 +79,10 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   launchAtLogin: false,
   showInDock: true,
-  language: 'zh-CN',
+  language: 'en',
   autoUpdate: true,
 
   appearancePreference: 'system',
-  appearancePreferenceByUserId: {},
 
   dictationMode: MODES.VOICE_TRANSCRIPT,
   pushToTalk: true,
@@ -121,12 +115,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sendFocusedAppContext: true,
   telemetryEnabled: false,
 
-  syncEnabled: true,
-  syncIntervalMs: 60_000,
 
-  // Ships with a self-contained pipeline so a fresh install dictates with no
-  // account. Point these at any OpenAI-compatible server (or an Offkey Cloud
-  // deployment) through the existing persisted provider configuration.
+  // Configure recognition and refinement through the persisted provider settings.
   provider: {
     transcription: 'openai-compatible',
     refinement: 'openai-compatible',
@@ -165,18 +155,22 @@ export function mergeSettings(persisted: Partial<Settings> | undefined): Setting
     return { ...base, ...(partial ?? {}) }
   }
 
+  const mergeBinding = (base: ShortcutBinding, partial: Partial<ShortcutBinding> | undefined): ShortcutBinding => {
+    const binding = mergeNested(base, partial)
+    return { ...binding, accelerator: normalizeShortcut(binding.accelerator) }
+  }
   return {
     ...DEFAULT_SETTINGS,
-    ...(persisted ?? {}),
+    ...Object.fromEntries(Object.entries(persisted ?? {}).filter(([key]) => key in DEFAULT_SETTINGS)),
     ...normalizeTranslationTargets(
       persisted?.translationTargetLanguages ?? [persisted?.translationTargetLanguage ?? 'en'],
       persisted?.translationTargetLanguage ?? 'en'
     ),
-    additionalShortcuts: persisted?.additionalShortcuts ?? {},
-    shortcut: mergeNested(DEFAULT_SETTINGS.shortcut, persisted?.shortcut),
-    commandShortcut: mergeNested(DEFAULT_SETTINGS.commandShortcut, persisted?.commandShortcut),
-    askAnythingShortcut: mergeNested(DEFAULT_SETTINGS.askAnythingShortcut, persisted?.askAnythingShortcut),
-    translationShortcut: mergeNested(DEFAULT_SETTINGS.translationShortcut, persisted?.translationShortcut),
+    additionalShortcuts: Object.fromEntries(Object.entries(persisted?.additionalShortcuts ?? {}).map(([key, bindings]) => [key, bindings.map(binding => mergeBinding(binding, undefined))])),
+    shortcut: mergeBinding(DEFAULT_SETTINGS.shortcut, persisted?.shortcut),
+    commandShortcut: mergeBinding(DEFAULT_SETTINGS.commandShortcut, persisted?.commandShortcut),
+    askAnythingShortcut: mergeBinding(DEFAULT_SETTINGS.askAnythingShortcut, persisted?.askAnythingShortcut),
+    translationShortcut: mergeBinding(DEFAULT_SETTINGS.translationShortcut, persisted?.translationShortcut),
     provider: mergeNested(DEFAULT_SETTINGS.provider, persisted?.provider),
     serviceProviders: persisted?.serviceProviders
       ? serviceProvidersSchema.parse(persisted.serviceProviders)
@@ -193,13 +187,13 @@ function migrateProviderSettings(legacy: Settings['provider'] | undefined): Serv
   if (legacy.transcription !== 'mock' && (legacy.transcription !== 'local-whisper' || legacy.baseUrl)) {
     const local = legacy.transcription === 'local-whisper'
     const model = local ? legacy.baseUrl || '' : legacy.model || 'whisper-1'
-    const profile: ProviderProfile = { ...fields, id: 'migrated-transcription', presetId: local ? 'asr-local-whisper' : 'asr-openai', name: local ? 'Whisper' : '语音转写', service: 'transcription', protocol: local ? 'local-whisper' : 'openai-transcription', endpoint: local ? legacy.model || 'whisper-cli' : endpoint, apiKey: local ? '' : apiKey, models: [model] }
+    const profile: ProviderProfile = { ...fields, id: 'migrated-transcription', presetId: local ? 'asr-local-whisper' : 'asr-openai', name: local ? 'Whisper' : "Transcription", service: 'transcription', protocol: local ? 'local-whisper' : 'openai-transcription', endpoint: local ? legacy.model || 'whisper-cli' : endpoint, apiKey: local ? '' : apiKey, models: [model] }
     state.profiles.push(profile)
     if (!providerConfigurationIssue(profile)) state.transcription = { providerId: profile.id, model }
   }
   if (legacy.refinement !== 'mock') {
     const model = legacy.refinementModel || legacy.model || 'gpt-4o-mini'
-    const profile: ProviderProfile = { ...fields, id: 'migrated-refinement', presetId: 'llm-openai_compatible', name: '文本润写', service: 'refinement', protocol: 'openai-chat', endpoint, apiKey, models: [model] }
+    const profile: ProviderProfile = { ...fields, id: 'migrated-refinement', presetId: 'llm-openai_compatible', name: "Text refinement", service: 'refinement', protocol: 'openai-chat', endpoint, apiKey, models: [model] }
     state.profiles.push(profile)
     // Empty old keys should lead to an unconfigured role, even for compatible endpoints.
     if (apiKey || /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::|\/|$)/.test(endpoint)) state.refinement = { providerId: profile.id, model }

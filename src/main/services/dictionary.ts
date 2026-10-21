@@ -1,4 +1,4 @@
-import { and, desc, eq, like } from 'drizzle-orm'
+import { desc, eq, like } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { parse } from 'csv-parse/sync'
 import { getDb, schema } from '../db'
@@ -8,17 +8,15 @@ import type { DictionaryEntry } from '../../shared/types'
 
 const table = schema.dictionary
 
-export function listDictionary(userId?: string | null): DictionaryEntry[] {
+export function listDictionary(): DictionaryEntry[] {
   const db = getDb()
-  const where = userId ? eq(table.userId, userId) : undefined
-  return db.select().from(table).where(where).orderBy(desc(table.createdAt)).all() as DictionaryEntry[]
+  return db.select().from(table).orderBy(desc(table.createdAt)).all() as DictionaryEntry[]
 }
 
 export function addWord(input: {
   word: string
   source?: 'manual' | 'auto' | 'csv'
   language?: string | null
-  userId?: string | null
 }): DictionaryEntry {
   const db = getDb()
   const word = input.word.trim()
@@ -27,7 +25,7 @@ export function addWord(input: {
   const existing = db
     .select()
     .from(table)
-    .where(and(eq(table.word, word), input.userId ? eq(table.userId, input.userId) : undefined))
+    .where(eq(table.word, word))
     .get()
   if (existing) return existing as DictionaryEntry
 
@@ -40,7 +38,7 @@ export function addWord(input: {
     createdAt: now
   }
   db.insert(table)
-    .values({ ...entry, userId: input.userId ?? null, updatedAt: now })
+    .values({ ...entry, updatedAt: now })
     .run()
 
   if (entry.source === 'auto') {
@@ -52,12 +50,12 @@ export function addWord(input: {
 /** Editing keeps the original identity, source and creation date. */
 export function updateWord(id: string, value: string): DictionaryEntry {
   const word = String(value ?? '').trim()
-  if (!word || word.length > 100) throw new Error('请输入 1 至 100 个字符。')
+  if (!word || word.length > 100) throw new Error("Enter 1 to 100 characters.")
   const db = getDb()
   const existing = db.select().from(table).where(eq(table.id, id)).get()
-  if (!existing) throw new Error('词条已不存在，请刷新后重试。')
-  const duplicate = listDictionary(existing.userId).find((entry) => entry.id !== id && entry.word.toLocaleLowerCase() === word.toLocaleLowerCase())
-  if (duplicate) throw new Error('该词汇已在词典中。')
+  if (!existing) throw new Error("This word no longer exists. Refresh and try again.")
+  const duplicate = listDictionary().find((entry) => entry.id !== id && entry.word.toLocaleLowerCase() === word.toLocaleLowerCase())
+  if (duplicate) throw new Error("This word is already in your dictionary.")
   db.update(table).set({ word, updatedAt: new Date().toISOString() }).where(eq(table.id, id)).run()
   return { ...existing, word } as DictionaryEntry
 }

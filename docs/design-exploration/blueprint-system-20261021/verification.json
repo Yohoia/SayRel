@@ -1,5 +1,5 @@
 {
-  "scope": "Isolated offline fixtures; no real microphone, account, providers or user data",
+  "scope": "Isolated offline fixtures; no real microphone, providers or user data",
   "typecheck": "passed",
   "settingsControls": "7 passed",
   "suites": {
@@ -106,9 +106,167 @@
     "screenshots": 30,
     "visualInspection": [
       "dashboard",
-      "settings",
-      "login"
+      "settings"
     ],
     "previousSuites": "Three-run results above belong to the preceding blue-background migration."
+  },
+  "latestBrandChange": {
+    "product": "Sayrel",
+    "defaultLanguage": "en",
+    "typecheck": "passed",
+    "settingsControls": "7 passed",
+    "providerRuntime": "35 local transport and failure checks passed",
+    "realtimeProviders": "21 local protocol scenarios passed",
+    "settingsMigration": "English-first migration, custom shortcuts, translation targets, device ID, later language choices and encrypted credentials preserved",
+    "fontFamilies": [
+      "Inter",
+      "Rules Variable",
+      "Rules Gothic Condensed",
+      "Rules Gothic Compressed",
+      "JetBrains Mono"
+    ],
+    "brandFiles": 15,
+    "fontAndSourceFiles": 9,
+    "independentWindowStates": 6,
+    "fullApplicationScreenshots": 30,
+    "interactionRuns": [
+      {
+        "name": "home-ui",
+        "round": 1,
+        "exitCode": 0,
+        "signal": null
+      },
+      {
+        "name": "ui-offline",
+        "round": 1,
+        "exitCode": 0,
+        "signal": null
+      },
+      {
+        "name": "providers-ui",
+        "round": 1,
+        "exitCode": 0,
+        "signal": null
+      },
+      {
+        "name": "feedback-ui",
+        "round": 1,
+        "exitCode": 0,
+        "signal": null
+      },
+      {
+        "name": "history-retention-ui",
+        "round": 1,
+        "exitCode": 0,
+        "signal": null
+      },
+      {
+        "name": "home-ui",
+        "round": 2,
+        "exitCode": 0,
+        "signal": null
+      },
+      {
+        "name": "ui-offline",
+        "round": 2,
+        "exitCode": 0,
+        "signal": null
+      },
+      {
+        "name": "providers-ui",
+        "round": 2,
+        "exitCode": 0,
+        "signal": null
+      },
+      {
+        "name": "feedback-ui",
+        "round": 2,
+        "exitCode": 0,
+        "signal": null
+      },
+      {
+        "name": "history-retention-ui",
+        "round": 2,
+        "exitCode": 0,
+        "signal": null
+      },
+      {
+        "name": "home-ui",
+        "round": 3,
+        "exitCode": 0,
+        "signal": null
+      },
+      {
+        "name": "ui-offline",
+        "round": 3,
+        "exitCode": 0,
+        "signal": null
+      },
+      {
+        "name": "providers-ui",
+        "round": 3,
+        "exitCode": 0,
+        "signal": null
+      },
+      {
+        "name": "feedback-ui",
+        "round": 3,
+        "exitCode": 0,
+        "signal": null
+      },
+      {
+        "name": "history-retention-ui",
+        "round": 3,
+        "exitCode": 0,
+        "signal": null
+      }
+    ],
+    "visualReview": "Main agent inspected representative final screenshots; no new independent review for font, brand and copy changes",
+    "scope": "Offline fixtures; network blocked; temporary profiles; no real microphone, external providers or installer acceptance"
+  },
+  "latestHomeCopyChange": {
+    "slogan": "Speak more. Type less.",
+    "positioning": "AI-powered voice typing",
+    "interactionConcept": "Hold to speak.",
+    "philosophy": "Let expression feel as natural as conversation.",
+    "typecheck": "passed",
+    "homeInteractionRuns": 3,
+    "visualInspection": [
+      "default",
+      "840x560",
+      "600x750"
+    ],
+    "scope": "Brand copy and typography; recording modes still follow existing settings"
+  },
+  "macIconFix": {
+    "canvas": 1024,
+    "artwork": 824,
+    "transparentPadding": 100,
+    "dockImage": "resources/build/mac-icon.png",
+    "installerIcon": "resources/build/icon.icns",
+    "reference": "Typeless 2.8.2 PNG and ICNS assets",
+    "checks": [
+      "PNG alpha bounds 100,100–923,923",
+      "ICNS extracted maximum representation matches PNG bounds",
+      "16px ICNS representation bounds 2,2–13,13",
+      "brand manifest hashes passed"
+    ],
+    "liveDockAcceptance": "New icon is loaded when the application restarts; live Dock screenshot not taken"
+  },
+  "latestWindowAndShortcutCleanup": {
+    "date": "2026-10-21",
+    "typecheck": "passed",
+    "settingsControls": "9 passed",
+    "nativeHotkeys": "22 replay cases passed; arm64/x86_64 helper rebuilt",
+    "database": "packaged upgrade preserves history text, audio paths, metadata and dictionary; retired columns removed; restart passed",
+    "providerSettings": "encrypted migration/save/reload passed",
+    "ui": {
+      "home": "3 consecutive passes, 600–2560px widths; responsive headline/instrument, centered pages/modals and native capture",
+      "ui-offline": "3 consecutive passes",
+      "feedback-ui": "3 consecutive passes"
+    },
+    "accountRemoval": "login renderer/window, account settings, auth service/IPC/bridges/types, user surveys, cloud sync and associated assets/styles/translations deleted",
+    "limits": "Offline fixtures and native event replay; no physical Fn press, real microphone, live provider or installer test",
+    "visualReview": "Two independent existing-interface review rounds; ultra-wide headline and narrow navigation fixed; final screenshots passed"
   }
 }

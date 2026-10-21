@@ -1,12 +1,12 @@
-# Offkey 全应用：灰白纸面与 Hermes 蓝字
+# Sayrel 全应用：灰白纸面与 Hermes 蓝字
 
 用户已选第二版首页的构图与交互，并要求扩展至整个项目；最新将配色改为灰白背景、Hermes 蓝色主文字。当前规范以根目录 [DESIGN.md](../../../DESIGN.md) 为准。
 
 - 当前背景 `#F2F2F2`，主文字 `#0000C2`；系统深色偏好不反转品牌配色。蓝色来源：项目内 Hermes 设计参考。此前蓝底方案由用户最新取舍覆盖。
-- 保留三行展示标题、精密星盘、虚线快捷键、应用邮票与录音反馈；星盘只作为首页主视觉，其余页面以清单、索引和仪器控件延续设计。
-- 全部主窗口页面共享顶部导航。历史、词典、服务商、设置、菜单、编辑/确认弹窗、登录、首次引导、回答卡、上下文窗口、悬浮条及 Toast 同步迁移。
+- 首页以两行 `Speak more. Type less.` 展示标题、精密星盘、虚线快捷键、应用邮票与录音反馈组成；星盘只作为首页主视觉，其余页面以清单、索引和仪器控件延续设计。
+- 全部主窗口页面共享顶部导航。历史、词典、服务商、设置、菜单、编辑/确认弹窗、首次引导、回答卡、上下文窗口、悬浮条及 Toast 同步迁移。
 - 颜色、字体、线条、圆角和交互反馈来自共享变量；移除旧 SideNav 和未使用的 theme.ts。没有保留第二套业务页面。
-- Offkey 与第三方服务商标志保留原始资产，使用衬底保证灰白界面上的辨识度。商业 Rules 字体未分发，英文标题使用本机窄体替代，等宽部分使用本地 JetBrains Mono。
+- 当前版本接入用户提供的 Sayrel 图标，并改为英文优先。展示标题与导航接入本地 Rules，正文使用 Inter，等宽部分使用 JetBrains Mono。第三方服务商标志保留原始资产；详见 [字体与品牌素材](../../brand-assets.md)。下方 `after/` 已更新为当前英文品牌版本，`before/` 保留最初改版前截图。
 
 ## 截图
 
@@ -17,7 +17,6 @@
 | 词典 | [词典](after/dictionary.png) | [原版本](before/dictionary.png) |
 | 服务商 | [服务商](after/providers.png) | [原版本](before/providers.png) |
 | 设置 | [设置](after/settings.png) · [小窗口](after/settings-small.png) | [原版本](before/settings.png) |
-| 登录 | [登录](after/login.png) | [原版本](before/login.png) |
 | 引导 | [权限](after/onboarding-permissions.png) · [麦克风](after/onboarding-microphone.png) · [快捷键](after/onboarding-shortcut.png) | [原版本](before/onboarding-permissions.png) |
 | 回答卡 | [回答卡](after/answer-card.png) | [原版本](before/answer-card.png) |
 | 上下文 | [检查器](after/context-sidebar.png) | [原版本](before/context-sidebar.png) |
@@ -29,7 +28,7 @@
 
 `capture.cjs` 检查30个页面/状态的资源加载、横向溢出和渲染错误，报告见 [after/report.json](after/report.json)。交互检查沿用项目的 `ui-offline`、`history-retention-ui`、`providers-ui`、`feedback-ui` 与首页 `scripts/diagnostics/home-ui.cjs`。异步脚本连续运行三次，最终结果另见 [verification.json](verification.json)。
 
-所有检查使用临时配置、阻断网络与离线数据；不读取真实账户或历史，不调用真实供应商或麦克风。保存、失败重试、键盘焦点、删除取消、外观切换和路由均通过真实页面入口操作，但不代表真实语音端到端已验收。
+所有检查使用临时配置、阻断网络与离线数据；不读取真实历史，不调用真实供应商或麦克风。保存、失败重试、键盘焦点、删除取消、外观切换和路由均通过真实页面入口操作，但不代表真实语音端到端已验收。
 
 动效保留入场、导航下划线、快捷键随焦点高亮、按压、应用箭头、录音呼吸、弹窗与悬浮条状态变化；遵循减少动态效果。没有为内容清单添加持续转动的装饰。
 
@@ -42,3 +41,9 @@
 取证工具静态截图和200%局部成功，唯一默认做法提示为 `p.home-eyebrow「VOICE INTO WORDS」` 标题上方眉标，按已选技术署记保留。工具动效探测报 `__oilMotion` / `__oilRecordTiming` 未定义，且系统缺少 ffmpeg；保留采样帧，不宣称连续录屏与动效手感独立验收。Electron 状态与减少动态效果交互检查通过。
 
 最新配色微调：主文字改为 `#0000C2`、背景 `#F2F2F2`，已同步全部窗口、星盘与按钮反色。更新 `after/` 全30张截图及README产品截图，类型检查、首页交互与消息/确认反馈检查重新通过。上述三轮回归及独立评审属于此前迁移；本次确定色值的调整做相邻状态检查，未重新派发独立评审。本地 `browser-evidence/` 保留此前蓝底版本的工具取证（不纳入版本控制），当前视觉以 `after/` 为准。
+
+2026-10-21品牌接续验收：`after/`的30张截图均已更新为英文Sayrel与本地Hermes字体；类型检查、7项设置检查、语言及凭据迁移检查通过，五组异步界面检查在最终修改后各连续通过三轮。新增 `npm run verify:brand` 校验15份品牌素材、9份字体及来源文件和六个独立窗口状态。最新结果见 [verification.json](verification.json) 的 `latestBrandChange`；本次收尾由主Agent查看代表性截图，没有另开独立评审。
+
+首页品牌文案更新：主标题改为两行 `Speak more. Type less.`，标题上方标注 `AI-powered voice typing`，正文表达自然说话的品牌理念，星盘图注使用 `Hold to speak.`。保留灰白底、蓝字与当前快捷键配置。首页交互连续通过三轮，检查默认、840×560及600×750截图；全部30张状态图和README展示图已同步。macOS图标增加透明边距后，当前品牌索引包含16份素材；PNG与ICNS实际像素留白检查通过。
+
+本次窗口与快捷键收尾：600–2560px窗口中首页两行标题与星盘随可用空间增大；历史、词典、服务商正文最大1600px横向居中，设置正文最大1200px居中，弹窗横纵居中。快捷键以文字显示，原生Fn/Globe键码63与179统一识别；保留左右Shift。产品登录、账户和云同步及相关素材已移除。本地数据库迁移保留历史、音频路径和词典。首页、设置与独立窗口、反馈交互最终版各连续通过三轮。

@@ -10,7 +10,7 @@ import { toast } from '../shared/components/Toast'
 import '../shared/styles/secondary.css'
 
 // Typeless BUWw_RCU:13–333 is the context inspector, not a second recorder.
-const POSITIONS = { 'top-left': '左上角', 'top-right': '右上角', 'bottom-left': '左下角', 'bottom-right': '右下角' }
+const POSITIONS = { 'top-left': "Top left", 'top-right': "Top right", 'bottom-left': "Bottom left", 'bottom-right': "Bottom right" }
 export function SidebarApp() {
   const [snapshot, setSnapshot] = useState<AudioContextSnapshot | null>(null)
   const [icon, setIcon] = useState<string | null>(null)
@@ -21,7 +21,7 @@ export function SidebarApp() {
   const refresh = async () => {
     setBusy(true)
     try { setSnapshot(await bridge.invoke('context:get-audio-context')) }
-    catch { toast.error('无法读取当前应用的上下文') }
+    catch { toast.error("Could not read context from the current app") }
     finally { setBusy(false) }
   }
   const changePosition = async (value: string) => {
@@ -32,14 +32,14 @@ export function SidebarApp() {
       const moved = await bridge.invoke('page:set-debug-window-position', 'sidebar.html',
         (display.availLeft ?? 0) + (left ? 0 : screen.availWidth - window.outerWidth),
         (display.availTop ?? 0) + (top ? 0 : screen.availHeight - window.outerHeight))
-      if (!moved) { toast.error('无法调整窗口位置，请重试'); return }
+      if (!moved) { toast.error("Could not move the window. Please try again."); return }
       localStorage.setItem('debug_window_position', value)
       setPosition(value)
-    } catch { toast.error('无法调整窗口位置，请重试') }
+    } catch { toast.error("Could not move the window. Please try again.") }
   }
   const copy = async () => {
-    try { await api.clipboard.writeText(JSON.stringify(snapshot || {}, null, 2)); toast.success('复制成功') }
-    catch { toast.error('复制失败，请重试') }
+    try { await api.clipboard.writeText(JSON.stringify(snapshot || {}, null, 2)); toast.success("Copied") }
+    catch { toast.error("Could not copy. Please try again.") }
   }
   const focusedApp = snapshot?.focusedApp
   const focusedInput = snapshot?.focusedInput
@@ -52,23 +52,23 @@ export function SidebarApp() {
   const summary = snapshot ? { active_application: focusedApp, text_insertion_point: focusedInput } : {}
   return <main className="secondary-sidebar">
     <header className="secondary-sidebar-header drag">
-      <div className="secondary-context-app"><i>{icon && <img src={icon} width={20} height={20} alt="" />}</i><span>{focusedApp?.appName || '无应用'}</span><small>{focusedApp?.windowTitle}</small></div>
+      <div className="secondary-context-app"><i>{icon && <img src={icon} width={20} height={20} alt="" />}</i><span>{focusedApp?.appName || "No app"}</span><small>{focusedApp?.windowTitle}</small></div>
       <div className="secondary-context-actions no-drag">
         {busy && <i className="secondary-context-busy" />}
-        <button className="secondary-icon-button" onClick={() => void refresh()} title="刷新" aria-label="刷新" disabled={busy}><RefreshRounded /></button>
-        <button className="secondary-icon-button" onClick={() => setSettings(!settings)} title="设置" aria-label="设置" aria-pressed={settings}><SettingsRounded /></button>
-        <button className="secondary-icon-button" onClick={() => void api.page.closeSidebar()} title="关闭" aria-label="关闭"><CloseRounded /></button>
+        <button className="secondary-icon-button" onClick={() => void refresh()} title="Refresh" aria-label="Refresh" disabled={busy}><RefreshRounded /></button>
+        <button className="secondary-icon-button" onClick={() => setSettings(!settings)} title="Settings" aria-label="Settings" aria-pressed={settings}><SettingsRounded /></button>
+        <button className="secondary-icon-button" onClick={() => void api.page.closeSidebar()} title="Close" aria-label="Close"><CloseRounded /></button>
       </div>
     </header>
     <div className="secondary-sidebar-body">
-      {settings && <section className="secondary-context-position"><span>窗口位置：</span><div>{Object.entries(POSITIONS).map(([value, label]) => <button key={value} className={value === position ? 'selected' : ''} onClick={() => void changePosition(value)}>{label}</button>)}</div></section>}
-      {!focusedInput ? <section className="secondary-context-empty"><TextFieldsRounded /><p>未检测到文本插入点</p><small>点击文本框，然后刷新以查看光标上下文</small></section> : <section className="secondary-context-cursor"><header><span><EditRounded />光标上下文</span><small>{focusedInput.role || '未知'}</small></header><div>
-        {focusedInput.selectedText && <><h2>选中的文本</h2><p className="secondary-context-selection">{focusedInput.selectedText}</p></>}
-        {focusedInput.valuePreview && <><h2>输入框文本</h2><p>{focusedInput.valuePreview}</p></>}
-        {!focusedInput.selectedText && !focusedInput.valuePreview && <p>光标位于空白位置</p>}
+      {settings && <section className="secondary-context-position"><span>Window position: </span><div>{Object.entries(POSITIONS).map(([value, label]) => <button key={value} className={value === position ? 'selected' : ''} onClick={() => void changePosition(value)}>{label}</button>)}</div></section>}
+      {!focusedInput ? <section className="secondary-context-empty"><TextFieldsRounded /><p>No text cursor detected</p><small>Click a text field, then refresh to see cursor context</small></section> : <section className="secondary-context-cursor"><header><span><EditRounded />Cursor context</span><small>{focusedInput.role || "Unknown"}</small></header><div>
+        {focusedInput.selectedText && <><h2>Selected text</h2><p className="secondary-context-selection">{focusedInput.selectedText}</p></>}
+        {focusedInput.valuePreview && <><h2>Text field content</h2><p>{focusedInput.valuePreview}</p></>}
+        {!focusedInput.selectedText && !focusedInput.valuePreview && <p>The cursor is in an empty position</p>}
       </div></section>}
-      {(focusedApp?.webDomain || focusedApp?.webUrl) && <section className="secondary-context-browser"><h2>浏览器上下文</h2><dl><dt>域名</dt><dd>{focusedApp.webDomain}</dd><dt>URL</dt><dd>{focusedApp.webUrl}</dd></dl></section>}
-      <section className="secondary-context-data"><header><h1>上下文数据</h1><div><button onClick={() => setFull(!full)}>{full ? '显示摘要' : '显示全部'}</button><button onClick={() => void copy()}>复制</button></div></header><pre>{JSON.stringify(full ? snapshot || {} : summary, null, 2)}</pre></section>
+      {(focusedApp?.webDomain || focusedApp?.webUrl) && <section className="secondary-context-browser"><h2>Browser context</h2><dl><dt>Domain</dt><dd>{focusedApp.webDomain}</dd><dt>URL</dt><dd>{focusedApp.webUrl}</dd></dl></section>}
+      <section className="secondary-context-data"><header><h1>Context data</h1><div><button onClick={() => setFull(!full)}>{full ? "Show summary" : "Show all"}</button><button onClick={() => void copy()}>Copy</button></div></header><pre>{JSON.stringify(full ? snapshot || {} : summary, null, 2)}</pre></section>
     </div>
   </main>
 }
