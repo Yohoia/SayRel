@@ -61,7 +61,7 @@ export interface PrivacySettings {
 
 export interface ProviderSettings {
   provider: {
-    type: 'offkey' | 'openai' | 'openai-compatible' | 'mock'
+    type: 'sayrel' | 'openai' | 'openai-compatible' | 'mock'
     baseUrl: string | null
     apiKey: string | null
     model: string | null
@@ -116,7 +116,7 @@ export interface Settings {
 
   // Provider
   provider: {
-    type: 'offkey' | 'openai' | 'openai-compatible' | 'mock'
+    type: 'sayrel' | 'openai' | 'openai-compatible' | 'mock'
     baseUrl: string | null
     apiKey: string | null
     model: string | null

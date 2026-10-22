@@ -15,6 +15,8 @@ export function registerHistoryHandlers(handle: (c: string, f: Handler) => void)
   handle('db:history-latest-id', () => history.getLatestId())
   handle('db:history-latest-id-for-error-tracking', () => history.getLatestId())
   handle('db:history-list', (_e, query?: unknown) => history.listHistory((query ?? {}) as any))
+  handle('db:history-activity', () => history.getHistoryActivity())
+  handle('db:history-usage', () => history.getDictationUsage())
   handle('db:history-retry', async (_e, id: string) => {
     await recordingMachine.retryHistory(id)
     return history.getHistory(id)
@@ -25,7 +27,7 @@ export function registerHistoryHandlers(handle: (c: string, f: Handler) => void)
     await stat(record.audioLocalPath)
     const extension = extname(record.audioLocalPath).slice(1) || 'ogg'
     const result = await dialog.showSaveDialog({
-      defaultPath: join(app.getPath('downloads'), `Offkey-${(record.createdAt ?? id).replace(/[:/]/g, '-')}.${extension}`),
+      defaultPath: join(app.getPath('downloads'), `Sayrel-${(record.createdAt ?? id).replace(/[:/]/g, '-')}.${extension}`),
       filters: [{ name: "Audio", extensions: [extension] }]
     })
     if (result.canceled || !result.filePath) return { canceled: true }

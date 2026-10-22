@@ -1,5 +1,5 @@
 /* Independent windows share the same ink, paper and precise controls. */
-html[data-offkey-surface='interactive-card'],html[data-offkey-surface='interactive-card'] body,html[data-offkey-surface='interactive-card'] #root { background:transparent; }
+html[data-sayrel-surface='interactive-card'],html[data-sayrel-surface='interactive-card'] body,html[data-sayrel-surface='interactive-card'] #root { background:transparent; }
 .secondary-onboarding,.secondary-sidebar,.secondary-card-shell { width:100%; height:100%; color:var(--ink); font-family:var(--font-sans); }
 .secondary-titlebar { height:44px; position:absolute; inset:0 0 auto; }
 .secondary-edition { color:var(--accent); font:13px/22px var(--font-mono); letter-spacing:1.2px; margin-bottom:20px; }

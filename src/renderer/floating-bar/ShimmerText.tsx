@@ -73,7 +73,7 @@ export function ShimmerText({
         ref={ref}
         style={{
           position: 'relative',
-          fontFamily: '"SF Pro", -apple-system, BlinkMacSystemFont, Arial, sans-serif',
+          fontFamily: 'var(--font-sans)',
           fontSize,
           fontWeight,
           lineHeight,

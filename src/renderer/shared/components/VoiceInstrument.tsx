@@ -1,5 +1,7 @@
+import { useAppText } from '../i18n/useAppText'
 /** A local line drawing for microphone setup, sharing the homepage's instrument grammar. */
 export function VoiceInstrument() {
+  const t = useAppText()
   return <svg className="voice-instrument" viewBox="0 0 360 360" fill="none" aria-hidden="true">
     <g stroke="currentColor"><path d="M16 44V16h28m272 0h28v28M16 316v28h28m272 0h28v-28" opacity=".4" />
       <circle cx="180" cy="180" r="144" strokeDasharray="1 8" opacity=".55" />
@@ -11,6 +13,6 @@ export function VoiceInstrument() {
       <path d="M105 153v54m-9-42v30m159-42v54m9-42v30" opacity=".65" />
       <circle cx="286" cy="97" r="5" fill="#ffd700" />
     </g>
-    <g fill="currentColor" fontFamily="var(--font-mono)" fontSize="10"><text x="180" y="54" textAnchor="middle">VOICE INPUT</text><text x="180" y="318" textAnchor="middle">SAYREL / 01</text></g>
+    <g fill="currentColor" fontFamily="var(--font-mono)" fontSize="10"><text x="180" y="54" textAnchor="middle">{t("VOICE INPUT")}</text><text x="180" y="318" textAnchor="middle">SAYREL / 01</text></g>
   </svg>
 }

@@ -1,3 +1,5 @@
+import { useAppText } from '../shared/i18n/useAppText'
+import { BrandLockup } from '../shared/components/BrandLockup'
 import { useEffect, useRef, useState } from 'react'
 import CloseRounded from '@mui/icons-material/CloseRounded'
 import MicRounded from '@mui/icons-material/MicRounded'
@@ -17,6 +19,7 @@ type Payload = {
 }
 
 export function CardApp() {
+  const t = useAppText()
   const [payload, setPayload] = useState<Payload | null>(null)
   const [copied, setCopied] = useState(false)
   const [promptCopied, setPromptCopied] = useState(false)
@@ -27,7 +30,7 @@ export function CardApp() {
 
   useEffect(() => {
     api.page.cardPayload().then((data: Payload | null) => setPayload(data)).catch(() => undefined)
-    const off = window.offkey.on('interactive-card:update', (data: Payload) => { setPayload(data); setExpanded(false) })
+    const off = window.sayrel.on('interactive-card:update', (data: Payload) => { setPayload(data); setExpanded(false) })
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') void api.page.closeCard() }
     window.addEventListener('keydown', onKey)
     return () => { off?.(); window.removeEventListener('keydown', onKey) }
@@ -74,13 +77,13 @@ export function CardApp() {
     <main className="secondary-card-shell">
       <section className="secondary-result-card" ref={cardRef}>
         <header className="secondary-result-brandbar drag">
-          <div className="secondary-result-logo"><img className="brand-lockup" src="./assets/brand/sayrel-horizontal.svg" alt="Sayrel" width={100} height={33} /></div>
-          <button className="secondary-icon-button no-drag" aria-label="Close answer" title="Close · Esc" onClick={() => api.page.closeCard()}><CloseRounded /></button>
+          <div className="secondary-result-logo"><BrandLockup /></div>
+          <button className="secondary-icon-button no-drag" aria-label={t("Close answer")} title={t("Close · Esc")} onClick={() => api.page.closeCard()}><CloseRounded /></button>
         </header>
         <div className="secondary-result-scroll no-drag">
-          {(payload.userPrompt || payload.title) && <section className="secondary-result-prompt"><div ref={promptRef} className={expanded ? 'is-expanded' : ''}><div className="secondary-prompt-row"><MicRounded /><p>{payload.userPrompt || payload.title}</p><button className={`secondary-icon-button ${promptCopied ? 'is-copied' : ''}`} aria-label="Copy question" title={promptCopied ? "Copied" : "Copy"} onClick={async () => { try { await api.clipboard.writeText([payload.userPrompt || payload.title, payload.selectedText].filter(Boolean).join('\n')); setPromptCopied(true); setTimeout(() => setPromptCopied(false), 3000); toast.success("Copied") } catch { toast.error("Could not copy. Please try again.") } }}>{promptCopied ? <CheckRounded /> : <CopyIcon />}</button></div>{payload.selectedText && <div className="secondary-selected-text">{payload.selectedText}</div>}</div>{collapsible && <button className="secondary-prompt-toggle" onClick={() => setExpanded(!expanded)}>{expanded ? "Show less" : "...more"}</button>}</section>}
+          {(payload.userPrompt || payload.title) && <section className="secondary-result-prompt"><div ref={promptRef} className={expanded ? 'is-expanded' : ''}><div className="secondary-prompt-row"><MicRounded /><p>{payload.userPrompt || payload.title}</p><button className={`secondary-icon-button ${promptCopied ? 'is-copied' : ''}`} aria-label={t("Copy question")} title={promptCopied ? t("Copied") : t("Copy")} onClick={async () => { try { await api.clipboard.writeText([payload.userPrompt || payload.title, payload.selectedText].filter(Boolean).join('\n')); setPromptCopied(true); setTimeout(() => setPromptCopied(false), 3000); toast.success("Copied") } catch { toast.error("Could not copy. Please try again.") } }}>{promptCopied ? <CheckRounded /> : <CopyIcon />}</button></div>{payload.selectedText && <div className="secondary-selected-text">{payload.selectedText}</div>}</div>{collapsible && <button className="secondary-prompt-toggle" onClick={() => setExpanded(!expanded)}>{expanded ? t("Show less") : t("...more")}</button>}</section>}
           <article className="secondary-answer">
-            <header><h1><AnswerIcon />Answer</h1><button className={`secondary-icon-button ${copied ? 'is-copied' : ''}`} aria-label={copied ? "Copied" : "Copy answer"} title={copied ? "Copied" : "Copy answer"} onClick={copy}>{copied ? <CheckRounded /> : <CopyIcon />}</button></header>
+            <header><h1><AnswerIcon />{t("Answer")}</h1><button className={`secondary-icon-button ${copied ? 'is-copied' : ''}`} aria-label={copied ? t("Copied") : t("Copy answer")} title={copied ? t("Copied") : t("Copy answer")} onClick={copy}>{copied ? <CheckRounded /> : <CopyIcon />}</button></header>
             <div className="secondary-answer-content">{payload.answer}</div>
           </article>
         </div>

@@ -1,3 +1,4 @@
+import { useAppText } from '../shared/i18n/useAppText'
 import { useEffect, useState } from 'react'
 import CloseRounded from '@mui/icons-material/CloseRounded'
 import RefreshRounded from '@mui/icons-material/RefreshRounded'
@@ -12,6 +13,7 @@ import '../shared/styles/secondary.css'
 // Typeless BUWw_RCU:13–333 is the context inspector, not a second recorder.
 const POSITIONS = { 'top-left': "Top left", 'top-right': "Top right", 'bottom-left': "Bottom left", 'bottom-right': "Bottom right" }
 export function SidebarApp() {
+  const t = useAppText()
   const [snapshot, setSnapshot] = useState<AudioContextSnapshot | null>(null)
   const [icon, setIcon] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -52,23 +54,23 @@ export function SidebarApp() {
   const summary = snapshot ? { active_application: focusedApp, text_insertion_point: focusedInput } : {}
   return <main className="secondary-sidebar">
     <header className="secondary-sidebar-header drag">
-      <div className="secondary-context-app"><i>{icon && <img src={icon} width={20} height={20} alt="" />}</i><span>{focusedApp?.appName || "No app"}</span><small>{focusedApp?.windowTitle}</small></div>
+      <div className="secondary-context-app"><i>{icon && <img src={icon} width={20} height={20} alt="" />}</i><span>{focusedApp?.appName || t("No app")}</span><small>{focusedApp?.windowTitle}</small></div>
       <div className="secondary-context-actions no-drag">
         {busy && <i className="secondary-context-busy" />}
-        <button className="secondary-icon-button" onClick={() => void refresh()} title="Refresh" aria-label="Refresh" disabled={busy}><RefreshRounded /></button>
-        <button className="secondary-icon-button" onClick={() => setSettings(!settings)} title="Settings" aria-label="Settings" aria-pressed={settings}><SettingsRounded /></button>
-        <button className="secondary-icon-button" onClick={() => void api.page.closeSidebar()} title="Close" aria-label="Close"><CloseRounded /></button>
+        <button className="secondary-icon-button" onClick={() => void refresh()} title={t("Refresh")} aria-label={t("Refresh")} disabled={busy}><RefreshRounded /></button>
+        <button className="secondary-icon-button" onClick={() => setSettings(!settings)} title={t("Settings")} aria-label={t("Settings")} aria-pressed={settings}><SettingsRounded /></button>
+        <button className="secondary-icon-button" onClick={() => void api.page.closeSidebar()} title={t("Close")} aria-label={t("Close")}><CloseRounded /></button>
       </div>
     </header>
     <div className="secondary-sidebar-body">
-      {settings && <section className="secondary-context-position"><span>Window position: </span><div>{Object.entries(POSITIONS).map(([value, label]) => <button key={value} className={value === position ? 'selected' : ''} onClick={() => void changePosition(value)}>{label}</button>)}</div></section>}
-      {!focusedInput ? <section className="secondary-context-empty"><TextFieldsRounded /><p>No text cursor detected</p><small>Click a text field, then refresh to see cursor context</small></section> : <section className="secondary-context-cursor"><header><span><EditRounded />Cursor context</span><small>{focusedInput.role || "Unknown"}</small></header><div>
-        {focusedInput.selectedText && <><h2>Selected text</h2><p className="secondary-context-selection">{focusedInput.selectedText}</p></>}
-        {focusedInput.valuePreview && <><h2>Text field content</h2><p>{focusedInput.valuePreview}</p></>}
-        {!focusedInput.selectedText && !focusedInput.valuePreview && <p>The cursor is in an empty position</p>}
+      {settings && <section className="secondary-context-position"><span>{t("Window position:")}</span><div>{Object.entries(POSITIONS).map(([value, label]) => <button key={value} className={value === position ? 'selected' : ''} onClick={() => void changePosition(value)}>{t(label)}</button>)}</div></section>}
+      {!focusedInput ? <section className="secondary-context-empty"><TextFieldsRounded /><p>{t("No text cursor detected")}</p><small>{t("Click a text field, then refresh to see cursor context")}</small></section> : <section className="secondary-context-cursor"><header><span><EditRounded />{t("Cursor context")}</span><small>{focusedInput.role || t("Unknown")}</small></header><div>
+        {focusedInput.selectedText && <><h2>{t("Selected text")}</h2><p className="secondary-context-selection">{focusedInput.selectedText}</p></>}
+        {focusedInput.valuePreview && <><h2>{t("Text field content")}</h2><p>{focusedInput.valuePreview}</p></>}
+        {!focusedInput.selectedText && !focusedInput.valuePreview && <p>{t("The cursor is in an empty position")}</p>}
       </div></section>}
-      {(focusedApp?.webDomain || focusedApp?.webUrl) && <section className="secondary-context-browser"><h2>Browser context</h2><dl><dt>Domain</dt><dd>{focusedApp.webDomain}</dd><dt>URL</dt><dd>{focusedApp.webUrl}</dd></dl></section>}
-      <section className="secondary-context-data"><header><h1>Context data</h1><div><button onClick={() => setFull(!full)}>{full ? "Show summary" : "Show all"}</button><button onClick={() => void copy()}>Copy</button></div></header><pre>{JSON.stringify(full ? snapshot || {} : summary, null, 2)}</pre></section>
+      {(focusedApp?.webDomain || focusedApp?.webUrl) && <section className="secondary-context-browser"><h2>{t("Browser context")}</h2><dl><dt>{t("Domain")}</dt><dd>{focusedApp.webDomain}</dd><dt>{t("URL")}</dt><dd>{focusedApp.webUrl}</dd></dl></section>}
+      <section className="secondary-context-data"><header><h1>{t("Context data")}</h1><div><button onClick={() => setFull(!full)}>{full ? t("Show summary") : t("Show all")}</button><button onClick={() => void copy()}>{t("Copy")}</button></div></header><pre>{JSON.stringify(full ? snapshot || {} : summary, null, 2)}</pre></section>
     </div>
   </main>
 }

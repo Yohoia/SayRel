@@ -13,7 +13,7 @@ function fixture({ trusted = true, helperAvailable = true, helperTrusted = trust
   }
   const mocks = {
     electron: {
-      app: { isPackaged: false, getName: () => 'offkey', getPath: () => '/fixture/Electron.app/Contents/MacOS/Electron', getAppPath: () => '/fixture/offkey' },
+      app: { isPackaged: false, getName: () => 'sayrel', getPath: () => '/fixture/Electron.app/Contents/MacOS/Electron', getAppPath: () => '/fixture/sayrel' },
       systemPreferences: { isTrustedAccessibilityClient: prompt => { prompts.push(prompt); return trusted }, getMediaAccessStatus: () => media, askForMediaAccess: async () => false },
       shell: { openExternal: async url => opened.push(url), showItemInFolder: noop },
       clipboard: {}, dialog: {}, nativeImage: {}

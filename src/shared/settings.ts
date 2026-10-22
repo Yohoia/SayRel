@@ -60,8 +60,8 @@ export interface Settings {
 
   // Advanced
   provider: {
-    transcription: 'offkey-cloud' | 'openai-compatible' | 'local-whisper' | 'mock'
-    refinement: 'offkey-cloud' | 'openai-compatible' | 'mock'
+    transcription: 'sayrel-cloud' | 'openai-compatible' | 'local-whisper' | 'mock'
+    refinement: 'sayrel-cloud' | 'openai-compatible' | 'mock'
     baseUrl: string | null
     apiKey: string | null
     model: string | null
@@ -159,6 +159,8 @@ export function mergeSettings(persisted: Partial<Settings> | undefined): Setting
     const binding = mergeNested(base, partial)
     return { ...binding, accelerator: normalizeShortcut(binding.accelerator) }
   }
+  const provider = mergeNested(DEFAULT_SETTINGS.provider, persisted?.provider)
+  const migrateCloudName = <T extends string>(name: T): T | 'sayrel-cloud' => name === 'offkey-cloud' ? 'sayrel-cloud' : name
   return {
     ...DEFAULT_SETTINGS,
     ...Object.fromEntries(Object.entries(persisted ?? {}).filter(([key]) => key in DEFAULT_SETTINGS)),
@@ -171,7 +173,7 @@ export function mergeSettings(persisted: Partial<Settings> | undefined): Setting
     commandShortcut: mergeBinding(DEFAULT_SETTINGS.commandShortcut, persisted?.commandShortcut),
     askAnythingShortcut: mergeBinding(DEFAULT_SETTINGS.askAnythingShortcut, persisted?.askAnythingShortcut),
     translationShortcut: mergeBinding(DEFAULT_SETTINGS.translationShortcut, persisted?.translationShortcut),
-    provider: mergeNested(DEFAULT_SETTINGS.provider, persisted?.provider),
+    provider: { ...provider, transcription: migrateCloudName(provider.transcription), refinement: migrateCloudName(provider.refinement) },
     serviceProviders: persisted?.serviceProviders
       ? serviceProvidersSchema.parse(persisted.serviceProviders)
       : migrateProviderSettings(persisted?.provider)

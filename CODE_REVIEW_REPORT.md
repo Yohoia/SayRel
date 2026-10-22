@@ -1,4 +1,4 @@
-# OffKey 项目代码审查报告
+# Sayrel 项目代码审查报告
 
 **审查日期**: 2024-01-20\
 **项目版本**: 1.0.0\
@@ -8,7 +8,7 @@
 
 ## 执行摘要
 
-OffKey 是一个基于 Electron 的 macOS 语音输入应用，整体代码质量良好，架构清晰。项目采用 TypeScript + React + Electron 技术栈，具有完善的类型定义和模块化设计。以下是关键发现：
+Sayrel 是一个基于 Electron 的 macOS 语音输入应用，整体代码质量良好，架构清晰。项目采用 TypeScript + React + Electron 技术栈，具有完善的类型定义和模块化设计。以下是关键发现：
 
 ### 优点 ✅
 - **严格的 TypeScript 配置**：启用了 strict 模式

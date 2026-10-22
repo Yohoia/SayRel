@@ -1,3 +1,4 @@
+import './appIdentity'
 import Store from 'electron-store'
 import { safeStorage } from 'electron'
 import { z } from 'zod'
@@ -44,12 +45,6 @@ export const settings = {
   get(): Settings {
     if (cache) return cache
     const persisted = store.get('settings')
-    // Apply the English-first release once; later language choices remain user-controlled.
-    if (store.get('interfaceLanguageVersion') !== 1) {
-      persisted.language = 'en'
-      store.set('settings', persisted)
-      store.set('interfaceLanguageVersion', 1)
-    }
     const legacyKey = decrypt(store.get('encryptedApiKey'))
     const decodedSecrets = decrypt(store.get('encryptedProviderSecrets'))
     let secrets: z.infer<typeof secretsSchema> = {}

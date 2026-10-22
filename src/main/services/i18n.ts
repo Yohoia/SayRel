@@ -67,7 +67,7 @@ export function setLanguage(locale: string): string {
 
 export async function resetToSystemLanguage(): Promise<string> {
   const detected = normalizeLocale(await detectSystemLanguage())
-  settings.patch({ language: null })
+  broadcast('store:changed', settings.patch({ language: null }))
   broadcast(IPC.I18N_LANGUAGE_CHANGED, detected)
   return detected
 }

@@ -6,10 +6,10 @@
  * namespace derives from it.
  */
 export const PRODUCT = {
-  name: 'Offkey',
+  name: 'Sayrel',
   displayName: 'Sayrel',
-  bundleId: 'app.offkey.desktop',
-  urlScheme: 'offkey',
+  bundleId: 'com.sayrel.app',
+  urlScheme: 'sayrel',
   version: '1.0.0',
   environment: 'prod'
 } as const

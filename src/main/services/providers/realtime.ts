@@ -210,7 +210,7 @@ function volcSession(req: TranscriptionRequest): RealtimeSession {
   return {
     begin(send) {
       send(volcPacket(1, sequence++, false, Buffer.from(JSON.stringify({
-        user: { uid: 'offkey' }, audio: { format: 'pcm', codec: 'raw', rate: 16000, bits: 16, channel: 1 },
+        user: { uid: 'sayrel' }, audio: { format: 'pcm', codec: 'raw', rate: 16000, bits: 16, channel: 1 },
         request: { model_name: 'bigmodel', enable_itn: true, enable_punc: true, show_utterances: true, result_type: 'full',
           ...(req.dictionary?.length ? { corpus: { context: JSON.stringify({ hotwords: req.dictionary.map(word => ({ word })) }) } } : {}) }
       }))))

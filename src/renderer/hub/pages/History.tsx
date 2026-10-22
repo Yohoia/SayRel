@@ -1,3 +1,5 @@
+import { useAppText } from '../../shared/i18n/useAppText'
+import { translateInterface } from '../../../shared/interfaceText'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, bridge } from '../../shared/utils/bridge'
 import { Icon } from '../../shared/components/Icons'
@@ -5,7 +7,7 @@ import { Modal } from '../../shared/components/Modal'
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { toast } from '../../shared/components/Toast'
 import { HubMenu } from '../components/HubMenu'
-import { useAppSettings } from '../state/settings'
+import { useAppSettings } from '../../shared/state/settings'
 import { HubSelect } from '../components/HubSelect'
 
 import type { HistoryListItem as Item } from '../../../shared/types'
@@ -14,7 +16,8 @@ const FILTERS = [{ id: 'all', label: "All" }, { id: 'dictations', label: "Dictat
 const RETENTION = [{ value: 'never', label: "Never" }, { value: '1', label: "24 hours" }, { value: '7', label: "1 week" }, { value: '30', label: "1 month" }, { value: '365', label: "1 year" }, { value: '0', label: "Forever" }]
 
 export function HistoryPage() {
-  const { settings, patch } = useAppSettings()
+  const t = useAppText()
+  const { settings, locale, patch } = useAppSettings()
   const [total, setTotal] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
   const [retrying, setRetrying] = useState<string | null>(null)
@@ -87,11 +90,11 @@ export function HistoryPage() {
     const groups = new Map<string, Item[]>()
     for (const item of items) {
       if (filter === 'dictations' && item.mode === 'ask_anything' || filter === 'ask_anything' && item.mode !== 'ask_anything') continue
-      const date = dayLabel(item.createdAt)
+      const date = dayLabel(item.createdAt, locale)
       groups.set(date, [...(groups.get(date) ?? []), item])
     }
     return [...groups.entries()]
-  }, [items, filter])
+  }, [items, filter, locale])
   const copy = async (item: Item) => { try { await api.clipboard.writeText(item.refinedText ?? ''); setCopied(item.id); setTimeout(() => setCopied(null), 1500); toast.success("Copied") } catch { toast.error("Could not copy. Please try again.") } }
   const changeRetention = async (value: string) => {
     if (busy) return
@@ -130,30 +133,30 @@ export function HistoryPage() {
     finally { setBusy(false) }
   }
   return <div className="page history-page">
-    <header className="page-heading"><div className="page-heading-copy"><p className="page-index">02 / ARCHIVE</p><h1 className="page-title">History</h1></div><div className="page-actions hub-menu-anchor"><button className="icon-button" title="More" aria-label="History actions" aria-haspopup="menu" aria-expanded={menu === 'header'} onClick={() => setMenu(menu === 'header' ? null : 'header')}><Icon name="more" /></button>{menu === 'header' && <HubMenu onClose={() => setMenu(null)}><button role="menuitem" className="danger" disabled={!items.length} onClick={() => { setMenu(null); setConfirmation({ type: 'all' }) }}><Icon name="trash" size={14} />Delete all</button></HubMenu>}</div></header>
-    <section className="history-retention" aria-label="Keep history">
-      <div className="history-retention-row"><div><h2><Icon name="history" size={14} />Keep history</h2><p>Choose how long to keep your history on this device.</p></div><HubSelect compact label="History retention" value={settings.historyEnabled ? String(settings.historyRetentionDays) : 'never'} options={RETENTION.some((option) => option.value === String(settings.historyRetentionDays)) ? RETENTION : [...RETENTION, { value: String(settings.historyRetentionDays), label: `${settings.historyRetentionDays} days` }]} disabled={busy} onChange={(value) => void changeRetention(value)} /></div>
-      <div className="history-retention-row"><div><h2><Icon name="shield" size={14} />Your data stays private</h2><p>Your dictation history stays on this device.</p></div></div>
+    <header className="page-heading"><div className="page-heading-copy"><h1 className="page-title">{t("History")}</h1></div><div className="page-actions hub-menu-anchor"><button className="icon-button" title={t("More")} aria-label={t("History actions")} aria-haspopup="menu" aria-expanded={menu === 'header'} onClick={() => setMenu(menu === 'header' ? null : 'header')}><Icon name="more" /></button>{menu === 'header' && <HubMenu onClose={() => setMenu(null)}><button role="menuitem" className="danger" disabled={!items.length} onClick={() => { setMenu(null); setConfirmation({ type: 'all' }) }}><Icon name="trash" size={14} />{t("Delete all")}</button></HubMenu>}</div></header>
+    <section className="history-retention" aria-label={t("Keep history")}>
+      <div className="history-retention-row"><div><h2><Icon name="history" size={14} />{t("Keep history")}</h2><p>{t("Choose how long to keep your history on this device.")}</p></div><HubSelect compact label={t("History retention")} value={settings.historyEnabled ? String(settings.historyRetentionDays) : 'never'} options={(RETENTION.some((option) => option.value === String(settings.historyRetentionDays)) ? RETENTION : [...RETENTION, { value: String(settings.historyRetentionDays), label: `${settings.historyRetentionDays} days` }]).map(option => ({ ...option, label:t(option.label) }))} disabled={busy} onChange={(value) => void changeRetention(value)} /></div>
+      <div className="history-retention-row"><div><h2><Icon name="shield" size={14} />{t("Your data stays private")}</h2><p>{t("Your dictation history stays on this device.")}</p></div></div>
     </section>
-    <div className="page-toolbar"><div className="segmented-tabs" role="tablist" aria-label="Recording type">{FILTERS.map((item) => <button key={item.id} role="tab" aria-selected={filter === item.id} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div></div>
-    {error && <p role="alert" className="inline-error">{error} <button className="text-button" onClick={() => void load()}>Retry</button></p>}
-    {loading ? <div className="hub-loading" role="status" aria-label="Loading" /> : grouped.length ? <div className="history-list">{grouped.map(([day, group]) => <section className="history-group" key={day}><h2 className="history-date">{day}</h2><div className="history-day-items">{group.map((item) => <article className={`history-item ${menu === item.id ? 'is-menu-open' : ''}`} key={item.id}>
-      <time className="history-item-time">{item.createdAt ? new Date(item.createdAt).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', hour12: false }) : '—'}</time>
-      <p className={`history-item-text ${item.status === 'failed' ? 'history-item-failed' : ''}`}>{retrying === item.id ? "Reprocessing audio…" : item.refinedText || (item.status === 'failed' ? "Your transcription was interrupted." : (item.status === 'cancelled' || item.status === 'canceled') ? "The transcription was dismissed." : "Audio is silent.")}</p>
-      <div className="history-item-actions">{item.mode === 'ask_anything' && item.refinedText && <button className="history-view-answer" onClick={() => setSelected(item)}>View answer</button>}<button className="icon-button" title={copied === item.id ? "Copied" : "Copy transcript"} aria-label="Copy transcript" disabled={!item.refinedText} onClick={() => void copy(item)}><Icon name={copied === item.id ? 'check' : 'copy'} size={14} /></button><div className="hub-menu-anchor"><button className="icon-button" title="More" aria-label="Transcription actions" aria-haspopup="menu" aria-expanded={menu === item.id} onClick={() => setMenu(menu === item.id ? null : item.id)}><Icon name="more" size={14} /></button>{menu === item.id && <HubMenu onClose={() => setMenu(null)}><button role="menuitem" disabled={!item.hasAudio || !!retrying} title={!item.hasAudio ? "No audio was saved for this recording" : undefined} onClick={() => void retry(item)}>{retrying === item.id ? "Retrying…" : "Retry"}</button><button role="menuitem" disabled={!item.hasAudio} title={!item.hasAudio ? "No audio was saved for this recording" : undefined} onClick={() => void download(item)}><Icon name="download" size={14} />Download audio</button><hr /><button role="menuitem" className="danger" onClick={() => { setMenu(null); setConfirmation({ type: 'item', item }) }}><Icon name="trash" size={14} />Delete transcript</button></HubMenu>}</div></div>
-    </article>)}</div></section>)}</div> : <div className="empty-state history-empty"><h2>No dictations yet</h2><p>Your dictations from other apps will appear here.</p></div>}
-    {!loading && items.length < total && <div ref={sentinel} className="history-load-more"><button className="text-button" disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore ? "Loading…" : "Load more"}</button></div>}
-    {selected && <Modal title="Answer" onClose={() => setSelected(null)}><div className="detail-transcript">{selected.refinedText}</div><footer className="modal-footer"><button className="primary-button" onClick={() => void copy(selected)}><Icon name={copied === selected.id ? 'check' : 'copy'} />{copied === selected.id ? "Copied" : "Copy text"}</button></footer></Modal>}
-    {confirmation && <ConfirmDialog title={confirmation.type === 'all' ? "Delete all history?" : confirmation.type === 'item' ? "Delete this transcript?" : "Delete old history?"} description={confirmation.type === 'all' ? "All your local history will be deleted forever. This can't be undone." : confirmation.type === 'item' ? "This transcript will be deleted forever. This can't be undone." : `All local history older than ${RETENTION.find((option) => Number(option.value) === confirmation.days)?.label} will be deleted forever. This can't be undone.`} subject={confirmation.type === 'item' ? confirmation.item.refinedText ?? "No transcript available" : undefined} pending={busy} onClose={() => { setConfirmation(null) }} onConfirm={() => void confirm()} />}
+    <div className="page-toolbar"><div className="segmented-tabs" role="tablist" aria-label={t("Recording type")}>{FILTERS.map((item) => <button key={item.id} role="tab" aria-selected={filter === item.id} onClick={() => setFilter(item.id)}>{t(item.label)}</button>)}</div></div>
+    {error && <p role="alert" className="inline-error">{t(error)} <button className="text-button" onClick={() => void load()}>{t("Retry")}</button></p>}
+    {loading ? <div className="hub-loading" role="status" aria-label={t("Loading")} /> : grouped.length ? <div className="history-list">{grouped.map(([day, group]) => <section className="history-group" key={day}><h2 className="history-date">{day}</h2><div className="history-day-items">{group.map((item) => <article className={`history-item ${menu === item.id ? 'is-menu-open' : ''}`} key={item.id}>
+      <time className="history-item-time">{item.createdAt ? new Date(item.createdAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false }) : '—'}</time>
+      <p className={`history-item-text ${item.status === 'failed' ? 'history-item-failed' : ''}`}>{retrying === item.id ? t("Reprocessing audio…") : item.refinedText || (item.status === 'failed' ? t("Your transcription was interrupted.") : (item.status === 'cancelled' || item.status === 'canceled') ? t("The transcription was dismissed.") : t("Audio is silent."))}</p>
+      <div className="history-item-actions">{item.mode === 'ask_anything' && item.refinedText && <button className="history-view-answer" onClick={() => setSelected(item)}>{t("View answer")}</button>}<button className="icon-button" title={copied === item.id ? t("Copied") : t("Copy transcript")} aria-label={t("Copy transcript")} disabled={!item.refinedText} onClick={() => void copy(item)}><Icon name={copied === item.id ? 'check' : 'copy'} size={14} /></button><div className="hub-menu-anchor"><button className="icon-button" title={t("More")} aria-label={t("Transcription actions")} aria-haspopup="menu" aria-expanded={menu === item.id} onClick={() => setMenu(menu === item.id ? null : item.id)}><Icon name="more" size={14} /></button>{menu === item.id && <HubMenu onClose={() => setMenu(null)}><button role="menuitem" disabled={!item.hasAudio || !!retrying} title={!item.hasAudio ? t("No audio was saved for this recording") : undefined} onClick={() => void retry(item)}>{retrying === item.id ? t("Retrying…") : t("Retry")}</button><button role="menuitem" disabled={!item.hasAudio} title={!item.hasAudio ? t("No audio was saved for this recording") : undefined} onClick={() => void download(item)}><Icon name="download" size={14} />{t("Download audio")}</button><hr /><button role="menuitem" className="danger" onClick={() => { setMenu(null); setConfirmation({ type: 'item', item }) }}><Icon name="trash" size={14} />{t("Delete transcript")}</button></HubMenu>}</div></div>
+    </article>)}</div></section>)}</div> : <div className="empty-state history-empty"><h2>{t("No dictations yet")}</h2><p>{t("Your dictations from other apps will appear here.")}</p></div>}
+    {!loading && items.length < total && <div ref={sentinel} className="history-load-more"><button className="text-button" disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore ? t("Loading…") : t("Load more")}</button></div>}
+    {selected && <Modal title={t("Answer")} onClose={() => setSelected(null)}><div className="detail-transcript">{selected.refinedText}</div><footer className="modal-footer"><button className="primary-button" onClick={() => void copy(selected)}><Icon name={copied === selected.id ? 'check' : 'copy'} />{copied === selected.id ? t("Copied") : t("Copy text")}</button></footer></Modal>}
+    {confirmation && <ConfirmDialog title={confirmation.type === 'all' ? t("Delete all history?") : confirmation.type === 'item' ? t("Delete this transcript?") : t("Delete old history?")} description={confirmation.type === 'all' ? t("All your local history will be deleted forever. This can't be undone.") : confirmation.type === 'item' ? t("This transcript will be deleted forever. This can't be undone.") : t(`All local history older than ${t(RETENTION.find((option) => Number(option.value) === confirmation.days)?.label ?? `${confirmation.days} days`)} will be deleted forever. This can't be undone.`)} subject={confirmation.type === 'item' ? confirmation.item.refinedText ?? t("No transcript available") : undefined} pending={busy} onClose={() => { setConfirmation(null) }} onConfirm={() => void confirm()} />}
   </div>
 }
 
-function dayLabel(iso: string | null): string {
-  if (!iso) return "Unknown date"
+function dayLabel(iso: string | null, locale: string): string {
+  if (!iso) return translateInterface("Unknown date", locale)
   const date = new Date(iso)
   const today = new Date()
   const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1)
-  if (date.toDateString() === today.toDateString()) return "Today"
-  if (date.toDateString() === yesterday.toDateString()) return "Yesterday"
-  return date.toLocaleDateString('en', { year: 'numeric', month: 'long', day: 'numeric' })
+  if (date.toDateString() === today.toDateString()) return translateInterface("Today", locale)
+  if (date.toDateString() === yesterday.toDateString()) return translateInterface("Yesterday", locale)
+  return date.toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' })
 }

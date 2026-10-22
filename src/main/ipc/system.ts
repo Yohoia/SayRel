@@ -132,7 +132,7 @@ export function registerSystemHandlers(handle: (c: string, f: Handler) => void):
   handle('file:save-png-with-dialog', async (_e, dataUrl: string, name?: string) => {
     const image = nativeImage.createFromDataURL(dataUrl)
     const result = await dialog.showSaveDialog({
-      defaultPath: join(app.getPath('downloads'), name ?? 'offkey.png'),
+      defaultPath: join(app.getPath('downloads'), name ?? 'sayrel.png'),
       filters: [{ name: 'PNG', extensions: ['png'] }]
     })
     if (result.canceled || !result.filePath) return { canceled: true }

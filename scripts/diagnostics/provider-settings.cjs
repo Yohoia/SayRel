@@ -4,10 +4,10 @@ const { mkdtempSync, rmSync, writeFileSync, readFileSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { join, resolve } = require('node:path')
 const assert = require('node:assert/strict')
-const profile = mkdtempSync(join(tmpdir(), 'offkey-provider-settings-'))
+const profile = mkdtempSync(join(tmpdir(), 'sayrel-provider-settings-'))
 app.setPath('userData', profile)
 app.commandLine.appendSwitch('disable-background-networking')
-const apiKey = 'offkey-settings-test-secret-unique'
+const apiKey = 'sayrel-settings-test-secret-unique'
 const legacy = { transcription: 'openai-compatible', refinement: 'openai-compatible', baseUrl: 'https://example.test/v1', apiKey: null, model: 'old-asr', refinementModel: 'old-llm' }
 app.whenReady().then(async () => {
   assert.equal(safeStorage.isEncryptionAvailable(), true, 'system encryption available in isolated test')
@@ -15,10 +15,10 @@ app.whenReady().then(async () => {
   writeFileSync(join(profile, 'settings.json'), JSON.stringify({ settings: { language:'zh-CN', provider:legacy, shortcut, translationTargetLanguages:['zh-CN', 'ja'], translationTargetLanguage:'ja' }, deviceId:'fixture-device', encryptedApiKey:safeStorage.encryptString(apiKey).toString('base64') }))
   const { settings } = await import(resolve(__dirname, '../../.build/provider-settings/settings.mjs'))
   const loaded = settings.get()
-  assert.equal(loaded.language, 'en', 'existing profiles switch to English on the first launch of this release')
-  assert.deepEqual(loaded.shortcut, shortcut, 'language migration preserves custom shortcuts')
-  assert.deepEqual(loaded.translationTargetLanguages, ['zh-CN', 'ja'], 'language migration preserves translation candidates')
-  assert.equal(loaded.translationTargetLanguage, 'ja', 'language migration preserves the selected translation target')
+  assert.equal(loaded.language, 'zh-CN', 'loading an existing profile preserves its chosen interface language')
+  assert.deepEqual(loaded.shortcut, shortcut, 'loading settings preserves custom shortcuts')
+  assert.deepEqual(loaded.translationTargetLanguages, ['zh-CN', 'ja'], 'loading settings preserves translation candidates')
+  assert.equal(loaded.translationTargetLanguage, 'ja', 'loading settings preserves the selected translation target')
   assert.equal(JSON.parse(readFileSync(join(profile, 'settings.json'), 'utf8')).deviceId, 'fixture-device')
   assert.equal(loaded.serviceProviders.profiles.length, 2)
   assert.equal(loaded.serviceProviders.profiles[0].apiKey, apiKey, 'encrypted legacy credentials migrate before provider profiles')

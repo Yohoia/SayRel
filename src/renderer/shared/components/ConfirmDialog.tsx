@@ -1,3 +1,4 @@
+import { useAppText } from '../i18n/useAppText'
 import { useId } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -7,13 +8,14 @@ import '../styles/feedback.css'
 export function ConfirmDialog({ title, description, subject, pending = false, onConfirm, onClose }: {
   title: string; description: ReactNode; subject?: string; pending?: boolean; onConfirm: () => void; onClose: () => void
 }) {
+  const t = useAppText()
   const descriptionId = useId()
   const subjectId = useId()
   return createPortal(<div className="confirmation-dialog">
     <Modal title={title} onClose={onClose} role="alertdialog" descriptionId={subject ? `${descriptionId} ${subjectId}` : descriptionId} dismissible={!pending} showClose={false}>
       <div className="confirmation-description" id={descriptionId}>{description}</div>
       {subject && <p className="confirmation-subject" id={subjectId} title={subject}>{subject}</p>}
-      <footer className="confirmation-actions"><button type="button" className="confirmation-cancel" data-dialog-autofocus disabled={pending} onClick={onClose}>Cancel</button><button type="button" className="confirmation-submit" disabled={pending} aria-busy={pending} onClick={onConfirm}>{pending && <span className="feedback-spinner" aria-hidden="true" />}{pending ? "Processing…" : "Confirm"}</button></footer>
+      <footer className="confirmation-actions"><button type="button" className="confirmation-cancel" data-dialog-autofocus disabled={pending} onClick={onClose}>{t("Cancel")}</button><button type="button" className="confirmation-submit" disabled={pending} aria-busy={pending} onClick={onConfirm}>{pending && <span className="feedback-spinner" aria-hidden="true" />}{pending ? t("Processing…") : t("Confirm")}</button></footer>
     </Modal>
   </div>, document.body)
 }

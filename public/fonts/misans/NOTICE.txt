@@ -1,0 +1,8 @@
+This app uses MiSans fonts.
+本应用使用了 MiSans 字体。
+
+Copyright © 2020-2025 Beijing Xiaomi Mobile Software Co.,Ltd. All Rights Reserved.
+MiSans is used under the MiSans Font Intellectual Property License Agreement.
+The original agreement is included in LICENSE.pdf.
+Fonts are copied unchanged from the official Xiaomi distribution.
+https://hyperos.mi.com/font/zh/download/

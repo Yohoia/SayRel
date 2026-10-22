@@ -3,7 +3,7 @@ const {mkdtempSync,mkdirSync,writeFileSync,rmSync}=require('node:fs')
 const {resolve,join}=require('node:path')
 const {tmpdir}=require('node:os')
 const assert=require('node:assert/strict')
-const root=resolve(__dirname,'../../..'),output=join(__dirname,process.argv.includes('--baseline')?'before':'after'),profile=mkdtempSync(join(tmpdir(),'offkey-blueprint-'))
+const root=resolve(__dirname,'../../..'),output=join(__dirname,process.argv.includes('--baseline')?'before':'after'),profile=mkdtempSync(join(tmpdir(),'sayrel-blueprint-'))
 app.setPath('userData',profile)
 app.disableHardwareAcceleration()
 let win;const reports=[],errors=[];const delay=ms=>new Promise(r=>setTimeout(r,ms));const js=code=>win.webContents.executeJavaScript(code)
@@ -13,11 +13,11 @@ async function shot(name){await js('new Promise(r=>requestAnimationFrame(()=>req
 app.whenReady().then(async()=>{
  mkdirSync(output,{recursive:true});session.defaultSession.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']},(_,cb)=>cb({cancel:true}));win=new BrowserWindow({width:1080,height:750,useContentSize:true,show:false,webPreferences:{backgroundThrottling:false}});win.webContents.debugger.attach('1.3');win.webContents.on('console-message',(_,level,message)=>{if(level>=3)errors.push(message)})
  for(const route of ['dashboard','history','dictionary','providers']){await page('hub','/'+route);await until("!!document.querySelector('.page-title')");await shot(route)}
- await js("window.offkey.invoke('page:open-settings-modal','settings')");await until("!!document.querySelector('.settings-modal')");await shot('settings')
+ await js("window.sayrel.invoke('page:open-settings-modal','settings')");await until("!!document.querySelector('.settings-modal')");await shot('settings')
  for(const [label,name] of [['Personalization','个性化'],['About','关于'],['Help','帮助']]){await js(`Array.from(document.querySelectorAll('.settings-nav-item')).find(n=>n.textContent.trim()===${JSON.stringify(label)}).click()`);await shot('settings-'+name)}
  win.setContentSize(840,560);await shot('settings-help-small');await js("Array.from(document.querySelectorAll('.settings-nav-item')).find(n=>n.textContent.trim()==='Settings').click()");await shot('settings-small');await js("document.querySelector('.settings-content').scrollTop=document.querySelector('.settings-content').scrollHeight");await shot('settings-small-bottom');win.setContentSize(1080,750)
  await page('hub','/history',{state:'empty'});await shot('history-empty');await page('hub','/dictionary',{state:'empty'});await shot('dictionary-empty')
- for(const route of ['dashboard','history','dictionary','providers']){await page('hub','/'+route);await js("window.offkey.invoke('appearance:set-preference','dark')");await delay(100);await shot(route+'-dark')}
+ for(const route of ['dashboard','history','dictionary','providers']){await page('hub','/'+route);await js("window.sayrel.invoke('appearance:set-preference','dark')");await delay(100);await shot(route+'-dark')}
  await page('onboarding','');await shot('onboarding-permissions');await js("document.querySelector('.secondary-onboarding-footer .secondary-primary-button').click()");await until("!!document.querySelector('[role=meter]')");await shot('onboarding-microphone');await until("!document.querySelector('.secondary-onboarding-footer .secondary-primary-button').disabled");await js("document.querySelector('.secondary-onboarding-footer .secondary-primary-button').click()");await until("!!document.querySelector('.secondary-shortcut-card,.secondary-keyboard-art')");await shot('onboarding-shortcut')
  win.setContentSize(800,500);await page('interactive-card','');await shot('answer-card')
  win.setContentSize(350,500);await page('sidebar','');await shot('context-sidebar')

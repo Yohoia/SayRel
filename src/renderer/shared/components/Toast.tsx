@@ -1,3 +1,4 @@
+import { useAppText } from '../i18n/useAppText'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from './Icons'
@@ -49,6 +50,7 @@ export const toast = {
 }
 
 function ToastCard({ entry }: { entry: ToastEntry }) {
+  const t = useAppText()
   const { id, input, leaving } = entry
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
@@ -66,17 +68,18 @@ function ToastCard({ entry }: { entry: ToastEntry }) {
     const timer = setTimeout(() => dismiss(id), remaining.current)
     return () => { clearTimeout(timer); remaining.current = Math.max(0, remaining.current - (performance.now() - started)) }
   }, [id, input, hovered, focused, windowPaused, leaving])
-  return <div className={`offkey-toast is-${input.tone}${leaving ? ' is-leaving' : ''}`} data-toast-id={id}
+  return <div className={`sayrel-toast is-${input.tone}${leaving ? ' is-leaving' : ''}`} data-toast-id={id}
     tabIndex={0} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); dismiss(id) } }}
     onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
     onFocusCapture={() => setFocused(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false) }}>
     {input.tone === 'success' && <Icon name="check" size={16} className="toast-check" />}
     {input.tone === 'loading' && <span className="feedback-spinner" aria-hidden="true" />}
-    <span className="toast-message" role={input.tone === 'error' ? 'alert' : 'status'} aria-atomic="true" title={input.message}>{input.message}</span>
+    <span className="toast-message" role={input.tone === 'error' ? 'alert' : 'status'} aria-atomic="true" title={t(input.message)}>{t(input.message)}</span>
   </div>
 }
 
 export function ToastViewport() {
+  const t = useAppText()
   const snapshot = useSyncExternalStore(subscribe, () => entries)
-  return createPortal(<section className="toast-viewport" aria-label="Notifications">{snapshot.map(entry => <ToastCard entry={entry} key={entry.id} />)}</section>, document.body)
+  return createPortal(<section className="toast-viewport" aria-label={t("Notifications")}>{snapshot.map(entry => <ToastCard entry={entry} key={entry.id} />)}</section>, document.body)
 }

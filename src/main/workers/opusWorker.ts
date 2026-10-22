@@ -113,7 +113,7 @@ function opusHead(channels: number, sampleRate: number, preSkip = 312): Uint8Arr
   return head
 }
 
-function opusTags(comment = 'Offkey'): Uint8Array {
+function opusTags(comment = 'Sayrel'): Uint8Array {
   const vendor = new TextEncoder().encode(comment)
   const tags = new Uint8Array(8 + 4 + vendor.length + 4)
   tags.set([0x4f, 0x70, 0x75, 0x73, 0x54, 0x61, 0x67, 0x73], 0) // OpusTags

@@ -22,7 +22,7 @@ export function useHotkeyState(mode = 'voice_transcript') {
       setShortcutLabel(binding?.enabled ? binding.accelerator : '')
       setHint(config?.onboardingCompleted && config?.shortcut?.enabled === false ? "No shortcut set. Click here to start" : null)
     }
-    const off = window.offkey?.on('store:changed', update)
+    const off = window.sayrel?.on('store:changed', update)
     api.settings
       .get()
       .then(update)

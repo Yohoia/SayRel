@@ -1,6 +1,6 @@
 const { app, BrowserWindow, session } = require('electron')
 const assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), os = require('node:os')
-const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'offkey-retention-ui-'))
+const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'sayrel-retention-ui-'))
 app.setPath('userData', profile)
 app.commandLine.appendSwitch('disable-background-networking')
 let win
@@ -19,15 +19,15 @@ async function choose(value) {
   await js(`[...document.querySelectorAll('[role=option]')].find(node => node.textContent.trim() === ${JSON.stringify(value)}).click()`)
   await waitFor("!document.querySelector('[role=listbox]')")
 }
-async function settings() { return js("window.offkey.invoke('store:use','get')") }
+async function settings() { return js("window.sayrel.invoke('store:use','get')") }
 app.whenReady().then(async () => {
   session.defaultSession.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, (_, done) => done({ cancel: true }))
   win = new BrowserWindow({ width: 1080, height: 750, show: false })
   win.webContents.on('console-message', (_, level, message) => { if (level >= 3) console.error(message) })
   await win.loadFile(path.resolve(__dirname, '../../.build/ui-review/hub.html'), { hash: '/history' })
   await waitFor("document.querySelectorAll('.history-item').length === 3")
-  await js("window.offkey.invoke('store:use','patch',{historyEnabled:true,historyRetentionDays:0})")
-  await js("window.offkey.invoke('db:history-delete','history-3')")
+  await js("window.sayrel.invoke('store:use','patch',{historyEnabled:true,historyRetentionDays:0})")
+  await js("window.sayrel.invoke('db:history-delete','history-3')")
   await js("[...document.querySelectorAll('[role=tab]')].find(node=>node.textContent==='Ask anything').click()")
   await waitFor("!!document.querySelector('.history-empty')")
   await choose("24 hours")
@@ -46,7 +46,7 @@ app.whenReady().then(async () => {
   await waitFor("!document.querySelector('[role=alertdialog]')")
   assert.equal((await settings()).historyEnabled, true)
   assert.equal((await settings()).historyRetentionDays, 1)
-  assert.equal(await js("window.offkey.invoke('db:history-list').then(result => result.total)"), 0)
+  assert.equal(await js("window.sayrel.invoke('db:history-list').then(result => result.total)"), 0)
   console.log('PASS re-enabling finite retention confirms before saving and deleting old records')
 
   await choose("Forever")

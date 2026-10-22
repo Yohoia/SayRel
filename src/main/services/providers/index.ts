@@ -11,8 +11,8 @@ export type { ChatMessage } from './chat'
 export interface TranscriptionProvider { readonly name: string; transcribe(req: TranscriptionRequest): Promise<TranscriptionResult> }
 export interface RefinementProvider { readonly name: string; refine(req: RefineRequest): Promise<RefineResult> }
 export type ProviderConfig = {
-  transcription: 'offkey-cloud' | 'openai-compatible' | 'local-whisper' | 'mock'
-  refinement: 'offkey-cloud' | 'openai-compatible' | 'mock'
+  transcription: 'sayrel-cloud' | 'openai-compatible' | 'local-whisper' | 'mock'
+  refinement: 'sayrel-cloud' | 'openai-compatible' | 'mock'
   baseUrl: string | null; apiKey: string | null; model: string | null; refinementModel: string | null
 }
 
@@ -146,7 +146,7 @@ export class LocalWhisperProvider implements TranscriptionProvider {
   constructor(private readonly binary = 'whisper-cli', private readonly modelPath: string | null = null) {}
   async transcribe(req: TranscriptionRequest, allowEmpty = false): Promise<TranscriptionResult> {
     const [{ execFile }, { promisify }, fs, { tmpdir }, { join }] = await Promise.all([import('node:child_process'), import('node:util'), import('node:fs/promises'), import('node:os'), import('node:path')])
-    const temp = await fs.mkdtemp(join(tmpdir(), 'offkey-whisper-'))
+    const temp = await fs.mkdtemp(join(tmpdir(), 'sayrel-whisper-'))
     try {
       const source = req.pcm?.length ? { pcm: req.pcm, sampleRate: req.sampleRate ?? 16000 } : decodeHistoryAudio(req.audioBuffer?.length ? req.audioBuffer : req.audioPath ? await fs.readFile(req.audioPath) : Buffer.alloc(0))
       const file = join(temp, 'audio.wav')

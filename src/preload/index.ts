@@ -245,9 +245,9 @@ const api = {
   }
 }
 
-export type OffkeyApi = typeof api
+export type SayrelApi = typeof api
 
-contextBridge.exposeInMainWorld('offkey', api)
+contextBridge.exposeInMainWorld('sayrel', api)
 // The reference build exposes `window.ipcRenderer`; keep the alias so bundled
 // renderer code can use either name.
 contextBridge.exposeInMainWorld('ipcRenderer', api)

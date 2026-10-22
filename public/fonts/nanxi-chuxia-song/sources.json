@@ -1,0 +1,37 @@
+{
+  "family": "NanxiChuxiasong",
+  "displayName": "南西初夏宋",
+  "version": "1.000;2025/01/06",
+  "weight": 400,
+  "author": "松陵南西",
+  "source": "https://www.maoken.com/freefonts/26693.html",
+  "download": "https://wwvk.lanzouq.com/imfrz356ve3i",
+  "authorSource": "https://www.xiaohongshu.com/discovery/item/68b3e1cd000000001c03feac",
+  "license": "SIL Open Font License 1.1",
+  "licenseSource": "https://raw.githubusercontent.com/adobe-fonts/source-han-serif/release/LICENSE.txt",
+  "downloaded": "2026-10-21",
+  "archiveSha256": "1bbddac5ba4c6068e904807895934b29943c1cbf53b74ec88dd3a1bc9d2e08e6",
+  "conversion": "Full glyph set, lossless WOFF2 packaging with fontTools; original TTF retained unchanged.",
+  "files": [
+    {
+      "file": "NanxiChuxiasong-Regular.ttf",
+      "bytes": 3272192,
+      "sha256": "6531ef4e8401fdf80127380a429cad16ff05b6a08e2e95404b03d4954461de5c"
+    },
+    {
+      "file": "NanxiChuxiasong-Regular.woff2",
+      "bytes": 1583064,
+      "sha256": "0e9aad754089cac1c367ec7dc576808d51ca88b611c43c00a4846eaa04c2251d"
+    },
+    {
+      "file": "OFL.txt",
+      "bytes": 4717,
+      "sha256": "598ee7760d382ee5e117113a3c69fdc5d7ec548e55a9f393b6ec7ff66ccbab98"
+    },
+    {
+      "file": "author-permission.pdf",
+      "bytes": 210364,
+      "sha256": "4788f312f4fc6e280b4e18133f927829485761544bd7074d6deb95f890509805"
+    }
+  ]
+}

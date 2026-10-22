@@ -1,9 +1,10 @@
+import { BrandLockup } from '../../shared/components/BrandLockup'
 import { useEffect, useRef, useState } from 'react'
 import InfoOutlined from '@mui/icons-material/InfoOutlined'
 import ArrowOutward from '@mui/icons-material/ArrowOutward'
 import { api } from '../../shared/utils/bridge'
 import { checkForUpdates } from '../../shared/utils/checkForUpdates'
-import { useAppSettings } from '../state/settings'
+import { useAppSettings } from '../../shared/state/settings'
 import { ShortcutEditor, TranslationTargets, LanguageVariants, MicrophonePicker, FeatureTour } from './SettingsControls'
 import { interfaceLanguages, useSettingsText, type SettingsTextKey } from './settingsText'
 import '../../shared/styles/settings.css'
@@ -53,7 +54,7 @@ export function SettingsPanel({ section: initialSection = 'settings', onSectionC
   useEffect(() => { contentRef.current?.scrollTo({ top: 0 }) }, [section])
   return (
     <div className="settings-shell">
-      <nav className="settings-nav" aria-label="Settings navigation"><div className="settings-nav-brand"><img className="brand-lockup" src="./assets/brand/sayrel-horizontal.svg" alt="Sayrel" width={100} height={33} /><small>PREFERENCES</small></div>
+      <nav className="settings-nav" aria-label="Settings navigation"><div className="settings-nav-brand"><BrandLockup /><small>PREFERENCES</small></div>
         {SECTIONS.map((id) => <button key={id} type="button" aria-current={section === id ? 'page' : undefined}
           className={`settings-nav-item ${section === id ? 'is-selected' : ''}`}
           onClick={() => { setSection(id); onSectionChange?.(id) }}>
@@ -176,7 +177,7 @@ function AboutSection() {
   return <><Row label="Version" hint={version ? `v${version}` : '—'}><button className="settings-pill" disabled={checking} onClick={async () => {
     setChecking(true)
     try { await checkForUpdates(version) } finally { setChecking(false) }
-  }}>{t(checking ? "Checking for updates..." : "Check for updates")}</button></Row><ExternalRow label="Privacy Policy" url="https://www.typeless.com/privacy" /><ExternalRow label="Terms of Service" url="https://www.typeless.com/terms" /></>
+  }}>{t(checking ? "Checking for updates..." : "Check for updates")}</button></Row><Row label="Typography" hint="This app uses MiSans fonts."><button className="settings-pill" onClick={() => void api.page.openUrl('https://hyperos.mi.com/font/zh/download/')}>{t("Font license")}</button></Row><ExternalRow label="Privacy Policy" url="https://www.typeless.com/privacy" /><ExternalRow label="Terms of Service" url="https://www.typeless.com/terms" /></>
 }
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {

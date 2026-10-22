@@ -211,7 +211,7 @@ private func selectedTextViaAccessibility() -> String? {
 private func selectedTextViaCopy(timeoutMs: Int32) -> String? {
     let pasteboard = NSPasteboard.general
     let saved = savePasteboard(pasteboard)
-    let marker = "offkey-selection-\(UUID().uuidString)"
+    let marker = "sayrel-selection-\(UUID().uuidString)"
     pasteboard.clearContents()
     pasteboard.setString(marker, forType: .string)
 

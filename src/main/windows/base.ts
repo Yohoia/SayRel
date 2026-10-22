@@ -1,4 +1,4 @@
-import { BrowserWindow, screen, type BrowserWindowConstructorOptions } from 'electron'
+import { app, BrowserWindow, screen, type BrowserWindowConstructorOptions } from 'electron'
 import { join } from 'node:path'
 import type { WindowRoute } from '../../shared/constants'
 
@@ -48,6 +48,7 @@ export abstract class BaseWindow {
     }
     const options: BrowserWindowConstructorOptions = {
       title: this.getWindowTitle(),
+      icon: join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
       show: false,
       webPreferences: {
         preload: resolvePreload(),

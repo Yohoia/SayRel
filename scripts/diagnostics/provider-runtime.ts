@@ -143,7 +143,7 @@ try {
   await assert.rejects(unconfigured.transcription.transcribe(input), /Configure and select/)
   assert.equal((await unconfigured.refinement.refine({ transcript: ' raw ', mode: 'voice_transcript' })).text, 'raw')
   assert.match((await createProviders(legacy).transcription.transcribe(input)).text, /mock transcript/); checks++
-  const whisperDir = await mkdtemp(join(tmpdir(), 'offkey-whisper-probe-'))
+  const whisperDir = await mkdtemp(join(tmpdir(), 'sayrel-whisper-probe-'))
   try {
     const binary = join(whisperDir, 'whisper-probe')
     await writeFile(binary, '#!/usr/bin/env node\nconst fs=require("node:fs");const a=process.argv;const wav=fs.readFileSync(a[a.indexOf("-f")+1]);if(wav.toString("ascii",0,4)!=="RIFF")process.exit(2);fs.writeFileSync(a[a.indexOf("--output-file")+1]+".txt","");', { mode: 0o755 })

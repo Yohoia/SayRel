@@ -206,11 +206,11 @@ async function start(machine) { await machine.start(); const id = machine.getSta
     const controller = new RecorderSessionController({
       settings: async () => ({ muteWhileDictating: false }),
       isMuted: async () => false, mute: async () => {}, unmute: async () => {},
-      status: (phase, payload) => exposed.offkey.invoke('recording-machine:status', phase, payload),
+      status: (phase, payload) => exposed.sayrel.invoke('recording-machine:status', phase, payload),
       onRecorder() {},
       start: async options => ({ stop: async () => { stopped++; options.onChunk(new Float32Array([.25, .5, .75])) } })
     })
-    const off = exposed.offkey.on('recording-machine:state', state => controller.sync(state))
+    const off = exposed.sayrel.on('recording-machine:state', state => controller.sync(state))
     forwardBroadcast = (channel, ...args) => listeners.get(channel)?.({ sender: 'main' }, ...args)
     transcribe = async ({ pcm }) => { samples = [...pcm]; return { result: { text: 'integrated' }, ogg: Buffer.alloc(0) } }
     await m.start(); await flush()

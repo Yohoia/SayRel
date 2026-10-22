@@ -11,7 +11,7 @@ import type { TranscriptionRequest } from '../../src/shared/types'
 import { transcribeRealtime } from '../../src/main/services/providers/realtime'
 
 const localKey = 'local-fixture-key'
-const request = { pcm: new Float32Array(7200).fill(0.25), sampleRate: 16000, durationMs: 450, mode: 'voice_transcript', language: 'zh', dictionary: ['Offkey'] } satisfies TranscriptionRequest
+const request = { pcm: new Float32Array(7200).fill(0.25), sampleRate: 16000, durationMs: 450, mode: 'voice_transcript', language: 'zh', dictionary: ['Sayrel'] } satisfies TranscriptionRequest
 const object = z.record(z.string(), z.unknown())
 function json(data: Buffer) { return object.parse(JSON.parse(data.toString())) }
 function profile(protocol: ProviderProfile['protocol'], endpoint: string): ProviderProfile {
@@ -110,7 +110,7 @@ await fixture((socket, req) => {
     if (binary) { assert(configured); return }
     if (data.length) {
       const event = json(data); assert.equal(event.api_key, localKey); assert.equal(event.audio_format, 'pcm_s16le'); assert.equal(event.sample_rate, 16000)
-      assert.deepEqual(event.context, { terms: ['Offkey'] }); configured = true
+      assert.deepEqual(event.context, { terms: ['Sayrel'] }); configured = true
     } else {
       send(socket, { tokens: [{ text: 'temporary', is_final: false }, { text: '你好', is_final: true, language: 'zh' }, { text: '<end>', is_final: true }] })
       send(socket, { tokens: [{ text: 'translated', is_final: true, translation_status: 'translation' }, { text: '世界', is_final: true }] })
@@ -202,7 +202,7 @@ const httpServer = createServer(async (req, res) => {
   const data = z.object({ model: z.literal('fun-asr-flash-2026-06-15'), input: z.object({ messages: z.array(z.object({ content: z.array(z.object({ type: z.literal('input_audio'), input_audio: z.object({ data: z.string() }) })) })) }), parameters: object }).parse(JSON.parse(Buffer.concat(chunks).toString()))
   const encoded = data.input.messages[0].content[0].input_audio.data
   assert(encoded.startsWith('data:audio/wav;base64,')); assert.equal(Buffer.from(encoded.split(',')[1], 'base64').toString('ascii', 0, 4), 'RIFF')
-  assert.deepEqual(data.parameters.vocabulary, { Offkey: 5 })
+  assert.deepEqual(data.parameters.vocabulary, { Sayrel: 5 })
   res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ output: { text: 'flash result' } }))
 })
 httpServer.listen(0, '127.0.0.1'); await once(httpServer, 'listening')

@@ -1,5 +1,5 @@
 /* Preserve the native transparent window and its measured click regions. */
-html[data-offkey-surface='floating-bar'],html[data-offkey-surface='floating-bar'] body,html[data-offkey-surface='floating-bar'] #root { background:transparent; }
+html[data-sayrel-surface='floating-bar'],html[data-sayrel-surface='floating-bar'] body,html[data-sayrel-surface='floating-bar'] #root { background:transparent; }
 .floating-bar-surface { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; padding:8px; pointer-events:none; }
 .floating-mode-glow { position:absolute; inset:0; overflow:hidden; border-radius:8px; pointer-events:none; z-index:0; }
 .floating-mode-glow>div { position:absolute; top:0; left:50%; transform:translateX(-50%); width:24px; height:2px; background:var(--success); }

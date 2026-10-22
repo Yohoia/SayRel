@@ -53,3 +53,7 @@ assert.equal(oldLocal.serviceProviders.profiles[0].endpoint, '/usr/local/bin/whi
 assert.deepEqual(oldLocal.serviceProviders.profiles[0].models, ['/models/ggml.bin'])
 assert.ok(oldLocal.serviceProviders.transcription)
 console.log('PASS old unconfigured and local Whisper settings migrate without invalid defaults')
+const legacyCloud = mergeSettings({ provider: JSON.parse(JSON.stringify(DEFAULT_SETTINGS.provider).replaceAll('openai-compatible', 'offkey-cloud')) })
+assert.equal(legacyCloud.provider.transcription, 'sayrel-cloud')
+assert.equal(legacyCloud.provider.refinement, 'sayrel-cloud')
+console.log('PASS persisted legacy cloud identifiers migrate to Sayrel')

@@ -5,6 +5,7 @@ import { getDb, getRawDb, schema } from '../db'
 import { createLogger } from '../lib/logger'
 import { paths } from '../lib/paths'
 import { HISTORY_STATUS } from '../../shared/constants'
+import { buildDictationUsage } from '../../shared/usage'
 import type {
   HistoryListQuery,
   HistoryListResult,
@@ -178,6 +179,21 @@ export function listHistory(query: HistoryListQuery = {}): HistoryListResult {
     total,
     nextCursor: rows.length === limit && last ? last.createdAt : null
   }
+}
+
+export function getHistoryActivity() {
+  const date = sql<string>`date(${table.createdAt}, 'localtime')`
+  const days = getDb().select({ date, count: count() }).from(table)
+    .where(and(eq(table.status, HISTORY_STATUS.COMPLETED), lt(table.createdAt, new Date().toISOString()), isNotNull(date)))
+    .groupBy(date).orderBy(date).all()
+  return { days }
+}
+
+export function getDictationUsage() {
+  const records = getDb().select({ refinedText: table.refinedText, duration: table.duration }).from(table)
+    .where(and(eq(table.status, HISTORY_STATUS.COMPLETED), sql`coalesce(${table.mode}, 'voice_transcript') != 'ask_anything'`,
+      lt(table.createdAt, new Date().toISOString()), sql`datetime(${table.createdAt}) is not null`)).all()
+  return buildDictationUsage(records)
 }
 
 export function deleteHistory(id: string): boolean {

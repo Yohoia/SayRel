@@ -3,13 +3,13 @@ export type Bridge = any
 
 declare global {
   interface Window {
-    offkey: Bridge
+    sayrel: Bridge
     ipcRenderer: Bridge
   }
 }
 
 export const bridge: Bridge =
-  typeof window !== 'undefined' ? (window.offkey ?? window.ipcRenderer) : ({} as Bridge)
+  typeof window !== 'undefined' ? (window.sayrel ?? window.ipcRenderer) : ({} as Bridge)
 
 export const api = {
   settings: {
@@ -29,6 +29,8 @@ export const api = {
     onChanged: (cb: (locale: string) => void) => bridge.on('i18n:language-changed', cb)
   },
   history: {
+    activity: () => bridge.invoke('db:history-activity'),
+    usage: () => bridge.invoke('db:history-usage'),
     list: (query?: unknown) => bridge.invoke('db:history-list', query),
     get: (id: string) => bridge.invoke('db:history-get', id),
     latest: (limit?: number) => bridge.invoke('db:history-latest', limit),

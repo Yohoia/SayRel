@@ -1,3 +1,4 @@
+import './lib/appIdentity'
 import { app, BrowserWindow, globalShortcut, Menu, protocol, session, Tray, nativeImage, Notification } from 'electron'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -97,7 +98,7 @@ async function bootstrap(): Promise<void> {
   }
   windows.floatingBar.createWindow()
 
-  log.info(`offkey ready (native: ${JSON.stringify(nativeStatus)})`)
+  log.info(`sayrel ready (native: ${JSON.stringify(nativeStatus)})`)
 }
 
 app.whenReady().then(bootstrap).catch((err) => {

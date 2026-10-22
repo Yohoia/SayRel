@@ -1,10 +1,9 @@
 /* Shared paper workspace, forms, menus and ledger surfaces. */
-.app-shell { display:flex; flex-direction:column; height:100%; background:var(--paper); }
+.app-shell { --hub-space-block:28px; --hub-space-inline:38px; display:flex; flex-direction:column; height:100%; background:var(--paper); }
 .app-titlebar { position:fixed; top:0; left:0; width:105px; height:44px; z-index:20; pointer-events:auto; }
-.app-content { flex:1; min-width:0; min-height:0; padding:32px 38px 20px; overflow:auto; }
+.app-content { flex:1; min-width:0; min-height:0; padding:var(--hub-space-block) var(--hub-space-inline); overflow:auto; }
 .page { width:100%; max-width:1600px; margin:0 auto; min-height:100%; }
 .page-title { font:400 48px/1.1 var(--font-display); color:var(--accent); letter-spacing:-1.5px; }
-.page-index { margin-bottom:10px; color:var(--accent); font:13px/20px var(--font-mono); letter-spacing:1px; }
 .page-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-shrink:0; padding-bottom:20px; border-bottom:1px solid var(--line); }
 .page-heading-copy { min-width:0; }
 .page-actions { display:flex; align-items:center; gap:8px; }
@@ -97,5 +96,6 @@
 @keyframes hub-spin { to { transform:rotate(360deg); } }
 @keyframes modal-fade { from { opacity:0; } to { opacity:1; } }
 @keyframes modal-enter { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
-@media(max-width:900px) { .app-content { padding:24px 28px 18px; } .history-retention { grid-template-columns:1fr; gap:14px; } .history-retention-row+ .history-retention-row { padding-left:0; border-left:0; } }
-@media(max-width:680px) { .app-content { padding:24px 20px; } .page-title { font-size:34px; } .page-toolbar { flex-wrap:wrap; } .history-item { gap:12px; } .history-item-actions { flex-direction:column; } .history-item-actions .icon-button { opacity:1; } .history-page,.dictionary-page { min-height:550px; } }
+@media(min-width:1400px) { .app-shell { --hub-space-block:36px; --hub-space-inline:56px; } }
+@media(max-width:900px) { .app-shell { --hub-space-block:24px; --hub-space-inline:28px; } .history-retention { grid-template-columns:1fr; gap:14px; } .history-retention-row+ .history-retention-row { padding-left:0; border-left:0; } }
+@media(max-width:680px) { .app-shell { --hub-space-inline:20px; } .page-title { font-size:34px; } .page-toolbar { flex-wrap:wrap; } .history-item { gap:12px; } .history-item-actions { flex-direction:column; } .history-item-actions .icon-button { opacity:1; } .history-page,.dictionary-page { min-height:550px; } }

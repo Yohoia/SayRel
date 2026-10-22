@@ -125,7 +125,7 @@ check("leaving shortcut editor restores normal shortcut matching", ["Fn down", "
     _ = replay(.keyUp, 40, [])
 }
 '''
-with tempfile.TemporaryDirectory(prefix="offkey-hotkey-audit-") as directory:
+with tempfile.TemporaryDirectory(prefix="sayrel-hotkey-audit-") as directory:
     temp = Path(directory)
     source = temp / "main.swift"
     source.write_text((ROOT / "swift/KeyboardHelper.swift").read_text() + "\n" + TAIL)

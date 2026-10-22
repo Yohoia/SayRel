@@ -7,6 +7,28 @@
 @font-face { font-family:'Rules Gothic Compressed'; src:url('/fonts/hermes/RulesGothicCmp-Semibold.woff2') format('woff2'); font-display:swap; font-weight:600; }
 @font-face { font-family:'Inter'; src:url('/fonts/hermes/Inter-latin-variable.woff2') format('woff2'); font-display:swap; font-weight:100 900; }
 @font-face { font-family:'JetBrains Mono'; src:url('/fonts/home-mono.woff2') format('woff2'); font-display:swap; font-weight:100 900; }
+@font-face {
+  font-family:'MiSans';
+  src:url('/fonts/misans/MiSans-Regular.woff2') format('woff2');
+  font-display:swap;
+  font-weight:400;
+  unicode-range:U+2E80-303F,U+31C0-31EF,U+3400-4DBF,U+4E00-9FFF,U+F900-FAFF,U+FE10-FE1F,U+FE30-FE4F,U+FF00-FFEF,U+20000-323AF;
+}
+@font-face {
+  font-family:'MiSans';
+  src:url('/fonts/misans/MiSans-Medium.woff2') format('woff2');
+  font-display:swap;
+  font-weight:500;
+  unicode-range:U+2E80-303F,U+31C0-31EF,U+3400-4DBF,U+4E00-9FFF,U+F900-FAFF,U+FE10-FE1F,U+FE30-FE4F,U+FF00-FFEF,U+20000-323AF;
+}
+@font-face {
+  font-family:'Nanxi Chuxia Song';
+  src:url('/fonts/nanxi-chuxia-song/NanxiChuxiasong-Regular.woff2') format('woff2');
+  font-display:swap;
+  font-weight:400;
+  size-adjust:110%;
+  unicode-range:U+2E80-303F,U+31C0-31EF,U+3400-4DBF,U+4E00-9FFF,U+F900-FAFF,U+FE10-FE1F,U+FE30-FE4F,U+FF00-FFEF,U+20000-323AF;
+}
 /* User-selected paper background and Hermes blue ink, independent of system appearance. */
 :root {
   --ink:#0000c2;
@@ -29,11 +51,14 @@
   --error:#b52249;
   --success:#08775f;
   --mask:#00005e66;
-  --font-sans:'Inter',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
-  --font-display:'Rules Gothic Condensed',var(--font-sans);
+  --font-chinese:'MiSans';
+  --tracking-chinese-body:.02em;
+  --tracking-chinese-title:.01em;
+  --font-sans:'Inter',var(--font-chinese),-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+  --font-display:'Rules Gothic Condensed',var(--font-chinese),var(--font-sans);
   --font-compressed:'Rules Gothic Compressed',var(--font-display);
-  --font-condensed:'Rules Variable',var(--font-sans);
-  --font-mono:'JetBrains Mono',monospace;
+  --font-condensed:'Rules Variable',var(--font-chinese),var(--font-sans);
+  --font-mono:'JetBrains Mono',var(--font-chinese),monospace;
   --radius-control:3px;
   --radius-panel:5px;
   --radius-floating:8px;
@@ -50,6 +75,11 @@ html,body,#root { margin:0; padding:0; width:100%; height:100%; font-family:var(
 body { background:var(--paper); overflow:hidden; user-select:none; }
 h1,h2,h3,p { margin:0; }
 button,input,textarea,select { font-family:inherit; color:inherit; font-size:inherit; }
+:root:lang(zh) { --ink-tertiary:#0000c2d9; }
+:root:lang(zh) body { letter-spacing:var(--tracking-chinese-body); font-weight:400; font-synthesis:none; }
+:root:lang(zh) :is(button,input,textarea,select) { letter-spacing:inherit; font-weight:inherit; }
+:root:lang(zh) :is(h1,h2,h3) { letter-spacing:var(--tracking-chinese-title); font-weight:400; }
+:root:lang(zh) :is(.home-navigation a,.settings-nav-item,.settings-row-label,.settings-row-hint,.primary-button,.secondary-button,.secondary-primary-button,.secondary-outline-button,.settings-pill) { font-weight:500; }
 button { border:0; background:none; cursor:pointer; padding:0; }
 button:disabled { cursor:default; opacity:.45; }
 button,a,input,textarea,select { -webkit-app-region:no-drag; }
@@ -70,4 +100,5 @@ input:focus-visible,textarea:focus-visible,select:focus-visible { outline:2px so
 
 /* App icons and vector wordmarks have separate sizing roles. */
 .brand-icon { flex-shrink:0; object-fit:contain; padding:3px; border-radius:3px; background:#f2f2f2; }
-.brand-lockup { display:block; width:100px; height:auto; flex-shrink:0; }
+.brand-lockup { display:inline-flex; align-items:center; gap:8px; flex-shrink:0; color:var(--accent); font:500 36px/36px var(--font-display); letter-spacing:-.5px; white-space:nowrap; }
+.brand-lockup img { display:block; width:28px; height:28px; flex-shrink:0; }

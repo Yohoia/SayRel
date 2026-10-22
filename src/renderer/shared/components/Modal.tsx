@@ -1,3 +1,4 @@
+import { useAppText } from '../i18n/useAppText'
 import { useEffect, useId, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { Icon } from './Icons'
@@ -7,6 +8,7 @@ const stack: symbol[] = []
 export function Modal({ title, onClose, children, role = 'dialog', descriptionId, dismissible = true, showClose = true }: {
   title: string; onClose: () => void; children: ReactNode; role?: 'dialog' | 'alertdialog'; descriptionId?: string; dismissible?: boolean; showClose?: boolean
 }) {
+  const t = useAppText()
   const ref = useRef<HTMLDivElement>(null)
   const closeRef = useRef(onClose)
   const dismissibleRef = useRef(dismissible)
@@ -34,5 +36,5 @@ export function Modal({ title, onClose, children, role = 'dialog', descriptionId
     window.addEventListener('keydown', key)
     return () => { stack.splice(stack.indexOf(id), 1); window.removeEventListener('keydown', key); if (previous instanceof HTMLElement && previous.isConnected) previous.focus() }
   }, [])
-  return <div className="modal-backdrop" onMouseDown={(event) => { if (dismissible && event.target === event.currentTarget) onClose() }}><div className="modal-card" role={role} aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} ref={ref} tabIndex={-1}><h2 id={titleId}>{title}</h2>{showClose && <button type="button" className="icon-button modal-close" aria-label="Close dialog" disabled={!dismissible} onClick={onClose}><Icon name="close" /></button>}{children}</div></div>
+  return <div className="modal-backdrop" onMouseDown={(event) => { if (dismissible && event.target === event.currentTarget) onClose() }}><div className="modal-card" role={role} aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} ref={ref} tabIndex={-1}><h2 id={titleId}>{title}</h2>{showClose && <button type="button" className="icon-button modal-close" aria-label={t("Close dialog")} disabled={!dismissible} onClick={onClose}><Icon name="close" /></button>}{children}</div></div>
 }

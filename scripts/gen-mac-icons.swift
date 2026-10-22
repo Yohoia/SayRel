@@ -8,7 +8,7 @@ let build = root.appendingPathComponent("resources/build")
 let iconset = root.appendingPathComponent(".build/mac-icons/Sayrel.iconset")
 try FileManager.default.createDirectory(at: iconset, withIntermediateDirectories: true)
 
-// Match Typeless's 824px artwork on a 1024px canvas, including its transparent margin.
+// Fixed V2 already includes the 100px inset. Scale the complete canvas once.
 func render(size: Int) throws -> Data {
     let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size,
                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
@@ -17,9 +17,7 @@ func render(size: Int) throws -> Data {
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = context
     context.imageInterpolation = .high
-    let padding = CGFloat(size) * 100 / 1024
-    let artwork = CGFloat(size) * 824 / 1024
-    sourceImage.draw(in: NSRect(x: padding, y: padding, width: artwork, height: artwork),
+    sourceImage.draw(in: NSRect(x: 0, y: 0, width: size, height: size),
                      from: .zero, operation: .copy, fraction: 1)
     NSGraphicsContext.restoreGraphicsState()
     return bitmap.representation(using: .png, properties: [:])!
@@ -49,7 +47,7 @@ for path in ["resources/build/mac-icon.png", "resources/build/icon.icns"] {
         "path": path, "source": "application-icons/png/1024x1024.png",
         "sha256": SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined(),
         "bytes": data.count, "pixels": [1024, 1024],
-        "transform": ["generator": "scripts/gen-mac-icons.swift", "canvas": 1024, "artwork": 824, "padding": 100]
+        "transform": ["generator": "scripts/gen-mac-icons.swift", "canvas": 1024, "artwork": 824, "padding": 100, "sourceIncludesPadding": true]
     ]
     if let index = assets.firstIndex(where: { $0["path"] as? String == path }) { assets[index] = asset }
     else { assets.append(asset) }

@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { join } from 'node:path'
-import { mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 
 /**
  * All on-disk locations derive from Electron's `app.getPath`, so a packaged
@@ -16,7 +16,9 @@ export const paths = {
     return dir
   },
   get db(): string {
-    return join(this.userData, 'offkey.db')
+    const current = join(this.userData, 'sayrel.db')
+    const legacy = join(this.userData, 'offkey.db')
+    return !existsSync(current) && existsSync(legacy) ? legacy : current
   },
   get recordings(): string {
     const dir = join(this.userData, 'recordings')
@@ -29,7 +31,7 @@ export const paths = {
     return dir
   },
   get opusTemp(): string {
-    const dir = join(app.getPath('temp'), 'offkey_opus')
+    const dir = join(app.getPath('temp'), 'sayrel_opus')
     mkdirSync(dir, { recursive: true })
     return dir
   },

@@ -1,13 +1,13 @@
-# OffKey 项目结构说明
+# Sayrel 项目结构说明
 
 ## 项目概览
 
-OffKey 是一个基于 Electron + React + TypeScript 的桌面应用程序，采用标准的三进程架构。
+Sayrel 是一个基于 Electron + React + TypeScript 的桌面应用程序，采用标准的三进程架构。
 
 ## 核心目录结构
 
 ```
-offkey/
+sayrel/
 ├── public/                    # 静态资源（标准 Vite 约定）
 │   ├── assets/               # 图片资源
 │   ├── fonts/                # 字体文件
@@ -131,7 +131,7 @@ offkey/
 
 ### 2. 多窗口架构
 
-OffKey 使用多窗口架构，每个窗口都是独立的 React 应用：
+Sayrel 使用多窗口架构，每个窗口都是独立的 React 应用：
 
 | 窗口 | 用途 | 入口文件 |
 |------|------|----------|
@@ -207,7 +207,7 @@ import { Modal } from '../../../renderer/shared/components/Modal'
 
 ## 与标准 Electron 项目的对比
 
-| 方面 | OffKey | 标准做法 | 符合度 |
+| 方面 | Sayrel | 标准做法 | 符合度 |
 |------|--------|----------|--------|
 | 进程分离 | main/preload/renderer | ✅ 标准 | ⭐⭐⭐⭐⭐ |
 | public 位置 | 项目根目录 | ✅ 标准 | ⭐⭐⭐⭐⭐ |
@@ -219,7 +219,7 @@ import { Modal } from '../../../renderer/shared/components/Modal'
 
 ## 总结
 
-OffKey 项目现在完全符合现代 Electron + React 项目的最佳实践：
+Sayrel 项目现在完全符合现代 Electron + React 项目的最佳实践：
 
 ✅ 清晰的进程分离架构\
 ✅ 标准的目录组织结构\

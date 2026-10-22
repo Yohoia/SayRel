@@ -5,7 +5,7 @@ import { bindingsFor, shortcutLabels, normalizeTranslationTargets, SHORTCUT_KEYS
 import { api } from '../../shared/utils/bridge'
 import { Modal } from '../../shared/components/Modal'
 import { toast } from '../../shared/components/Toast'
-import { useAppSettings } from '../state/settings'
+import { useAppSettings } from '../../shared/state/settings'
 import { HubSelect } from './HubSelect'
 import { interfaceLanguages, useSettingsText } from './settingsText'
 
@@ -47,18 +47,18 @@ export function ShortcutEditor({ settingKey }: { settingKey: ShortcutKey }) {
     if (editing === null) return
     let disposed = false
     captureMode.current = 'pending'
-    const off = window.offkey.on('keyboard:shortcut-captured', (event: { combination: string; pressed: boolean }) => {
+    const off = window.sayrel.on('keyboard:shortcut-captured', (event: { combination: string; pressed: boolean }) => {
       if (disposed) return
       if (event.combination === 'Escape') { setEditing(null); return }
       if (event.pressed) { capture.current = event.combination; setDraft(event.combination) }
       else if (event.combination !== 'Escape') finish.current(capture.current)
     })
-    void window.offkey.invoke('keyboard:begin-shortcut-capture').then((result: { native: boolean }) => { if (!disposed) captureMode.current = result.native ? 'native' : 'browser' }).catch(() => { if (!disposed) { setEditing(null); toast.error("Could not record the shortcut. Please try again.") } })
+    void window.sayrel.invoke('keyboard:begin-shortcut-capture').then((result: { native: boolean }) => { if (!disposed) captureMode.current = result.native ? 'native' : 'browser' }).catch(() => { if (!disposed) { setEditing(null); toast.error("Could not record the shortcut. Please try again.") } })
     const away = (event: PointerEvent) => { if (!container.current?.contains(event.target as Node)) setEditing(null) }
     const blur = () => setEditing(null)
     window.addEventListener('blur', blur)
     document.addEventListener('pointerdown', away)
-    return () => { disposed = true; off?.(); document.removeEventListener('pointerdown', away); window.removeEventListener('blur', blur); void window.offkey.invoke('keyboard:end-shortcut-capture') }
+    return () => { disposed = true; off?.(); document.removeEventListener('pointerdown', away); window.removeEventListener('blur', blur); void window.sayrel.invoke('keyboard:end-shortcut-capture') }
   }, [editing])
   function begin(index: number) { capture.current = ''; setDraft(''); setEditing(index) }
   function keyDown(event: KeyboardEvent) {

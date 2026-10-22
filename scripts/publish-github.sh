@@ -14,7 +14,7 @@ if ! gh auth status; then
 fi
 GITHUB_LOGIN="$(gh api user --jq .login)"
 GITHUB_USER_ID="$(gh api user --jq .id)"
-REPOSITORY="$GITHUB_LOGIN/OffKey"
+REPOSITORY="$GITHUB_LOGIN/Sayrel"
 
 if git rev-parse --show-toplevel >/dev/null 2>&1; then
   EXISTING_ROOT="$(git rev-parse --show-toplevel)"
@@ -37,12 +37,12 @@ if ! git diff --cached --quiet; then
   COMMIT_NAME="${COMMIT_NAME:-$GITHUB_LOGIN}"
   COMMIT_EMAIL="${COMMIT_EMAIL:-$GITHUB_USER_ID+$GITHUB_LOGIN@users.noreply.github.com}"
   git -c user.name="$COMMIT_NAME" -c user.email="$COMMIT_EMAIL" \
-    commit -m 'Initial commit: OffKey desktop application'
+    commit -m 'Initial commit: Sayrel desktop application'
 fi
 
 gh auth setup-git --hostname github.com
 gh repo create "$REPOSITORY" --private --source "$PROJECT_ROOT" \
-  --remote origin --push --description 'OffKey desktop voice dictation application'
+  --remote origin --push --description 'Sayrel desktop voice dictation application'
 
 VISIBILITY="$(gh repo view "$REPOSITORY" --json visibility --jq .visibility)"
 if [ "$VISIBILITY" != 'PRIVATE' ]; then

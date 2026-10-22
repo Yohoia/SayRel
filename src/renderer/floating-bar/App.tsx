@@ -1,3 +1,4 @@
+import { useAppText } from '../shared/i18n/useAppText'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DEFAULT_SETTINGS, type Settings } from '../../shared/settings'
 import { api } from '../shared/utils/bridge'
@@ -45,6 +46,7 @@ const SIZES = {
 }
 
 export function FloatingBarApp() {
+  const t = useAppText()
   const [status, setStatus] = useState<BarStatus>('idle-hidden')
   const [hover, setHover] = useState(false)
   const [countdown, setCountdown] = useState<string | null>(null)
@@ -53,7 +55,7 @@ export function FloatingBarApp() {
   const languageChoicesRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     let live = true
-    const off = window.offkey?.on('store:changed', (next: Settings) => { if (live) setSettings(next) })
+    const off = window.sayrel?.on('store:changed', (next: Settings) => { if (live) setSettings(next) })
     void api.settings.get().then((next: Settings) => { if (live && next) setSettings(next) })
     return () => { live = false; off?.() }
   }, [])
@@ -90,7 +92,7 @@ export function FloatingBarApp() {
         setCountdown(`${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`)
       } else setCountdown(null)
     }
-    const off = window.offkey?.on?.('recording-machine:state', (state: any) => { receivedState = true; update(state) })
+    const off = window.sayrel?.on?.('recording-machine:state', (state: any) => { receivedState = true; update(state) })
     void api.recording.state().then((state: any) => { if (!receivedState) update(state) }).catch(() => undefined)
     return () => { disposed = true; off?.(); void controller.dispose() }
   }, [])
@@ -137,13 +139,13 @@ export function FloatingBarApp() {
       else if (allowed.includes(detail?.status)) setPreview(detail)
     }
     const params = new URLSearchParams(window.location.search)
-    if (params.has('state')) show(new CustomEvent('offkey:ui-review-floating-bar', { detail: {
+    if (params.has('state')) show(new CustomEvent('sayrel:ui-review-floating-bar', { detail: {
       status: params.get('state'), mode: params.get('mode') ?? 'voice_transcript',
       countdown: params.get('countdown') ?? undefined,
       error: params.get('state') === 'error' ? "Microphone unavailable. Check system permissions and try again." : undefined
     } }))
-    window.addEventListener('offkey:ui-review-floating-bar', show)
-    return () => window.removeEventListener('offkey:ui-review-floating-bar', show)
+    window.addEventListener('sayrel:ui-review-floating-bar', show)
+    return () => window.removeEventListener('sayrel:ui-review-floating-bar', show)
   }, [])
 
   const visibleStatus = preview?.status ?? status
@@ -165,9 +167,9 @@ export function FloatingBarApp() {
 
   return (
     <div className="floating-bar-surface">
-      <style>{`@keyframes loadingMove { 0% { transform: translateX(-27px); } 100% { transform: translateX(54px); } }`}</style>
-      {visibleStatus === 'error' && visibleError && <div style={errorBubbleStyle}>{visibleError}</div>}
-      {visibleStatus === 'long-pressing' && <div role="status" style={errorBubbleStyle}>Tap to start. Tap again to finish recording.</div>}
+      <style>{t(`@keyframes loadingMove { 0% { transform: translateX(-27px); } 100% { transform: translateX(54px); } }`)}</style>
+      {visibleStatus === 'error' && visibleError && <div style={errorBubbleStyle}>{t(visibleError)}</div>}
+      {visibleStatus === 'long-pressing' && <div role="status" style={errorBubbleStyle}>{t("Tap to start. Tap again to finish recording.")}</div>}
       <div
         ref={pillRef}
         data-testid="floating-bar"
@@ -178,23 +180,23 @@ export function FloatingBarApp() {
         tabIndex={visibleStatus === 'hover' || visibleStatus === 'error' ? 0 : -1}
         onClick={() => { if (!preview && ['idle-hidden', 'hover', 'error'].includes(status)) click(status === 'error' ? 'retry' : 'start') }}
         onKeyDown={(event) => { if (!preview && (event.key === 'Enter' || event.key === ' ') && ['hover', 'error'].includes(status)) { event.preventDefault(); click(status === 'error' ? 'retry' : 'start') } }}
-        aria-label="Recording status"
+        aria-label={t("Recording status")}
         style={{ ...BASE_STYLE, ...style, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto', cursor: ['idle-hidden', 'hover', 'error'].includes(visibleStatus) ? 'pointer' : undefined }}
       >
         {['voice_command', 'translation'].includes(visibleMode) && <div className={`floating-mode-glow ${visibleMode === 'translation' ? 'is-translation' : ''}`} aria-hidden="true"><div /></div>}
-        {visibleStatus === 'hover' && hover && <span className="floating-tooltip" role="tooltip">Click to start dictating</span>}
+        {visibleStatus === 'hover' && hover && <span className="floating-tooltip" role="tooltip">{t("Click to start dictating")}</span>}
         {(visibleStatus === 'hover' || visibleStatus === 'error') && <StatusIcons status={visibleStatus} />}
         {showWaveform && <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', height: 24, overflow: handsFree ? 'visible' : 'hidden' }}>
-          {handsFree && <button className="floating-action" style={cancelButtonStyle} aria-label="Cancel dictation" onClick={() => { if (!preview) click('cancel') }}><Icon name="close" size={16} /><span className="floating-tooltip" role="tooltip">Cancel</span></button>}
+          {handsFree && <button className="floating-action" style={cancelButtonStyle} aria-label={t("Cancel dictation")} onClick={() => { if (!preview) click('cancel') }}><Icon name="close" size={16} /><span className="floating-tooltip" role="tooltip">{t("Cancel")}</span></button>}
           <div style={{ width: 38, flexShrink: 0, margin: '0 8px' }}><Waveform analyser={recorder?.analyser ?? null} active width={38} /></div>
           {visibleCountdown && <span style={{ width: 32, marginRight: 8, flexShrink: 0, fontSize: 12, lineHeight: '16px', fontWeight: 400, color: 'var(--ink)' }}>{visibleCountdown}</span>}
-          {handsFree && <button className="floating-action" style={finishButtonStyle} aria-label="Finish dictation" onClick={() => { if (!preview) click('finish') }}><Icon name="check" size={16} /><span className="floating-tooltip" role="tooltip">Finish <kbd>{hotkey.shortcutLabel}</kbd></span></button>}
+          {handsFree && <button className="floating-action" style={finishButtonStyle} aria-label={t("Finish dictation")} onClick={() => { if (!preview) click('finish') }}><Icon name="check" size={16} /><span className="floating-tooltip" role="tooltip">{t("Finish")}<kbd>{hotkey.shortcutLabel}</kbd></span></button>}
         </div>}
         {refining && <RefiningContent />}
         {visibleStatus === 'starting-microphone' && <div style={shimmerOverlayStyle()} />}
       </div>
-      {visibleMode === 'translation' && ['starting-microphone', 'recording', 'hands-free'].includes(visibleStatus) && <div ref={languageChoicesRef} className="floating-language-choices" role="group" aria-label="Translation targets">{settings.translationTargetLanguages.map(code => <button key={code} aria-pressed={settings.translationTargetLanguage === code} onClick={() => { if (!preview) void api.page.floatingBarClick('translation-language', code) }}>{new Intl.DisplayNames([settings.language ?? 'en'], { type: 'language' }).of(code) ?? code}</button>)}</div>}
-      {hotkey.hint && !preview && <div style={hintStyle}>{hotkey.hint}</div>}
+      {visibleMode === 'translation' && ['starting-microphone', 'recording', 'hands-free'].includes(visibleStatus) && <div ref={languageChoicesRef} className="floating-language-choices" role="group" aria-label={t("Translation targets")}>{settings.translationTargetLanguages.map(code => <button key={code} aria-pressed={settings.translationTargetLanguage === code} onClick={() => { if (!preview) void api.page.floatingBarClick('translation-language', code) }}>{new Intl.DisplayNames([settings.language ?? 'en'], { type: 'language' }).of(code) ?? code}</button>)}</div>}
+      {hotkey.hint && !preview && <div style={hintStyle}>{t(hotkey.hint)}</div>}
     </div>
   )
 }
@@ -222,6 +224,7 @@ function computeStyle(status: BarStatus, hasCountdown: boolean): React.CSSProper
 
 /** Progress timing from the original Thinking treatment; purely visual. */
 function RefiningContent() {
+  const t = useAppText()
   const [progress, setProgress] = useState(0)
   useEffect(() => {
     const keyframes = [[0, 0], [1, 80], [2, 90], [3, 95], [4, 97], [5, 98], [10, 99]]
@@ -238,7 +241,7 @@ function RefiningContent() {
   }, [])
   return <>
     <div aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 8, overflow: 'hidden', pointerEvents: 'none' }}><div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${progress}%`, background: 'var(--fill-selected)' }} /></div>
-    <div style={{ position: 'relative', zIndex: 1, width: 90, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ShimmerText active fontSize={14} fontWeight={450} lineHeight="16px" speed={64} shimmerWidth={24} waitMs={300} angle={90} dim="var(--ink-tertiary)" high="var(--ink)" blur={3.4}>Thinking</ShimmerText></div>
+    <div style={{ position: 'relative', zIndex: 1, width: 90, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ShimmerText active fontSize={14} fontWeight={450} lineHeight="16px" speed={64} shimmerWidth={24} waitMs={300} angle={90} dim="var(--ink-tertiary)" high="var(--ink)" blur={3.4}>{t("Thinking")}</ShimmerText></div>
   </>
 }
 

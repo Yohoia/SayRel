@@ -9,7 +9,7 @@ await build({
   publicDir: resolve(root, 'public'),
   base: './',
   plugins: [react(), {
-    name: 'offkey-offline-review',
+    name: 'sayrel-offline-review',
     transformIndexHtml: { order: 'pre', handler() {
       return [{ tag: 'script', attrs: { type: 'module', src: '/@fs/' + resolve(root, 'scripts/ui-fixture.ts') }, injectTo: 'head-prepend' }]
     } }

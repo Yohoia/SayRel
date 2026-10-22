@@ -3,7 +3,7 @@ const { mkdtempSync, rmSync, writeFileSync, readFileSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { join, resolve } = require('node:path')
 const assert = require('node:assert/strict')
-const profile = mkdtempSync(join(tmpdir(), 'offkey-provider-ipc-'))
+const profile = mkdtempSync(join(tmpdir(), 'sayrel-provider-ipc-'))
 app.setPath('userData', profile); app.setPath('logs', profile)
 app.commandLine.appendSwitch('disable-background-networking')
 let win

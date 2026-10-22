@@ -28,6 +28,7 @@ async function shot(name, bodySelector) {
   await js('Promise.all(document.getAnimations().filter(animation => Number.isFinite(animation.effect?.getComputedTiming().iterations)).map(animation => animation.finished.catch(() => null))).then(() => true)')
   const report = await js(`({ name:${JSON.stringify(name)}, lang:document.documentElement.lang, text:document.body.innerText,
     missing:[...document.images].filter(image => !image.complete || !image.naturalWidth).map(image => image.src),
+    brands:[...document.querySelectorAll('.brand-lockup')].map(brand => { const rect=brand.getBoundingClientRect(); return {x:rect.x,y:rect.y,width:rect.width,height:rect.height,display:getComputedStyle(brand).display} }),
     overflow:document.documentElement.scrollWidth > innerWidth,
     bodyFont:getComputedStyle(document.querySelector(${JSON.stringify(bodySelector)})).fontFamily })`)
   assert.deepEqual(report.missing, [], name + ' images load')
@@ -50,8 +51,19 @@ app.whenReady().then(async () => {
   session.defaultSession.webRequest.onBeforeRequest({ urls:['http://*/*', 'https://*/*'] }, (_, callback) => callback({ cancel:true }))
   const assets = JSON.parse(readFileSync(join(root, 'public/assets/brand/manifest.json'), 'utf8')).assets
   for (const asset of assets) verifyAsset(asset.path, asset)
+  const icoSizes = file => {
+    const data = readFileSync(join(root, file))
+    assert.equal(data.readUInt16LE(2), 1, file + ' is an ICO')
+    return Array.from({ length:data.readUInt16LE(4) }, (_, index) => data[6 + index * 16] || 256)
+  }
+  for (const size of [16, 32, 48, 256]) assert.ok(icoSizes('resources/build/icon.ico').includes(size), 'Windows ICO includes ' + size + 'px')
+  assert.deepEqual(icoSizes('public/favicon.ico'), [16, 32, 48])
   const fonts = JSON.parse(readFileSync(join(root, 'public/fonts/hermes/sources.json'), 'utf8'))
   for (const font of fonts) verifyAsset('public/fonts/hermes/' + font.file, font)
+  const chineseFonts = JSON.parse(readFileSync(join(root, 'public/fonts/nanxi-chuxia-song/sources.json'), 'utf8'))
+  for (const font of chineseFonts.files) verifyAsset('public/fonts/nanxi-chuxia-song/' + font.file, font)
+  const misansFonts = JSON.parse(readFileSync(join(root, 'public/fonts/misans/sources.json'), 'utf8'))
+  for (const font of misansFonts.files) verifyAsset('public/fonts/misans/' + font.file, font)
   console.log(`PASS ${assets.length} brand files and ${fonts.length} font/source files match their manifests`)
   const icon = nativeImage.createFromPath(join(root, 'resources/build/icon.png'))
   assert.deepEqual(icon.getSize(), { width:1024, height:1024 })
@@ -65,7 +77,7 @@ app.whenReady().then(async () => {
       right = Math.max(right, x); bottom = Math.max(bottom, y)
     }
   }
-  assert.deepEqual({ left, top, right, bottom }, { left:100, top:100, right:923, bottom:923 }, 'macOS artwork matches the Typeless inset')
+  assert.deepEqual({ left, top, right, bottom }, { left:100, top:100, right:923, bottom:923 }, 'macOS artwork preserves the supplied 100px inset')
   console.log('PASS macOS Dock artwork: 824px centered on a 1024px transparent canvas')
   const tray = nativeImage.createFromPath(join(root, 'resources/build/tray.png'))
   assert.deepEqual(tray.getSize(), { width:16, height:16 })
@@ -79,6 +91,13 @@ app.whenReady().then(async () => {
   win.webContents.on('console-message', (_, level, message) => { if (level >= 3) errors.push(message) })
   await win.loadFile(join(root, '.build/ui-review/hub.html'))
   await until("!!document.querySelector('.home-headline')")
+  assert.equal(await js("document.querySelector('.brand-lockup').textContent.trim()"), 'sayrel')
+  const lockup = await js("(() => { const brand=document.querySelector('.home-brand .brand-lockup'), icon=brand.querySelector('img').getBoundingClientRect(), text=brand.querySelector('span').getBoundingClientRect(); return {icon:icon.height,text:text.height,centerOffset:Math.abs(icon.top+icon.height/2-text.top-text.height/2),font:getComputedStyle(brand).fontSize} })()")
+  assert.equal(lockup.icon, 28)
+  assert.equal(lockup.text, 36)
+  assert.equal(lockup.font, '36px')
+  assert.ok(lockup.centerOffset < 1, 'brand icon and text are vertically centered')
+  await shot('home-brand', '.home-intro')
   const fontStatus = await js(`Promise.all(['Inter', 'Rules Variable', 'Rules Gothic Condensed', 'Rules Gothic Compressed', 'JetBrains Mono'].map(async family => ({ family, count:(await document.fonts.load('400 24px "' + family + '"', 'Sayrel')).length })))`)
   assert.ok(fontStatus.every(font => font.count > 0), 'all five local font families load offline')
   await win.loadFile(join(root, '.build/ui-review/onboarding.html'))

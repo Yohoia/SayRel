@@ -9,7 +9,7 @@ const server = await createServer({
   configFile: false,
   root: resolve(root, 'src/renderer'),
   plugins: [react(), {
-    name: 'offkey-ui-review-fixtures',
+    name: 'sayrel-ui-review-fixtures',
     transformIndexHtml() {
       return [{ tag: 'script', attrs: { type: 'module', src: '/@fs/' + resolve(root, 'scripts/ui-fixture.ts') }, injectTo: 'head-prepend' }]
     }

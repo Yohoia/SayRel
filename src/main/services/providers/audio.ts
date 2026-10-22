@@ -19,7 +19,7 @@ export function wavAudio(pcm: Float32Array, sampleRate: number): Buffer {
   return Buffer.concat([header, data])
 }
 
-/** Decode the mono Ogg/Opus history format produced by Offkey, including older headerless recordings. */
+/** Decode the mono Ogg/Opus history format produced by Sayrel, including older headerless recordings. */
 export function decodeHistoryAudio(audio: Buffer): { pcm: Float32Array; sampleRate: number } {
   const packets: Buffer[] = []
   let chunks: Buffer[] = []

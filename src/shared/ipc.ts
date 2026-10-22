@@ -45,6 +45,8 @@ export const IPC = {
   DB_HISTORY_LATEST_ID: 'db:history-latest-id',
   DB_HISTORY_LATEST_ID_FOR_ERROR_TRACKING: 'db:history-latest-id-for-error-tracking',
   DB_HISTORY_LIST: 'db:history-list',
+  DB_HISTORY_ACTIVITY: 'db:history-activity',
+  DB_HISTORY_USAGE: 'db:history-usage',
   DB_HISTORY_SAVE_AUDIO: 'db:history-save-audio',
   DB_HISTORY_TRIGGER_DISK_CLEANUP: 'db:history-trigger-disk-cleanup',
   DB_HISTORY_TRIGGER_HISTORY_CLEANUP: 'db:history-trigger-history-cleanup',

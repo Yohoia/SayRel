@@ -1,12 +1,13 @@
 import { DEFAULT_SETTINGS, mergeSettings } from '../src/shared/settings'
 import { providerActionSchema, updateProviderState } from '../src/shared/providers'
+import { buildDictationUsage } from '../src/shared/usage'
 
 const params = new URLSearchParams(location.search)
 const empty = params.get('state') === 'empty'
 const listeners = new Map<string, Set<(...args: any[]) => void>>()
 const emit = (channel: string, ...args: any[]) => listeners.get(channel)?.forEach((cb) => cb(...args))
-let settings = mergeSettings(JSON.parse(localStorage.getItem('offkey-ui-settings') || 'null') ?? DEFAULT_SETTINGS)
-let words = JSON.parse(localStorage.getItem('offkey-ui-words') || 'null') ?? (empty ? [] : [
+let settings = mergeSettings(JSON.parse(localStorage.getItem('sayrel-ui-settings') || 'null') ?? DEFAULT_SETTINGS)
+let words = JSON.parse(localStorage.getItem('sayrel-ui-words') || 'null') ?? (empty ? [] : [
   { id: 'word-1', word: 'Sayrel', source: 'manual', language: 'en', createdAt: '2026-10-19' },
   { id: 'word-2', word: 'Figma', source: 'auto', language: 'en', createdAt: '2026-10-19' },
   { id: 'word-3', word: 'TypeScript', source: 'manual', language: 'en', createdAt: '2026-10-19' }
@@ -53,11 +54,11 @@ const bridge = {
       if (params.get('fail') === 'save') throw new Error("Could not save. Please try again.")
       await new Promise(resolve => setTimeout(resolve, 180))
       settings = { ...settings, serviceProviders: updateProviderState(settings.serviceProviders, action) }
-      localStorage.setItem('offkey-ui-settings', JSON.stringify(settings)); emit('store:changed', settings)
+      localStorage.setItem('sayrel-ui-settings', JSON.stringify(settings)); emit('store:changed', settings)
       return settings.serviceProviders
     }
     if (channel === 'store:use') {
-      if (args[0] === 'patch') { settings = mergeSettings({ ...settings, ...args[1], provider: { ...settings.provider, ...args[1]?.provider } }); localStorage.setItem('offkey-ui-settings', JSON.stringify(settings)); emit('store:changed', settings) }
+      if (args[0] === 'patch') { settings = mergeSettings({ ...settings, ...args[1], provider: { ...settings.provider, ...args[1]?.provider } }); localStorage.setItem('sayrel-ui-settings', JSON.stringify(settings)); emit('store:changed', settings) }
       if (args[0] === 'reset') settings = mergeSettings(DEFAULT_SETTINGS)
       return settings
     }
@@ -65,6 +66,27 @@ const bridge = {
       const query = args[0] ?? {}; const items = history.filter((item) => (!query.mode || (query.mode === 'dictations' ? item.mode !== 'ask_anything' : item.mode === query.mode)) && (!query.search || item.refinedText.toLowerCase().includes(query.search.toLowerCase())))
       const offset = query.offset ?? 0
       return { items: items.slice(offset, offset + (query.limit ?? 50)), total: items.length, nextCursor: null }
+    }
+    if (channel === 'db:history-usage') {
+      return buildDictationUsage(history.filter(item => item.status === 'completed' && item.mode !== 'ask_anything' && new Date(item.createdAt).getTime() <= Date.now()))
+    }
+    if (channel === 'db:history-activity') {
+      if (params.get('state') === 'activity') {
+        const now = new Date()
+        return { days: Array.from({ length: 291 }, (_, offset) => {
+          const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset)
+          const active = offset < 16 || offset >= 200 || offset >= 20 && offset < 188 && offset % 2 === 0
+          return { date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`, count: active ? 1 + (offset * 13) % 15 : 0 }
+        }) }
+      }
+      const counts = new Map<string, number>()
+      for (const item of history) {
+        if (item.status !== 'completed' || new Date(item.createdAt).getTime() > Date.now()) continue
+        const date = new Date(item.createdAt)
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+        counts.set(key, (counts.get(key) ?? 0) + 1)
+      }
+      return { days: [...counts].map(([date, count]) => ({ date, count })) }
     }
     if (channel === 'db:history-get') return history.find((item) => item.id === args[0])
     if (channel === 'db:history-delete') { history = history.filter((item) => item.id !== args[0]); return true }
@@ -76,13 +98,13 @@ const bridge = {
     }
     if (channel === 'db:history-clear') { history = []; return true }
     if (channel === 'dictionary:list') return words
-    if (channel === 'dictionary:add') { if (params.get('fail') === 'save') throw new Error('UI fixture save failure'); words.push({ id: crypto.randomUUID(), word: args[0], source: 'manual', createdAt: new Date().toISOString() }); localStorage.setItem('offkey-ui-words', JSON.stringify(words)); return words.at(-1) }
-    if (channel === 'dictionary:remove') { await new Promise(resolve => setTimeout(resolve, 180)); if (params.get('fail') === 'delete') throw new Error("Could not delete"); words = words.filter((item: any) => item.id !== args[0]); localStorage.setItem('offkey-ui-words', JSON.stringify(words)); return true }
+    if (channel === 'dictionary:add') { if (params.get('fail') === 'save') throw new Error('UI fixture save failure'); words.push({ id: crypto.randomUUID(), word: args[0], source: 'manual', createdAt: new Date().toISOString() }); localStorage.setItem('sayrel-ui-words', JSON.stringify(words)); return words.at(-1) }
+    if (channel === 'dictionary:remove') { await new Promise(resolve => setTimeout(resolve, 180)); if (params.get('fail') === 'delete') throw new Error("Could not delete"); words = words.filter((item: any) => item.id !== args[0]); localStorage.setItem('sayrel-ui-words', JSON.stringify(words)); return true }
     if (channel === 'dictionary:update') {
       if (params.get('fail') === 'save') throw new Error('UI fixture save failure')
       const entry = words.find((item: any) => item.id === args[0])
       if (!entry) throw new Error("Word not found")
-      entry.word = args[1]; localStorage.setItem('offkey-ui-words', JSON.stringify(words)); return entry
+      entry.word = args[1]; localStorage.setItem('sayrel-ui-words', JSON.stringify(words)); return entry
     }
     if (channel === 'appearance:get-state') return { resolved: settings.appearancePreference === 'dark' ? 'dark' : 'light' }
     if (channel === 'appearance:set-preference') { emit('appearance:color-mode-changed', { resolved: args[0] === 'dark' ? 'dark' : 'light' }); return true }
@@ -104,6 +126,6 @@ const bridge = {
   send() {},
   app: { platform: 'darwin', arch: 'arm64' }
 }
-;(window as any).offkey = bridge
+;(window as any).sayrel = bridge
 ;(window as any).ipcRenderer = bridge
 document.documentElement.dataset.uiReview = 'fixture'

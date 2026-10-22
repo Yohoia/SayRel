@@ -1,0 +1,44 @@
+{
+  "family": "MiSans",
+  "source": "https://hyperos.mi.com/font/zh/download/",
+  "download": "https://hyperos.mi.com/font-download/MiSans.zip",
+  "licenseSource": "https://hyperos.mi.com/font-download/MiSans字体知识产权许可协议.pdf",
+  "downloaded": "2026-10-21",
+  "archiveSha256": "b6aa1fc827035922612df8edf36e5609bca1c5441e25cd57572204569b7b81d9",
+  "fonts": [
+    {
+      "file": "MiSans-Regular.woff2",
+      "weight": 330,
+      "version": "Version 4.009",
+      "cssWeight": 400
+    },
+    {
+      "file": "MiSans-Medium.woff2",
+      "weight": 380,
+      "version": "Version 4.009",
+      "cssWeight": 500
+    }
+  ],
+  "files": [
+    {
+      "file": "LICENSE.pdf",
+      "bytes": 79535,
+      "sha256": "4a93a27cd2bd81b3b5ecfd0a853144a876fa26938a93a68443c67d74172fcb86"
+    },
+    {
+      "file": "MiSans-Medium.woff2",
+      "bytes": 4942368,
+      "sha256": "44e28ca6c2f0ca79829f192831ef87b5eec7c464f5cfb7a83467f57bb6e58114"
+    },
+    {
+      "file": "MiSans-Regular.woff2",
+      "bytes": 4858624,
+      "sha256": "d704c1a932c0bd7e8a071d276cd81c0ed0c9fecfa26ac234f4bed0559fe1cb2d"
+    },
+    {
+      "file": "NOTICE.txt",
+      "bytes": 385,
+      "sha256": "f5ea5f90e3ba8c8d0637472219e47713d524679248d3a0c8373bb3ace3301209"
+    }
+  ]
+}
