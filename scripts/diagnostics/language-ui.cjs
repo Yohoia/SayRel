@@ -8,7 +8,10 @@ const profile = mkdtempSync(join(tmpdir(), 'sayrel-language-'))
 const output = join(root, 'docs/ui-evidence/language')
 let win
 app.setPath('userData', profile)
-const js = expression => win.webContents.executeJavaScript(expression)
+const js = async expression => {
+  try { return await win.webContents.executeJavaScript(expression) }
+  catch (error) { throw new Error('Renderer check failed: ' + expression, {cause:error}) }
+}
 async function until(expression) {
   for (let attempt = 0; attempt < 100; attempt++) {
     if (await js(expression)) return
@@ -26,6 +29,7 @@ async function shot(name) {
   console.log('PASS ' + name)
 }
 async function verifyChineseFont(name) {
+  assert.equal(await js("!document.querySelector('.home-headline') || getComputedStyle(document.querySelector('.home-headline')).fontFamily.startsWith('\"Nanxi Chuxia Song\"')"), true, name + ' home headline selects the Song font')
   const count = await js(`(async () => {
     const samples = new Map();
     for (const element of document.querySelectorAll('body *')) {
@@ -45,6 +49,7 @@ async function verifyChineseFont(name) {
     for (const {font, text} of samples.values()) {
       const probe = document.createElement('span');
       probe.dataset.chineseFontProbe = String(index++);
+      probe.dataset.song = String(font[0].includes('Nanxi Chuxia Song'));
       probe.style.cssText = 'position:fixed;left:0;top:0;opacity:0;pointer-events:none';
       [probe.style.fontFamily, probe.style.fontSize, probe.style.fontWeight, probe.style.fontStyle, probe.style.fontStretch] = font;
       probe.textContent = [...new Set(text)].join('');
@@ -59,8 +64,9 @@ async function verifyChineseFont(name) {
     for (let index = 0; index < count; index++) {
       const { nodeId } = await win.webContents.debugger.sendCommand('DOM.querySelector', { nodeId:documentNode.nodeId, selector:`[data-chinese-font-probe="${index}"]` })
       const { fonts } = await win.webContents.debugger.sendCommand('CSS.getPlatformFontsForNode', { nodeId })
+      const song = await js(`document.querySelector('[data-chinese-font-probe="${index}"]').dataset.song === 'true'`)
       assert.ok(fonts.length > 0, name + ' renders Chinese glyphs')
-      assert.ok(fonts.every(font => font.isCustomFont && ['MiSans', 'MiSans Medium'].includes(font.familyName)), name + ' Chinese uses embedded MiSans: ' + JSON.stringify(fonts))
+      assert.ok(fonts.every(font => font.isCustomFont && (song ? font.postScriptName === 'NanxiChuxiasong-Regualr' : ['MiSans', 'MiSans Medium'].includes(font.familyName))), name + ' Chinese uses the selected embedded font: ' + JSON.stringify(fonts))
     }
   } finally {
     await js("document.querySelectorAll('[data-chinese-font-probe]').forEach(node => node.remove())")
@@ -82,7 +88,9 @@ app.whenReady().then(async () => {
   await js("[...document.querySelectorAll('.hub-select-menu button')].find(button => button.textContent === new Intl.DisplayNames(['zh-CN'],{type:'language'}).of('zh-CN')).click()")
   await until("document.documentElement.lang === 'zh-CN'")
   assert.equal(await js("document.querySelector('.home-navigation a').textContent"), '首页', 'navigation follows Chinese language setting')
-  assert.equal(await js("document.querySelector('.home-intro').textContent"), '用声音记录想法，在常用应用中直接输入。')
+  assert.equal(await js("document.querySelector('.home-headline').getAttribute('aria-label')"), '开口只管随心，落笔自有逻辑。')
+  assert.deepEqual(await js("[...document.querySelectorAll('.home-intro-positioning,.home-intro-benefit')].map(span=>span.textContent)"), ['SayRel，新一代 AI 语音输入工具','将你的跳跃灵感，实时转化为得体文字。'])
+  assert.equal(await js("getComputedStyle(document.querySelector('.home-intro-separator')).display"), 'none', 'Chinese subtitle uses a line break instead of a dash')
   await until("!!document.querySelector('.sayrel-toast')")
   assert.equal(await js("document.querySelector('.sayrel-toast').textContent.trim()"), '已保存')
   await shot('settings-chinese')
@@ -101,11 +109,16 @@ app.whenReady().then(async () => {
     const headline = await js("(() => { const heading=document.querySelector('.home-headline'); return {height:heading.getBoundingClientRect().height,lineHeight:parseFloat(getComputedStyle(heading).lineHeight)} })()")
     assert.ok(headline.height <= headline.lineHeight * 2 + 1, 'Chinese slogan remains two lines at width ' + width)
   }
+  await js("document.querySelector('.home-navigation a[href=\"#/statistics\"]').click()")
+  await until("document.querySelector('.statistics-page h1')?.textContent==='使用概览' && document.querySelector('.activity-panel')?.dataset.state==='ready'")
+  assert.equal(await js("document.querySelector('.home-navigation a[href=\"#/statistics\"]').textContent"),'统计')
+  await shot('statistics-chinese')
   win.setContentSize(1080,750)
   for (const [route, title] of [['history','历史'], ['dictionary','词典'], ['providers','服务商']]) {
     await js(`location.hash='/${route}'`)
     await until(`document.querySelector('h1')?.textContent.includes('${title}')`)
     if (route === 'history') {
+      await until("!!document.querySelector('.history-item-text') && !!document.querySelector('.history-date') && !!document.querySelector('.history-retention')")
       assert.match(await js("document.querySelector('.history-item-text').textContent"), /^Hi team,/)
       assert.match(await js("document.querySelector('.history-date').textContent"), /年|今天|昨天/)
       assert.doesNotMatch(await js("document.querySelector('.history-retention').textContent"), /Keep history|Forever/)

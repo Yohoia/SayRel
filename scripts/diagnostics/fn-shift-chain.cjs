@@ -17,11 +17,19 @@ const mocks = { '../lib/logger': { createLogger: () => logger } }
 const shared = load('src/shared/constants.ts')
 mocks['./constants'] = shared
 mocks['./providers'] = load('src/shared/providers.ts')
+const sharedProviders = mocks['./providers']
+mocks['../../shared/recordingFeedback'] = load('src/shared/recordingFeedback.ts', { './constants': shared, './providers': sharedProviders })
 mocks['./settingsControls'] = load('src/shared/settingsControls.ts')
 mocks['../../shared/settingsControls'] = mocks['./settingsControls']
 const { DEFAULT_SETTINGS, mergeSettings } = load('src/shared/settings.ts')
 const config = structuredClone(DEFAULT_SETTINGS)
 config.historyEnabled = false
+const readyProviders = {
+  profiles: ['transcription', 'refinement'].map(service => ({ id: service, presetId: '', name: service, enabled: true, service,
+    protocol: service === 'transcription' ? 'openai-transcription' : 'openai-chat', endpoint: 'https://fixture.example/v1',
+    apiKey: 'fixture-key', models: ['fixture-model'], appId: '', accessToken: '', resourceId: '', apiVersion: '' })),
+  transcription: { providerId: 'transcription', model: 'fixture-model' }, refinement: { providerId: 'refinement', model: 'fixture-model' }
+}
 let transcribe = async () => ({ result: { text: 'hello' }, ogg: Buffer.alloc(0) })
 Object.assign(mocks, {
   'node:fs/promises': { readFile: async () => Buffer.from('fixture-audio') },
@@ -35,9 +43,112 @@ Object.assign(mocks, {
   '../lib/settings': { settings: { get: () => config } }, './contextCapture': { captureAudioContext: async () => null }
 })
 const { RecordingMachine } = load('src/main/services/recordingMachine.ts')
-async function test(name, fn) { await fn(); console.log(`PASS ${name}`) }
+async function test(name, fn) { config.serviceProviders = structuredClone(readyProviders); await fn(); console.log(`PASS ${name}`) }
 async function start(machine) { await machine.start(); const id = machine.getState().context.sessionId; machine.markStreaming(id); machine.pushPcm(new Float32Array([.25]), id); return id }
 ;(async () => {
+  await test('intro and completion pages block microphone shortcuts without disabling later normal recordings', async () => {
+    const m=new RecordingMachine()
+    m.blockPractice(7)
+    await m.start()
+    assert.equal(m.getState().phase,'idle')
+    assert.throws(()=>m.blockPractice(8),/another window/)
+    await assert.rejects(m.retryHistory('saved-id'),/Exit the practice/)
+    m.setPracticeTarget(8,null);await m.start();assert.equal(m.getState().phase,'idle')
+    m.setPracticeTarget(7,null);await m.start();assert.equal(m.getState().phase,'starting');m.cancel()
+  })
+  await test('practice dictation delivers only to its owner without pasting or writing history', async () => {
+    const m = new RecordingMachine(), results = [], beforeInserted=inserted.length, beforeRows=rows.length
+    m.on('practice-result', result => results.push(result))
+    m.setPracticeTarget(7,{id:'practice-1',kind:'dictation',mode:'voice_transcript'})
+    const id=await start(m), finished=m.finish()
+    m.markStopped(id); await finished
+    assert.equal(inserted.length,beforeInserted)
+    assert.equal(rows.length,beforeRows)
+    assert.equal(results.length,1)
+    assert.equal(results[0].ownerId,7)
+    assert.equal(results[0].targetId,'practice-1')
+    assert.equal(results[0].text,'hello')
+    m.setPracticeTarget(7,null)
+  })
+  await test('practice Fn+Space upgrade starts only the requested mode and snapshots selected text', async () => {
+    const m = new RecordingMachine(), keys = load('src/main/services/hotkeys.ts', { './recordingMachine': { recordingMachine: m } })
+    m.setPracticeTarget(7,{id:'rewrite',kind:'rewrite',mode:'ask_anything',selectedText:'selected passage'})
+    keys.handleKeyEvent({combination:'Fn',pressed:true})
+    assert.equal(m.getState().phase,'idle')
+    keys.handleKeyEvent({combination:'Fn+Space',pressed:true,replacedCombination:'Fn'})
+    assert.equal(m.getState().phase,'starting')
+    assert.equal((await m.session.context).focusedInput.selectedText,'selected passage')
+    m.setPracticeTarget(8,null)
+    assert.equal(m.getState().phase,'starting','another window cannot stop the practice')
+    m.setPracticeTarget(7,null)
+    assert.equal(m.getState().phase,'idle')
+    keys.resetHotkeyState()
+  })
+  await test('leaving a practice aborts its pending result and restores normal dictation', async () => {
+    const gate=deferred(), m=new RecordingMachine(), results=[], beforeInserted=inserted.length
+    m.on('practice-result', result=>results.push(result))
+    m.setPracticeTarget(7,{id:'practice-2',kind:'dictation',mode:'voice_transcript'})
+    transcribe=()=>gate.promise
+    const id=await start(m), finished=m.finish();m.markStopped(id);await flush()
+    m.setPracticeTarget(7,null)
+    gate.resolve({result:{text:'late practice'},ogg:Buffer.alloc(0)})
+    await finished
+    assert.equal(results.length,0);assert.equal(inserted.length,beforeInserted)
+    transcribe=async()=>({result:{text:'normal again'},ogg:Buffer.alloc(0)})
+    const next=await start(m), normal=m.finish();m.markStopped(next);await normal
+    assert.equal(inserted.at(-1),'normal again')
+    transcribe=async()=>({result:{text:'hello'},ogg:Buffer.alloc(0)})
+  })
+  await test('missing provider opens a setup error before microphone capture', async () => {
+    config.serviceProviders = { profiles: [], transcription: null, refinement: null }
+    const machine = new RecordingMachine()
+    let starts = 0
+    machine.on('start', () => starts++)
+    await machine.start('voice_transcript')
+    const state = machine.getState()
+    machine.cancel()
+    assert.equal(state.phase, 'error')
+    assert.equal(state.context.issue.kind, 'provider-setup')
+    assert.equal(state.context.issue.service, 'transcription')
+    assert.equal(state.context.sessionId, null)
+    assert.equal(starts, 0, 'setup errors never open the microphone')
+  })
+  await test('translation and questions require a writing model before capture', async () => {
+    config.serviceProviders.refinement = null
+    for (const mode of ['translation', 'ask_anything']) {
+      const machine = new RecordingMachine()
+      await machine.start(mode)
+      assert.equal(machine.getState().phase, 'error')
+      assert.equal(machine.getState().context.issue.service, 'refinement')
+      assert.equal(machine.getState().context.sessionId, null)
+      machine.cancel()
+    }
+  })
+  await test('configuring a provider lets the next shortcut start without restarting', async () => {
+    config.serviceProviders = { profiles: [], transcription: null, refinement: null }
+    const machine = new RecordingMachine()
+    await machine.start('voice_transcript')
+    assert.equal(machine.getState().phase, 'error')
+    config.serviceProviders = structuredClone(readyProviders)
+    await machine.start('voice_transcript')
+    const state = machine.getState()
+    machine.cancel()
+    assert.equal(state.phase, 'starting')
+    assert.equal(state.context.issue, null)
+  })
+  await test('upgrading Fn to translation without a writing model stops capture and keeps the setup alert', async () => {
+    config.serviceProviders.refinement = null
+    const machine = new RecordingMachine()
+    await machine.start('voice_transcript')
+    machine.switchMode('translation')
+    const state = machine.getState()
+    assert.equal(state.phase, 'error')
+    assert.equal(state.context.mode, 'translation')
+    assert.equal(state.context.issue.service, 'refinement')
+    assert.equal(state.context.sessionId, null)
+    assert.equal(machine.session, null)
+    machine.cancel()
+  })
   await test('old defaults migrate Fn+Shift to translation and tap gestures', () => {
     const migrated = mergeSettings({ shortcut: { accelerator: 'Fn', style: 'hold', enabled: true }, commandShortcut: { accelerator: 'Fn+Shift', style: 'hold', enabled: true } })
     assert.equal(migrated.translationShortcut.accelerator, 'Fn+Shift')
@@ -89,9 +200,13 @@ async function start(machine) { await machine.start(); const id = machine.getSta
   })
   await test('retry reuses failed audio; explicit cancel discards it', async () => {
     const m = new RecordingMachine(), id = await start(m)
+    const failurePhases = []
+    m.on('state', state => failurePhases.push(state.phase))
     transcribe = async () => { throw new Error('offline') }
     const finished = m.finish(); m.markStopped(id); await finished
     assert.equal(m.getState().phase, 'error')
+    assert.deepEqual(failurePhases, ['finishing','error'], 'failure never briefly enters idle and hides the recorder')
+    assert.equal(m.getState().context.issue.canRetry, true)
     let samples
     transcribe = async ({ pcm }) => { samples = [...pcm]; return { result: { text: 'retried' }, ogg: Buffer.alloc(0) } }
     await m.retry()

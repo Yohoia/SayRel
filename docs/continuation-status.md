@@ -1,5 +1,11 @@
 # Typeless 对齐任务接续记录
 
+## 2026-10-22：首页新文案、语音转写演示与独立统计页
+
+首页主标题与副标题改用用户确认的新文案：中文「开口只管随心，落笔自有逻辑。」，副标题「SayRel，新一代 AI 语音输入工具」与「将你的跳跃灵感，实时转化为得体文字。」；英文 `Speak freely. Write brilliantly.`，副标题 `SayRel, the next-gen AI voice tool—turning your raw thoughts into polished text in real time.`。品牌 Slogan `Speak more. Type less.`、交互理念 `Hold to speak.` 与核心定位 `AI-powered voice typing` 保留在品牌定义中，见 [DESIGN.md](../DESIGN.md) 与 [品牌素材文档](brand-assets.md)。
+
+首页改为居中排印：语音转写连续演示动画（左侧原始语句、中间悬浮条、右侧润写结果，独立于真实录音）、三列真实快捷键与「随处表达」应用入口；使用热力图、五项输入指标与活跃天数拆分到独立统计页 `/statistics`，两页共用页脚（`Builded By Yohoia` 与版本号）。首页中文主标题改用南西初夏宋，展示键帽使用 Rules Gothic Condensed。界面验收用 `npm run verify:home`，截图与文本检查输出到 `docs/ui-evidence/home/`；README 主界面与统计页截图已同步为本轮版本。
+
 ## 2026-10-21：首页品牌表达与Dock图标
 
 首页采用用户确认的 `Speak more. Type less.`、`AI-powered voice typing` 和自然表达理念，`Hold to speak.` 用于星盘图注；现有快捷键与录音模式仍由当前配置决定。macOS Dock与ICNS改用带透明留白的图标：1024画布上居中824图形，与本机Typeless资源一致。图标可通过 `npm run icons:mac` 重建，详情见 [品牌素材文档](brand-assets.md)。

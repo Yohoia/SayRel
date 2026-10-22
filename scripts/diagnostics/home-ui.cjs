@@ -13,31 +13,45 @@ app.setPath('userData', profile)
 app.commandLine.appendSwitch('disable-background-networking')
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 async function until(expression) {
-  for (let i = 0; i < 100; i++) { if (await win.webContents.executeJavaScript(expression)) return; await wait(50) }
+  for (let i = 0; i < 160; i++) { if (await win.webContents.executeJavaScript(expression)) return; await wait(50) }
   throw new Error('Timed out: ' + expression)
 }
 const js = code => win.webContents.executeJavaScript(code)
+async function navigateTo(route) {
+  await js(`document.querySelector('.home-navigation a[href="#/${route}"]').click()`)
+  await until(`location.hash==='#/${route}' && !!document.querySelector('${route === 'statistics' ? '.statistics-page' : '.home-headline'}')`)
+  if(route==='statistics') await until("document.querySelector('.activity-panel').dataset.state!=='loading'")
+  else await until("document.querySelector('.home-speech-flow')?.dataset.ready==='true'")
+}
 async function shot(name) {
   await wait(300)
   await js("Promise.all(document.getAnimations().filter(animation => Number.isFinite(animation.effect?.getComputedTiming().iterations)).map(animation => animation.finished.catch(() => null))).then(() => true)")
+  assert.equal(await js("!!document.querySelector('.home-view-tabs,.home-status')"),false,name+' no home tabs or header status')
+  assert.equal(await js("document.querySelector('.home-navigation a[aria-current=page]')?.getAttribute('href')"),await js('location.hash'),name+' active navigation matches route')
+  assert.equal(await js("(() => {if(innerWidth<=680)return true;const nav=document.querySelector('.home-navigation').getBoundingClientRect(),brand=document.querySelector('.home-brand').getBoundingClientRect(),settings=document.querySelector('.home-settings').getBoundingClientRect();return nav.left>=brand.right+12 && nav.right<=settings.left-8 && Math.abs(nav.left+nav.width/2-innerWidth/2)<1})()"),true,name+' centered navigation fits beside brand and settings')
   const state = await js(`({width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth>innerWidth,missing:[...document.images].filter(i=>!i.complete||!i.naturalWidth).map(i=>i.src),text:document.querySelector('.home-canvas')?.innerText})`)
   assert.equal(state.overflow, false, name)
-  assert.equal(await js(`(() => { const composition=document.querySelector('.home-composition'),apps=document.querySelector('.home-applications');return !composition||!apps||composition.getBoundingClientRect().bottom<=apps.getBoundingClientRect().top+1 })()`),true,name+' overlapping sections')
+  assert.equal(await js(`(() => { const apps=document.querySelector('.home-applications'),footer=document.querySelector('.home-footer');if(!!apps!==location.hash.includes('statistics'))return false;return !apps||!footer||apps.getBoundingClientRect().bottom<=footer.getBoundingClientRect().top })()`),true,name+' applications only on statistics and fit above footer')
   assert.deepEqual(state.missing, [], name)
+  if(await js("!!document.querySelector('.usage-stats')")) {
+  assert.equal(await js("(() => {const boxes=['.home-statistics-header','.usage-stats','.activity-panel','.home-applications','.home-footer'].map(s=>document.querySelector(s).getBoundingClientRect());const gaps=boxes.slice(1).map((b,i)=>b.top-boxes[i].bottom);return Math.min(...gaps)>=20 && Math.max(...gaps)-Math.min(...gaps)<2})()"),true,name+' statistics sections share equal vertical spacing')
   assert.deepEqual(await js("(() => {const values=[...document.querySelectorAll('.usage-stat dd')];return values.flatMap(value=>{const column=value.closest('.usage-stat').getBoundingClientRect();return [...value.children].flatMap(child=>{const r=child.getBoundingClientRect();return r.left>=column.left-1&&r.right<=column.right+1?[]:[{text:child.textContent,width:r.width,columnWidth:column.width}]})})})()"),[],name+' statistic values fit their columns')
   assert.equal(await js("(() => {const group=document.querySelector('.usage-stats').getBoundingClientRect();const rows=[...document.querySelectorAll('.usage-stat dd')].map(row=>row.getBoundingClientRect());return rows.every((r,i)=>r.left>=group.left+8&&r.right<=group.right-8&&(!i||r.left>=rows[i-1].right+4))})()"),true,name+' statistics fit their glass container without overlap')
   assert.equal(await js("[...document.querySelectorAll('.usage-stat dd')].every(row=>{const icon=row.querySelector('svg').getBoundingClientRect();const value=row.querySelector('strong').getBoundingClientRect();const unit=row.querySelector('.usage-stat-value>span')?.getBoundingClientRect();return value.left>icon.right&&Math.abs(icon.top+icon.height/2-value.top-value.height/2)<4&&(!unit||(unit.left>value.right&&unit.top<value.bottom))})"),true,name+' icon number and unit stay inline')
   assert.equal(await js("new Set([...document.querySelectorAll('.usage-stat dd')].map(value=>{const r=value.getBoundingClientRect();return Math.round(r.top+r.height/2)})).size"),1,name+' five statistics stay on one row')
+  }
   assert.equal(await js("[...document.querySelectorAll('.home-headline span')].every(span => {const range=document.createRange();range.selectNodeContents(span);return range.getBoundingClientRect().width<=span.getBoundingClientRect().width+2})"),true,name+' both title lines fit their column')
+  assert.equal(await js("(() => {const keys=[...document.querySelectorAll('.home-shortcut kbd')];return new Set(keys.map(key=>getComputedStyle(key).height)).size<=1 && new Set(keys.map(key=>getComputedStyle(key).fontSize)).size<=1 && new Set(keys.filter(key=>key.textContent==='Fn').map(key=>getComputedStyle(key).width)).size<=1})()"),true,name+' shortcut keycaps share height and type size, including all Fn keys')
   assert.equal(await js("!!document.querySelector('.settings-modal')"), ['shortcut-settings','native-fn-capture','settings-modal-narrow'].includes(name), name+' correct surface')
-  if (!['shortcut-settings','native-fn-capture','settings-modal-narrow'].includes(name)) assert.equal(await js("(() => {const span=document.querySelector('.home-headline span');return Math.abs(span.getBoundingClientRect().height-parseFloat(getComputedStyle(span).lineHeight))<2})()"),true,name+' headline remains two lines')
+  if (await js("!!document.querySelector('.home-headline')")) assert.equal(await js("(() => {const span=document.querySelector('.home-headline span');return Math.abs(span.getBoundingClientRect().height-parseFloat(getComputedStyle(span).lineHeight))<2})()"),true,name+' headline phrases remain unbroken')
   writeFileSync(join(output, name + '.png'), (await win.webContents.capturePage()).toPNG())
   reports.push({ name, ...state })
   console.log('PASS ' + name)
 }
-async function load(query = {}) {
-  console.log('LOAD',query); await win.loadFile(join(root, '.build/ui-review/hub.html'), { query:{...query,load:String(++loadNumber)}, hash: '/dashboard' })
-  await until("document.querySelector('.activity-panel')?.dataset.state==='ready'")
+async function load(query = {}, route = 'statistics') {
+  const target = route === 'start' ? 'dashboard' : route
+  console.log('LOAD',query); await win.loadFile(join(root, '.build/ui-review/hub.html'), { query:{...query,load:String(++loadNumber)}, hash:'/'+target })
+  await until(target==='statistics' ? "document.querySelector('.activity-panel')?.dataset.state==='ready'" : "!!document.querySelector('.home-headline')")
 }
 app.whenReady().then(async () => {
   mkdirSync(output, { recursive: true })
@@ -56,27 +70,45 @@ app.whenReady().then(async () => {
       this.__homeBridge=value;
     }});
   ` })
-  console.log('hook ready'); await load()
+  console.log('hook ready'); await load({},'start')
   const fontStatus = await js(`(async () => {
     const families = ['Inter', 'Rules Variable', 'Rules Gothic Condensed', 'Rules Gothic Compressed', 'JetBrains Mono'];
     return Promise.all(families.map(async family => ({ family, count:(await document.fonts.load('400 24px "' + family + '"', 'Sayrel')).length })));
   })()`)
   assert.ok(fontStatus.every(font => font.count > 0), 'all five local font families load with the network blocked')
   assert.equal(await js('document.documentElement.lang'), 'en')
+  assert.equal(await js("document.querySelector('.home-headline').getAttribute('aria-label')"), 'Speak freely. Write brilliantly.')
+  assert.equal(await js("document.querySelector('.home-intro').textContent"), 'SayRel, the next-gen AI voice tool—turning your raw thoughts into polished text in real time.')
   assert.equal(await js("getComputedStyle(document.querySelector('.home-headline span')).fontFamily.split(',')[0].replaceAll('\"','').trim()"), 'Rules Gothic Condensed')
   assert.match(await js("document.querySelector('.home-brand img').getAttribute('src')"), /sayrel-ui-symbol\.svg$/)
   assert.equal(await js("document.querySelector('.home-brand .brand-lockup').textContent.trim()"), 'sayrel')
   assert.equal(await js("/\\p{Script=Han}/u.test(document.body.innerText)"), false, 'English initial screen')
   console.log('PASS local fonts, English initial screen, and Sayrel wordmark')
   assert.equal(await js("getComputedStyle(document.querySelector('.brand-lockup')).fontFamily.split(',')[0].replaceAll('\"','').trim()"), 'Rules Gothic Condensed')
-  assert.equal(await js("document.querySelectorAll('.activity-day').length"), 182)
-  assert.equal(await js("getComputedStyle(document.querySelector('.activity-panel')).backgroundColor"), 'rgba(0, 0, 0, 0)', 'heatmap has no panel background')
+  assert.equal(await js("document.querySelectorAll('.activity-day,.usage-stats').length"),0,'home contains no statistics')
+  assert.deepEqual(await js("[...document.querySelectorAll('.home-navigation a')].map(a=>a.getAttribute('href'))"),['#/dashboard','#/statistics','#/history','#/dictionary','#/providers'],'statistics menu precedes history')
+  assert.equal(await js("window.__homeCalls.some(call=>['db:history-usage','db:history-activity'].includes(call[0]))"),false,'home does not load statistics')
+  assert.equal(await js("window.__homeCalls.some(call=>call[0]==='recording-machine:state')"), false, 'home animation does not read recorder state')
   await shot('home-default')
+  await until("document.querySelector('.home-speech-flow')?.dataset.ready==='true'")
+  assert.equal(await js("(() => {const svg=document.querySelector('.home-speech-lottie svg');return svg?.getAttribute('viewBox')==='0 0 269 161' && svg.querySelectorAll('path').length>23 && !!document.querySelector('.home-speech-bar .home-speech-play svg')})()"),true,'original hero composition renders the waveform and edit layers')
+  for (let index=0;index<3;index++) {
+    const point=await js(`(() => {const r=document.querySelectorAll('.home-shortcut-name')[${index}].getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}})()`)
+    win.webContents.sendInputEvent({type:'mouseMove',...point})
+    await until(`getComputedStyle(document.querySelectorAll('.home-shortcut')[${index}],'::before').opacity==='1'`)
+    assert.equal(await js(`(() => {const items=[...document.querySelectorAll('.home-shortcut')];return items.every((item,i)=>getComputedStyle(item,'::before').opacity===(i===${index}?'1':'0')) && getComputedStyle(items[${index}]).color==='rgb(255, 255, 255)'})()`),true,'hovering the label highlights only its entire shortcut section')
+    assert.equal(await js(`[...document.querySelectorAll('.home-shortcut')[${index}].querySelectorAll('kbd')].every(key=>getComputedStyle(key).backgroundColor==='rgb(255, 255, 255)' && getComputedStyle(key).color==='rgb(0, 0, 194)')`),true,'hovered section keeps white keycaps with blue lettering')
+    await shot('home-shortcut-hover-'+index)
+  }
+  win.webContents.sendInputEvent({type:'mouseMove',x:10,y:70})
   assert.equal(await js("!!document.querySelector('.home-eyebrow,.activity-heading,.page-index')"),false,'home omits redundant captions')
   assert.equal(await js("(() => {const content=document.querySelector('.app-content'),style=getComputedStyle(content),top=document.querySelector('.home-composition').getBoundingClientRect().top-document.querySelector('.home-header').getBoundingClientRect().bottom;return style.paddingTop===style.paddingBottom && Math.abs(top-parseFloat(style.paddingTop))<1})()"),true,'home starts at shared page inset with equal vertical padding')
   assert.equal(await js("document.querySelector('.home-credit').textContent"),'Builded By Yohoia','footer shows author credit')
   await until("document.querySelector('.home-version').textContent==='v1.0.0'")
-  assert.equal(await js("!!document.querySelector('.home-footer button')"),false,'footer only shows credit and version')
+  assert.equal(await js("!!document.querySelector('.home-version button')"),false,'version has no updater action')
+  await navigateTo('statistics')
+  assert.equal(await js("document.querySelectorAll('.activity-day').length"),182)
+  assert.equal(await js("getComputedStyle(document.querySelector('.activity-panel')).backgroundColor"),'rgba(0, 0, 0, 0)','heatmap has no panel background')
   assert.equal(await js("document.querySelectorAll('.usage-stat').length"),5)
   const expectedUsage = await js("window.sayrel.invoke('db:history-usage')")
   assert.equal(await js("document.querySelector('[data-metric=words] strong').textContent"),String(expectedUsage.words))
@@ -84,11 +116,41 @@ app.whenReady().then(async () => {
   assert.equal(await js("[...document.querySelectorAll('.usage-stat dt')].every(label=>getComputedStyle(label).clip!=='auto')"),true,'statistics omit visible captions')
   assert.equal(await js("!!document.querySelector('.usage-stat-hint')"),false,'statistics omit explanatory popovers')
   assert.equal(await js("parseFloat(getComputedStyle(document.querySelector('.usage-stats')).borderRadius)>0 && getComputedStyle(document.querySelector('.usage-stats')).backdropFilter.includes('blur')"),true,'statistics share a rounded glass container')
-  for (const phase of ['recording','finishing','error','unavailable','idle']) {
-    await js(`window.__homeSubscribers.get('recording-machine:state').forEach(cb=>cb({phase:${JSON.stringify(phase)}}))`)
-    await until(`document.querySelector('.home-canvas').dataset.recordingPhase===${JSON.stringify(phase)}`)
-    await shot('status-' + phase)
+  await shot('statistics-default')
+  await navigateTo('dashboard')
+  await until("Number(document.querySelector('.home-speech-flow').dataset.flowTime)>5600")
+  for(let round=0;round<3;round++) {
+    await js("document.querySelector('.home-speech-bar').click()")
+    await until("document.querySelector('.home-speech-bar').getAttribute('aria-pressed')==='true'")
+    const stopped=await js("document.querySelector('.home-speech-flow').dataset.flowTime")
+    const next=await js("new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(document.querySelector('.home-speech-flow').dataset.flowTime))))")
+    assert.equal(next,stopped,'speech flow pauses all animation')
+    await js("document.querySelector('.home-speech-bar').click()")
+    await until("Number(document.querySelector('.home-speech-flow').dataset.flowTime)>"+Number(stopped))
   }
+  console.log('PASS three speech flow pause and resume cycles')
+  for(let round=0;round<3;round++) {
+    await navigateTo('statistics')
+    assert.equal(await js("!!document.querySelector('.home-speech-flow,.home-shortcuts')"),false,'statistics route unmounts home animation')
+    await navigateTo('dashboard')
+    await until("Number(document.querySelector('.home-speech-flow').dataset.flowTime)>5600")
+  }
+  await js("document.querySelector('.home-navigation a[href=\"#/statistics\"]').focus()")
+  win.webContents.sendInputEvent({type:'keyDown',keyCode:'Return'})
+  win.webContents.sendInputEvent({type:'keyUp',keyCode:'Return'})
+  await until("!!document.querySelector('.statistics-page')")
+  await navigateTo('dashboard')
+  console.log('PASS three route switching cycles, animation unmounting and keyboard navigation')
+  for (let cycle=0;cycle<3;cycle++) for (const phase of ['starting','recording','finishing','error','long_pressing','idle']) {
+    const before = await js("Number(document.querySelector('.home-speech-flow').dataset.flowTime)")
+    await js(`window.__homeSubscribers.get('recording-machine:state')?.forEach(cb=>cb({phase:${JSON.stringify(phase)}}))`)
+    assert.equal(await js("document.querySelector('.home-speech-flow').dataset.paused"), 'false', 'recorder phase must not pause the home animation: ' + phase)
+    assert.equal(await js("document.querySelector('.home-speech-bar').disabled"), false, 'animation controls remain independent: ' + phase)
+    await until("Number(document.querySelector('.home-speech-flow').dataset.flowTime)>" + before)
+    assert.equal(await js("getComputedStyle(document.querySelector('.home-speech-paths')).visibility"), 'visible', 'home illustration stays visible: ' + phase)
+    if(cycle===0) await shot('status-' + phase)
+  }
+  assert.equal(await js("window.__homeCalls.some(call=>call[0]==='page:floating-bar-click')"), false, 'animation controls never start or finish real recordings')
   await js("document.querySelectorAll('.home-shortcut')[1].focus(); document.querySelectorAll('.home-shortcut')[1].click()")
   await until("!!document.querySelector('.settings-modal')")
   await shot('shortcut-settings')
@@ -112,6 +174,7 @@ app.whenReady().then(async () => {
   await js("window.sayrel.invoke('store:use','patch',{shortcut:{accelerator:'Control+K',enabled:true},translationShortcut:{accelerator:'Shift+Fn',enabled:false}})")
   await until("document.querySelectorAll('.home-shortcut')[0].innerText.includes('Control') && document.querySelectorAll('.home-shortcut')[1].innerText.includes('Disabled')")
   await shot('changed-shortcuts')
+  await navigateTo('statistics')
   await js("document.querySelectorAll('.home-stamp')[2].click()")
   await until("window.__homeCalls.some(c=>c[0]==='page:open-url' && c[1]==='https://chatgpt.com/')")
   for (const route of ['history','dictionary','providers']) {
@@ -120,6 +183,8 @@ app.whenReady().then(async () => {
     await js("document.querySelector('.home-navigation a[href=\"#/dashboard\"]').click()")
     await until("!!document.querySelector('.home-canvas')")
     assert.equal(await js("!!document.querySelector('.app-sidebar')"), false)
+    assert.equal(await js("!!document.querySelector('.activity-panel')"),false,'returning home shows only voice input')
+    await navigateTo('statistics')
   }
   await js("window.__homeFail=true; window.dispatchEvent(new Event('focus'))")
   await until("document.querySelector('.activity-panel').dataset.state==='error'")
@@ -137,25 +202,27 @@ app.whenReady().then(async () => {
   await shot('home-empty')
   assert.equal(await js("document.querySelector('.home-credit').textContent"),'Builded By Yohoia','empty history preserves footer credit')
   await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features:[{name:'prefers-reduced-motion',value:'reduce'}] })
-  await js("window.__homeSubscribers.get('recording-machine:state').forEach(cb=>cb({phase:'recording'}))")
   assert.equal(await js("getComputedStyle(document.querySelector('.activity-grid')).animationName"), 'none')
+  await navigateTo('dashboard')
+  assert.equal(await js("document.querySelector('.home-speech-flow').dataset.paused"),'true','reduced motion freezes speech flow')
   await shot('reduced-motion')
+  await navigateTo('statistics')
   await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features:[] })
   await js("window.sayrel.invoke('appearance:set-preference','dark')")
   assert.equal(await js("getComputedStyle(document.querySelector('.home-canvas')).backgroundColor"), 'rgb(242, 242, 242)')
   await shot('paper-in-dark-preference')
   await js("window.sayrel.invoke('appearance:set-preference','light')")
-  const baseGeometry = await js("({instrument:document.querySelector('.home-activity').getBoundingClientRect().width,headline:parseFloat(getComputedStyle(document.querySelector('.home-headline')).fontSize)})")
+  const baseGeometry = await js("({instrument:document.querySelector('.usage-stats').getBoundingClientRect().width,headline:parseFloat(getComputedStyle(document.querySelector('.home-statistics-header h1')).fontSize)})")
   for (const [width,height,name] of [[1440,900,'large-window'],[1920,1080,'fullscreen-window'],[2560,1440,'wide-window'],[1440,1200,'tall-window']]) {
     win.setContentSize(width,height)
     await shot(name)
-    const geometry = await js("({instrument:document.querySelector('.home-activity').getBoundingClientRect().width,headline:parseFloat(getComputedStyle(document.querySelector('.home-headline')).fontSize)})")
+    const geometry = await js("({instrument:document.querySelector('.usage-stats').getBoundingClientRect().width,headline:parseFloat(getComputedStyle(document.querySelector('.home-statistics-header h1')).fontSize)})")
     assert.ok(geometry.instrument > baseGeometry.instrument, name+' activity chart grows')
     assert.ok(geometry.headline > baseGeometry.headline, name+' headline grows')
   }
   for (const [width,height] of [[1440,900],[1920,1080],[2560,1440],[840,560]]) {
     win.setContentSize(width,height)
-    for (const route of ['history','dictionary','providers','settings']) {
+    for (const route of ['statistics','history','dictionary','providers','settings']) {
       await win.loadFile(join(root,'.build/ui-review/hub.html'),{hash:'/'+route,query:{load:String(++loadNumber)}})
       await until("!!document.querySelector('.page,.settings-page')")
       const geometry = await js(`(() => {const r=document.querySelector('.page,.settings-page').getBoundingClientRect();return {left:r.left,right:innerWidth-r.right,overflow:document.documentElement.scrollWidth>innerWidth};})()`)
@@ -189,13 +256,14 @@ app.whenReady().then(async () => {
   await js("document.querySelector('.app-content').scrollTop=0")
   await shot('home-active')
   await js("window.sayrel.invoke('store:use','patch',{language:'zh-CN'})")
-  await until("document.documentElement.lang==='zh-CN' && document.querySelector('.home-headline').textContent==='说出所想即刻成文'")
+  await until("document.documentElement.lang==='zh-CN' && document.querySelector('.home-statistics-header h1').textContent==='使用概览'")
   await shot('home-active-chinese')
-  assert.equal(await js("document.querySelector('.home-headline').textContent"), '说出所想即刻成文')
-  assert.equal(await js("(() => {const metrics=[...document.querySelectorAll('.activity-metric')];return metrics.every(metric => {const range=document.createRange();range.selectNodeContents(metric.querySelector('p'));const text=range.getBoundingClientRect(),column=metric.getBoundingClientRect();return Math.abs((text.left+text.right-column.left-column.right)/2)<2})})()"),true,'activity labels centered within their columns')
+  assert.equal(await js("document.querySelector('.home-navigation a[href=\"#/statistics\"]').textContent"),'统计')
+  assert.equal(await js("(() => {const metrics=[...document.querySelectorAll('.activity-metric')];return metrics.every(metric => {const range=document.createRange();range.selectNodeContents(metric.querySelector('p'));const text=range.getBoundingClientRect(),column=metric.getBoundingClientRect();return Math.abs(text.left-column.left)<2})})()"),true,'activity labels align with their numbers')
   for (const [width,height] of [[1440,900],[988,685],[840,560],[600,750]]) {
     win.setContentSize(width,height)
     await shot('home-chinese-'+width)
+    await navigateTo('dashboard'); await shot('home-start-chinese-'+width); await navigateTo('statistics')
   }
   win.setContentSize(988,685)
   await js("window.__homeUsageOverride={dictationCount:12345,durationMs:98765432100,words:12345678,wordsPerMinute:12345,savedTimeMs:12345678900};window.__homeSubscribers.get('history:changed').forEach(cb=>cb())")
@@ -205,14 +273,15 @@ app.whenReady().then(async () => {
   await until("document.querySelector('[data-metric=words] strong').textContent==='40'")
   await js("window.sayrel.invoke('store:use','patch',{language:'en'})")
   await until("document.documentElement.lang==='en'")
-  win.setContentSize(988,685); await shot('minimum-window')
-  win.setContentSize(840,560); await shot('small-window')
-  win.setContentSize(600,750); await shot('narrow-window')
+  for(const [width,height,name] of [[988,685,'minimum-window'],[840,560,'small-window'],[600,750,'narrow-window']]) {
+    win.setContentSize(width,height); await shot(name)
+    await navigateTo('dashboard'); await shot(name+'-start'); await navigateTo('statistics')
+  }
   await js("window.sayrel.invoke('page:open-settings-modal','settings')")
   await until("!!document.querySelector('.settings-modal')")
   assert.equal(await js("(() => { const label=document.querySelectorAll('.settings-modal .settings-nav-item>span:last-child')[1];const range=document.createRange();range.selectNodeContents(label);return range.getBoundingClientRect().right<=document.querySelector('.settings-modal .settings-nav').getBoundingClientRect().right; })()"),true,'narrow settings labels fit navigation')
   await shot('settings-modal-narrow')
   assert.deepEqual(errors, [])
-  writeFileSync(join(output,'report.json'), JSON.stringify({reports,errors,checks:['actual navigation and return','settings open and focus return','live shortcut changes and disabled state','application URL forwarding','recording state updates','history failure and retry','empty history','author credit, version, and no home updater button','reduced motion','paper in dark preference','600–2560 widths; large/tall windows; centered history/dictionary/providers/settings and settings modal'],scope:'Offline fixture, temporary profile, network blocked'},null,2))
+  writeFileSync(join(output,'report.json'), JSON.stringify({reports,errors,checks:['independent statistics route before history, centered navigation without status','statistics stay directly below their heading at every window height','home animation unmounting on route change','actual navigation and return','settings open and focus return','live shortcut changes and disabled state','application URL forwarding','home animation stays independent across three recorder-state cycles','history failure and retry','empty history','author credit, version, and no home updater button','reduced motion','paper in dark preference','600–2560 widths; large/tall windows; centered history/dictionary/providers/settings and settings modal'],scope:'Offline fixture, temporary profile, network blocked'},null,2))
 }).catch(error=>{console.error(error);process.exitCode=1}).finally(()=>{win?.destroy();app.exit(process.exitCode||0)})
 app.on('quit',()=>rmSync(profile,{recursive:true,force:true}))

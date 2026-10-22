@@ -188,15 +188,3 @@ export function MicrophonePicker({ autoOpen = false }: { autoOpen?: boolean }) {
     {!devices.length && <p>{t("No microphone detected")}<br />{t("Check your device settings or connect a microphone.")}</p>}
   </SettingsDialog>}</>
 }
-
-export function FeatureTour({ onClose }: { onClose: () => void }) {
-  const t = useSettingsText()
-  const { settings } = useAppSettings()
-  const [step, setStep] = useState(0)
-  const steps = [
-    { title: "Dictate", shortcut: settings.shortcut.accelerator, description: "Press to start and stop dictation.", example: "Let’s discuss the project tomorrow at three." },
-    { title: "Translate", shortcut: settings.translationShortcut.accelerator, description: "Press to start and stop translation.", example: "Choose a target language and speak naturally." },
-    { title: "Ask anything", shortcut: settings.askAnythingShortcut.accelerator, description: "Press to start and stop asking anything.", example: "Please make this paragraph more concise." }
-  ]
-  return <SettingsDialog title="Explore key features" onClose={onClose}><div className="settings-tour"><span>{step + 1} / 3</span><h3>{t(steps[step].title)}</h3><div className="settings-tour-keys"><KeyCaps value={steps[step].shortcut} /></div><p>{t(steps[step].description)}</p><blockquote>{steps[step].example}</blockquote></div><div className="settings-dialog-actions"><button className="settings-pill" onClick={onClose}>{t("Close")}</button><button className="settings-pill is-primary" onClick={() => step === 2 ? onClose() : setStep(step + 1)}>{t(step === 2 ? "Finish" : "Next")}</button></div></SettingsDialog>
-}

@@ -5,7 +5,8 @@ import ArrowOutward from '@mui/icons-material/ArrowOutward'
 import { api } from '../../shared/utils/bridge'
 import { checkForUpdates } from '../../shared/utils/checkForUpdates'
 import { useAppSettings } from '../../shared/state/settings'
-import { ShortcutEditor, TranslationTargets, LanguageVariants, MicrophonePicker, FeatureTour } from './SettingsControls'
+import { ShortcutEditor, TranslationTargets, LanguageVariants, MicrophonePicker } from './SettingsControls'
+import { useFeatureTour } from './FeatureTour'
 import { interfaceLanguages, useSettingsText, type SettingsTextKey } from './settingsText'
 import '../../shared/styles/settings.css'
 import { HubSelect } from './HubSelect'
@@ -164,9 +165,9 @@ function ExternalRow({ label, url }: { label: string; url: string }) {
 
 function HelpSection() {
   const t = useSettingsText()
-  const [tour, setTour] = useState(false)
+  const openTour = useFeatureTour()
   const { settings } = useAppSettings()
-  return <><Row label="Explore key features" hint="Guided examples for Dictate, Translate, and Ask anything."><button className="settings-pill" onClick={() => setTour(true)}>{t("Start")}</button></Row><ExternalRow label="Help center" url="https://www.typeless.com/help" /><ExternalRow label="Release notes" url={`https://www.typeless.com/help/release-notes/macos?lang=${settings.language ?? 'en'}`} />{tour && <FeatureTour onClose={() => setTour(false)} />}</>
+  return <><Row label="Explore key features" hint="Guided examples for Dictate, Translate, and Ask anything."><button className="settings-pill" onClick={openTour}>{t("Start")}</button></Row><ExternalRow label="Help center" url="https://www.typeless.com/help" /><ExternalRow label="Release notes" url={`https://www.typeless.com/help/release-notes/macos?lang=${settings.language ?? 'en'}`} /></>
 }
 
 function AboutSection() {

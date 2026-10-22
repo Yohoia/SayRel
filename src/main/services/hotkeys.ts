@@ -24,6 +24,7 @@ export function handleKeyEvent(event: KeyEvent): void {
   // Always clear releases, even after a binding was edited or disabled.
   if (!event.pressed) {
     if (!gesture || gesture.combination !== event.combination) return
+    log.debug('shortcut released', { combination: event.combination, cancelled: !!event.cancelled, phase: recordingMachine.getState().phase, sourceCode: event.sourceCode, sourceType: event.sourceType })
     const released = gesture
     gesture = null
     clearLongPressTimer()
@@ -48,6 +49,7 @@ export function handleKeyEvent(event: KeyEvent): void {
   if (recordingMachine.isDisabled()) return
   const resolved = resolveBinding(event.combination)
   if (!resolved) return
+  log.debug('shortcut pressed', { combination: event.combination, phase: recordingMachine.getState().phase, eventDelayMs: Date.now() - event.ts, sourceCode: event.sourceCode, sourceType: event.sourceType })
   const { binding, mode } = resolved
   if (gesture?.combination === event.combination) return
 
@@ -56,7 +58,8 @@ export function handleKeyEvent(event: KeyEvent): void {
     gesture.style = binding.style
     // Fn then Shift/Space upgrades initialization; never submits the first mode.
     if (gesture.started && recordingMachine.getState().phase !== 'long_pressing') {
-      recordingMachine.switchMode(mode)
+      if (['idle', 'error'].includes(recordingMachine.getState().phase)) void recordingMachine.start(mode)
+      else recordingMachine.switchMode(mode)
     }
     return
   }
@@ -79,6 +82,7 @@ export function handleKeyEvent(event: KeyEvent): void {
   if (binding.style === 'toggle') {
     longPressTimer = setTimeout(() => {
       longPressTimer = null
+      log.debug('shortcut long hold', { phase: recordingMachine.getState().phase })
       if (gesture?.started) recordingMachine.setLongPressing()
     }, LONG_PRESS_MS)
   }

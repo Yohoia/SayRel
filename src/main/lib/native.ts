@@ -74,6 +74,8 @@ export type KeyEvent = {
   pressed: boolean
   combination: string
   ts: number
+  sourceCode?: number
+  sourceType?: number
   /** A more specific chord within the same physical gesture. */
   replacedCombination?: string
   /** The native tap reset or stopped while keys were held. */

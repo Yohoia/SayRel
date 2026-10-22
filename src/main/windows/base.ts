@@ -65,9 +65,11 @@ export abstract class BaseWindow {
 
     const target = resolveUrl(this.getWindowRoute())
     if (target.url) {
-      win.loadURL(target.url)
+      const url = new URL(target.url)
+      url.hash = this.getInitialHash() ?? ''
+      win.loadURL(url.href)
     } else if (target.file) {
-      win.loadFile(target.file)
+      win.loadFile(target.file, { hash: this.getInitialHash() })
     }
 
     win.once('ready-to-show', () => {
@@ -91,6 +93,10 @@ export abstract class BaseWindow {
 
   protected shouldShowOnReady(): boolean {
     return true
+  }
+
+  protected getInitialHash(): string | undefined {
+    return undefined
   }
 
   closeWindow(): void {

@@ -84,7 +84,7 @@
 .settings-shortcut-item { position:relative; }
 .settings-shortcut-key { flex-wrap:wrap; justify-content:flex-start; min-height:40px; height:auto; width:198px; border-radius:var(--radius-control); padding:3px 32px 3px 3px; text-align:left; }
 .settings-shortcut-key span { font-size:14px; line-height:20px; color:var(--ink-tertiary); }
-.settings-shortcut-key kbd,.settings-tour-keys kbd { min-width:32px; min-height:32px; padding:7px 8px; border:1px solid var(--line); background:var(--paper-elevated); border-radius:var(--radius-control); line-height:16px; font-family:var(--font-mono); }
+.settings-shortcut-key kbd { min-width:32px; min-height:32px; padding:7px 8px; border:1px solid var(--line); background:var(--paper-elevated); border-radius:var(--radius-control); line-height:16px; font-family:var(--font-mono); }
 .settings-shortcut-action { position:absolute; right:6px; top:7px; width:26px; height:26px; color:var(--ink-tertiary); background:transparent; border-radius:var(--radius-control); font-size:18px; }
 .settings-shortcut-action:hover { background:var(--fill-hover); }
 .settings-row:has(.settings-shortcuts) { align-items:flex-start; }
@@ -128,10 +128,6 @@
 .settings-dialog-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:24px; }
 .settings-personal-heading .settings-pill { margin-left:auto; }
 .settings-info { display:inline-block; margin-left:4px; vertical-align:middle; font-size:13px; color:var(--ink-tertiary); cursor:help; }
-.settings-tour { text-align:center; color:var(--ink-soft); }
-.settings-tour h3 { font-size:24px; margin:20px 0; }
-.settings-tour-keys { display:flex; justify-content:center; gap:4px; margin:16px; }
-.settings-tour blockquote { padding:24px; border-radius:var(--radius-panel); background:var(--fill-hover); margin:24px 0; font-size:16px; }
 .settings-mic-option[aria-checked=true] { border-color:var(--accent); background:var(--fill-hover); }
 .settings-subdialog:has(.settings-mic-list) .modal-card { border-radius:var(--radius-panel); }
 .settings-mic-list { border-top:1px solid var(--line); margin-top:16px; padding-top:16px; max-height:368px; overflow:auto; }

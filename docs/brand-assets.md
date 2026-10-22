@@ -1,12 +1,12 @@
 # Sayrel：字体、英文界面与品牌素材
 
-更新：2026-10-21
+更新：2026-10-22
 
 ## 当前约定
 
-应用显示名称为 Sayrel，新安装界面默认英文，可在设置中切换中文。整体沿用 Hermes 的本地 Rules 字体、灰白背景 `#F2F2F2` 与蓝色文字 `#0000C2`；首页右侧改为没有背景面板的使用热力图。
+应用显示名称为 Sayrel，新安装界面默认英文，可在设置中切换中文。整体沿用 Hermes 的本地 Rules 字体、灰白背景 `#F2F2F2` 与蓝色文字 `#0000C2`；首页以居中排印与语音转写演示动画为主视觉，使用统计移至独立统计页。
 
-品牌Slogan为 `Speak more. Type less.`，交互理念为 `Hold to speak.`，核心定位为 `AI-powered voice typing`，品牌理念为“让表达像说话一样自然”。首页使用两行Slogan、定位眉标与理念文案，现有快捷键配置与录音模式继续按用户设置执行。
+品牌Slogan为 `Speak more. Type less.`，交互理念为 `Hold to speak.`，核心定位为 `AI-powered voice typing`，品牌理念为“让表达像说话一样自然”。首页主标题中文为「开口只管随心，落笔自有逻辑。」，英文为 `Speak freely. Write brilliantly.`；副标题分行为品牌定位与功能说明。现有快捷键配置与录音模式继续按用户设置执行。
 
 产品名称、npm 包名、应用标识、IPC、URL scheme、导出文件名与文档已统一为 Sayrel / sayrel。应用标识为 `com.sayrel.app`，IPC 桥接为 `window.sayrel`，URL scheme 为 `sayrel`。GitHub 仓库地址以 `git remote -v` 为准。
 
@@ -18,13 +18,13 @@
 
 | 字体 | 位置 | 用途 |
 | --- | --- | --- |
-| Rules Gothic Condensed，300 / 400 / 500 | `public/fonts/hermes/RulesGothicCnd-*.woff2` | Sayrel 字标、首页及业务页面展示标题、热力图大数字 |
+| Rules Gothic Condensed，300 / 400 / 500 | `public/fonts/hermes/RulesGothicCnd-*.woff2` | Sayrel 字标、首页英文标题与展示键帽、业务页面展示标题、统计数字 |
 | Rules Gothic Compressed，400 / 500 / 600 | `public/fonts/hermes/RulesGothicCmp-*.woff2` | 本地压缩展示字体，随字体清单保留 |
 | Rules Variable | `public/fonts/hermes/RulesVariable.woff2` | 顶部导航，使用 `font-stretch:50%` |
 | Inter，可变字重 | `public/fonts/hermes/Inter-latin-variable.woff2` | 英文正文、表单、设置及操作文案 |
 | JetBrains Mono | `public/fonts/home-mono.woff2` | 快捷键、时间、刻度、编号及技术信息 |
-| MiSans，Regular / Medium | `public/fonts/misans/MiSans-*.woff2` | 全部窗口的主要中文字体；正文与标题使用 Regular，小标签与操作使用 Medium |
-| 南西初夏宋，常规 400 | `public/fonts/nanxi-chuxia-song/NanxiChuxiasong-Regular.woff2` | 保留的备用展示字体；不再作为当前默认字体 |
+| MiSans，Regular / Medium | `public/fonts/misans/MiSans-*.woff2` | 全部窗口的主要中文字体（首页中文主标题除外）；正文与标题使用 Regular，小标签与操作使用 Medium |
+| 南西初夏宋，常规 400 | `public/fonts/nanxi-chuxia-song/NanxiChuxiasong-Regular.woff2` | 首页中文主标题展示字体 |
 
 MiSans 从[小米官方下载页](https://hyperos.mi.com/font/zh/download/)获取，直接使用官方 WOFF2，保留完整字库，不修改字体文件。Regular 与 Medium 分别以 CSS 400、500 声明，使用真实字重；字体原始元数据的权重值分别为 330、380。版本为 4.009，两款各含 29,571 个 Unicode 映射，当前界面和中文翻译的汉字均已覆盖。下载地址、原始文件哈希、版权声明与许可协议 PDF 随字体保存在 `public/fonts/misans/`；“设置 → 关于”展示 MiSans 使用声明与许可链接。
 
@@ -32,7 +32,7 @@ MiSans 从[小米官方下载页](https://hyperos.mi.com/font/zh/download/)获�
 
 中文正文与标题使用正常字形尺寸，分别以 `--tracking-chinese-body:.02em` 和 `--tracking-chinese-title:.01em` 设置字距。正文和标题用 Regular，小字、统计标签和操作用 Medium，不再对正文合成加粗。中文次级文字保留 85% 蓝色不透明度；首页中文主标题行高 1.2，保持两行。
 
-南西初夏宋的原始 TTF、完整 WOFF2、作者商用许可 PDF、OFL 和来源清单全部保留在 `public/fonts/nanxi-chuxia-song/`。其 `@font-face` 声明继续保留，可按字体名称显式使用；当前默认字体栈不加载它。此前排版截图保存在 `docs/design-exploration/chinese-typography-20261021/`。
+南西初夏宋的原始 TTF、完整 WOFF2、作者商用许可 PDF、OFL 和来源清单全部保留在 `public/fonts/nanxi-chuxia-song/`。其 `@font-face` 声明保留，首页中文主标题按字体名称显式使用；其余中文场景仍为 MiSans。此前排版截图保存在 `docs/design-exploration/chinese-typography-20261021/`。
 
 Rules 来自 [Hermes Agent](https://hermes-agent.nousresearch.com/) 当前参考采集中的 Nous 官方公开字体资源；Inter 来自同一参考样式引用的 Google Fonts。逐文件下载地址与哈希见 `public/fonts/hermes/sources.json`。JetBrains Mono 沿用已有本地文件。
 

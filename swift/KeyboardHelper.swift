@@ -168,6 +168,10 @@ private var pressingKeys: Set<String> = []
 private var activeCombination: String?
 private var blockedKeycodes: Set<Int64> = []
 private var pressingFnKeycodes: Set<Int64> = []
+// macOS can append a Globe keyDown/keyUp pair after the physical Fn release.
+// Prefer modifier events for keyboards that provide them; retain key events
+// for keyboards that expose only Globe/Fn as a normal key.
+private var fnModifierKeyboards: Set<Int64> = []
 
 private let modifierGroups: [(CGEventFlags, String, String, Int64, Int64, UInt64, UInt64)] = [
     (.maskShift, "LeftShift", "RightShift", 56, 60, 0x2, 0x4),
@@ -177,7 +181,7 @@ private let modifierGroups: [(CGEventFlags, String, String, Int64, Int64, UInt64
 ]
 
 private func updateModifiers(_ flags: CGEventFlags, changedKey: Int64?) {
-    if flags.contains(.maskSecondaryFn) || !pressingFnKeycodes.isEmpty { pressingKeys.insert("Fn") }
+    if !pressingFnKeycodes.isEmpty { pressingKeys.insert("Fn") }
     else { pressingKeys.remove("Fn") }
     for (mask, left, right, leftCode, rightCode, leftBit, rightBit) in modifierGroups {
         if !flags.contains(mask) {
@@ -271,10 +275,24 @@ private func handle(type: CGEventType, event: CGEvent) -> Bool {
     let repeated = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
     let wasBlocked = blockedKeycodes.contains(code)
     if type == .keyDown && repeated { return wasBlocked }
+    if code == 63 || code == 179 {
+        let keyboardType = event.getIntegerValueField(.keyboardEventKeyboardType)
+        if type == .flagsChanged {
+            fnModifierKeyboards.insert(keyboardType)
+        } else if fnModifierKeyboards.contains(keyboardType) {
+            return true
+        }
+    }
     let previousKeys = pressingKeys
     if code == 63 || code == 179 {
         if type == .keyDown { pressingFnKeycodes.insert(code) }
         else if type == .keyUp { pressingFnKeycodes.remove(code) }
+        // Arrow and function keys also carry this flag; only Fn's own event
+        // can change whether the physical modifier is held.
+        else if type == .flagsChanged {
+            if event.flags.contains(.maskSecondaryFn) { pressingFnKeycodes.insert(code) }
+            else { pressingFnKeycodes.remove(code) }
+        }
     }
     updateModifiers(event.flags, changedKey: type == .flagsChanged ? code : nil)
     if type != .flagsChanged && !((code == 63 || code == 179) && (type == .keyDown || type == .keyUp)) {
@@ -302,7 +320,7 @@ private func handle(type: CGEventType, event: CGEvent) -> Bool {
         return true
     }
     if pressingKeys.isEmpty {
-        if let combo = activeCombination { emit(key: combo, pressed: false, combination: combo) }
+        if let combo = activeCombination { emit(key: combo, pressed: false, combination: combo, sourceCode: code, sourceType: type.rawValue) }
         activeCombination = nil
         return wasBlocked
     }
@@ -316,7 +334,7 @@ private func handle(type: CGEventType, event: CGEvent) -> Bool {
         if previous == nil || parts(candidate).count > parts(previous!).count {
             activeCombination = candidate
             emit(key: keyNames[code] ?? candidate, pressed: true,
-                 combination: candidate, replacedCombination: previous)
+                 combination: candidate, replacedCombination: previous, sourceCode: code, sourceType: type.rawValue)
         }
     }
     let shouldBlock = (type == .keyDown || type == .otherMouseDown) && candidate != nil
@@ -325,13 +343,16 @@ private func handle(type: CGEventType, event: CGEvent) -> Bool {
 }
 
 private func emit(key: String, pressed: Bool, combination: String,
-                  replacedCombination: String? = nil, cancelled: Bool = false, capture: Bool = false) {
+                  replacedCombination: String? = nil, cancelled: Bool = false, capture: Bool = false,
+                  sourceCode: Int64? = nil, sourceType: UInt32? = nil) {
     guard let callback else { return }
     var payload: [String: Any] = [
         "key": key, "pressed": pressed, "combination": combination,
         "ts": Date().timeIntervalSince1970 * 1000
     ]
     if capture { payload["capture"] = true }
+    if let sourceCode { payload["sourceCode"] = sourceCode }
+    if let sourceType { payload["sourceType"] = sourceType }
     if let replacedCombination { payload["replacedCombination"] = replacedCombination }
     if cancelled { payload["cancelled"] = true }
     guard let data = try? JSONSerialization.data(withJSONObject: payload),

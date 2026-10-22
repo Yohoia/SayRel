@@ -1,6 +1,9 @@
 import { nativeTheme, screen } from 'electron'
 import { WINDOWS, type WindowRoute } from '../../shared/constants'
 import { BaseWindow } from './base'
+import { createLogger } from '../lib/logger'
+
+const log = createLogger('hub')
 
 export type HubMode = 'main' | 'sidebar'
 
@@ -34,10 +37,23 @@ export class HubWindow extends BaseWindow {
 
   setRoute(route: string): void {
     this.route = route
+    this.navigateToRoute()
   }
 
   getRoute(): string {
     return this.route
+  }
+
+  protected getInitialHash(): string {
+    return this.route
+  }
+
+  private navigateToRoute(): void {
+    const win = this.getWindow()
+    if (!win || win.webContents.isLoadingMainFrame()) return
+    void win.webContents.executeJavaScript(`window.location.hash = ${JSON.stringify(this.route)}`).catch(error => {
+      log.warn('could not navigate hub', error)
+    })
   }
 
   getWindowOptions() {

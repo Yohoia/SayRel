@@ -17,6 +17,8 @@ import { createProviders } from './providers'
 import { runVoiceAction } from './voiceActions'
 import { settings } from '../lib/settings'
 import { captureAudioContext } from './contextCapture'
+import { recordingSetupIssue, type RecordingIssue } from '../../shared/recordingFeedback'
+import type { OwnedPracticeTarget, PracticeTarget } from '../../shared/featureTour'
 
 const log = createLogger('recording-machine')
 export type RecorderPhase = 'idle' | 'long_pressing' | 'starting' | 'recording' | 'finishing' | 'error'
@@ -27,6 +29,7 @@ export interface RecorderContext {
   handsFree: boolean
   mode: Mode
   error: string | null
+  issue: RecordingIssue | null
 }
 export interface RecordingMachineState { phase: RecorderPhase; context: RecorderContext }
 type MachineEvent = { type: 'PRESS' | 'RELEASE' | 'STARTED' | 'FINISH' | 'CANCEL' | 'RETRY' | 'TIMEOUT' | 'ERROR'; error?: string }
@@ -36,16 +39,42 @@ type Session = {
   stopped: boolean; stoppedAt?: number; resolveStop?: () => void; stopTimer?: NodeJS.Timeout
   historyRetry?: boolean
   completion?: Promise<void>; historyWritten: boolean
+  practice: OwnedPracticeTarget | null
 }
 
 /** Main owns session identity; renderer owns the microphone and acknowledges its drain. */
 export class RecordingMachine extends EventEmitter {
   private state: RecordingMachineState = { phase: 'idle', context: {
     sessionId: null, recorderState: { isStartingMicrophone: false }, recorderTimeoutState: null,
-    handsFree: false, mode: MODES.VOICE_TRANSCRIPT, error: null
+    handsFree: false, mode: MODES.VOICE_TRANSCRIPT, error: null, issue: null
   } }
   private session: Session | null = null
   private disabled = false
+  private practiceScope: { kind: 'closed' } | { kind: 'blocked'; ownerId: number } | ({ kind: 'ready' } & OwnedPracticeTarget) = { kind: 'closed' }
+
+  blockPractice(ownerId: number): void {
+    if (this.practiceScope.kind !== 'closed' && this.practiceScope.ownerId !== ownerId) throw new Error('A practice is already open in another window')
+    if (this.session && this.session.practice?.ownerId !== ownerId) throw new Error('Finish the current recording first')
+    this.setPracticeTarget(ownerId, null)
+    this.practiceScope = { kind: 'blocked', ownerId }
+  }
+
+  setPracticeTarget(ownerId: number, target: PracticeTarget | null): void {
+    const current = this.practiceScope
+    if (!target && (current.kind === 'closed' || current.ownerId !== ownerId)) return
+    if (target && current.kind !== 'closed' && current.ownerId !== ownerId) throw new Error('A practice is already open in another window')
+    if (target && this.session && this.session.practice?.ownerId !== ownerId) throw new Error('Finish the current recording first')
+    if (current.kind === 'ready' && (current.ownerId !== ownerId || current.target.id !== target?.id)) this.cancel()
+    this.practiceScope = target ? { kind: 'ready', ownerId, target: structuredClone(target) } : { kind: 'closed' }
+  }
+  async startPractice(ownerId: number): Promise<void> {
+    if (this.practiceScope.kind !== 'ready' || this.practiceScope.ownerId !== ownerId) throw new Error('Open a practice first')
+    await this.start(this.practiceScope.target.mode)
+    if (this.session) this.setHandsFree(true)
+  }
+  finishPractice(ownerId: number): Promise<void> {
+    return this.session?.practice?.ownerId === ownerId ? this.finish() : Promise.resolve()
+  }
   private countdown: NodeJS.Timeout | null = null
   private retryInput: { pcm: Float32Array; mode: Mode; durationMs: number; context: AudioContextSnapshot | null; config: Settings } | null = null
 
@@ -57,6 +86,7 @@ export class RecordingMachine extends EventEmitter {
     broadcast(IPC.RECORDING_MACHINE_DISABLED_CHANGED, value)
   }
   private transition(phase: RecorderPhase, patch: Partial<RecorderContext> = {}): void {
+    if (phase !== this.state.phase) log.debug('recorder phase changed', { from: this.state.phase, to: phase, issue: patch.issue?.kind ?? null })
     this.state = { phase, context: { ...this.state.context, ...patch } }
     this.emit('state', this.state)
     broadcast('recording-machine:state', this.state)
@@ -88,6 +118,9 @@ export class RecordingMachine extends EventEmitter {
   }
   switchMode(mode: Mode): void {
     if (!this.session || !['starting', 'recording'].includes(this.state.phase)) return
+    if (this.session.practice && mode !== this.session.practice.target.mode) return
+    const issue = recordingSetupIssue(this.session.config, mode)
+    if (issue) { this.showSetupIssue(mode, issue); return }
     this.session.mode = mode
     this.transition(this.state.phase, { mode })
   }
@@ -120,16 +153,34 @@ export class RecordingMachine extends EventEmitter {
   private newSession(mode: Mode): Session {
     return { id: randomUUID(), startedAt: Date.now(), mode, frames: [],
       context: Promise.resolve(null), config: structuredClone(settings.get()),
-      controller: new AbortController(), stopped: false, historyWritten: false }
+      controller: new AbortController(), stopped: false, historyWritten: false, practice: this.practiceScope.kind === 'ready' ? { ownerId: this.practiceScope.ownerId, target: structuredClone(this.practiceScope.target) } : null }
+  }
+  private showSetupIssue(mode: Mode, issue: RecordingIssue): void {
+    this.releaseSession()
+    this.retryInput = null
+    this.transition('error', { sessionId: null, mode, error: issue.message, issue,
+      handsFree: false, recorderState: { isStartingMicrophone: false }, recorderTimeoutState: null })
   }
   async start(mode?: Mode): Promise<void> {
     if (this.disabled || this.session || this.state.phase === 'long_pressing') return
-    const session = this.newSession(mode ?? settings.get().dictationMode)
+    const requestedMode = mode ?? settings.get().dictationMode
+    if (this.practiceScope.kind === 'blocked' || this.practiceScope.kind === 'ready' && requestedMode !== this.practiceScope.target.mode) return
+    const issue = recordingSetupIssue(settings.get(), requestedMode)
+    if (issue) { this.showSetupIssue(requestedMode, issue); return }
+    const session = this.newSession(requestedMode)
     this.session = session
     this.retryInput = null
     // Capture the target before any renderer can focus a window.
-    session.context = captureAudioContext().catch(err => { log.warn('context capture failed', err); return null })
-    this.transition('starting', { sessionId: session.id, mode: session.mode, error: null,
+    if (session.practice) {
+      session.config.historyEnabled = false
+      session.config.saveAudio = false
+      const target = session.practice.target
+      session.context = Promise.resolve({ focusedApp: null, visibleText: null,
+        focusedInput: { role: target.kind === 'rewrite' ? 'AXTextArea' : 'AXStaticText', valuePreview: 'selectedText' in target ? target.selectedText : '', selectedText: 'selectedText' in target ? target.selectedText : '', isSecure: false, bounds: null } })
+    } else {
+      session.context = captureAudioContext().catch(err => { log.warn('context capture failed', err); return null })
+    }
+    this.transition('starting', { sessionId: session.id, mode: session.mode, error: null, issue: null,
       handsFree: false, recorderState: { isStartingMicrophone: true }, recorderTimeoutState: null })
     this.countdown = setInterval(() => {
       if (!this.active(session)) return
@@ -175,6 +226,10 @@ export class RecordingMachine extends EventEmitter {
     this.retryInput = null
     this.transition('idle', { sessionId: null, recorderState: { isStartingMicrophone: false }, handsFree: false, recorderTimeoutState: null })
     this.emit('result', result)
+    if (session.practice) {
+      this.emit('practice-result', { ownerId: session.practice.ownerId, targetId: session.practice.target.id, transcript: result.transcript, text: result.refined })
+      return
+    }
     if (result.delivery === 'card') {
       interactiveCardWindow.setPayload({ id: result.id, mode: result.mode, title: result.transcript,
         question: result.transcript, selectedText: input.context?.focusedInput?.selectedText ?? null,
@@ -185,29 +240,34 @@ export class RecordingMachine extends EventEmitter {
     broadcast(IPC.PAGE_FLOATING_BAR_CLICK, 'done', result)
     broadcast('history:changed')
   }
-  cancel(): void {
+  private releaseSession(): Session | null {
     const session = this.session
     this.session = null
-    this.retryInput = null
     this.stopCountdown()
     if (session) {
       session.controller.abort()
       clearTimeout(session.stopTimer)
       session.resolveStop?.()
-      if (session.historyWritten) history.upsertHistory({ id: session.id, status: HISTORY_STATUS.CANCELLED })
       session.frames = []
     }
-    this.transition('idle', { sessionId: null, recorderState: { isStartingMicrophone: false }, recorderTimeoutState: null, handsFree: false, error: null })
+    return session
+  }
+  cancel(): void {
+    const session = this.releaseSession()
+    this.retryInput = null
+    if (session?.historyWritten) history.upsertHistory({ id: session.id, status: HISTORY_STATUS.CANCELLED })
+    this.transition('idle', { sessionId: null, recorderState: { isStartingMicrophone: false }, recorderTimeoutState: null, handsFree: false, error: null, issue: null })
     this.emit('cancel')
   }
   private fail(session: Session, err: unknown): void {
     const message = err instanceof Error ? err.message : String(err)
     log.error('voice flow failed', { message })
-    const retryInput = this.retryInput
-    this.cancel()
-    this.retryInput = retryInput
+    const issue: RecordingIssue = this.state.phase === 'starting' || this.state.phase === 'recording'
+      ? { kind: 'microphone', message }
+      : { kind: 'processing', message, canRetry: this.retryInput !== null }
+    this.releaseSession()
     if (session.historyWritten) history.upsertHistory({ id: session.id, status: HISTORY_STATUS.FAILED, debugInfo: message })
-    this.transition('error', { error: message })
+    this.transition('error', { sessionId: null, error: message, issue, recorderState: { isStartingMicrophone: false }, handsFree: false, recorderTimeoutState: null })
     broadcast(IPC.PAGE_FLOATING_BAR_CLICK, 'error', message)
     broadcast('history:changed')
   }
@@ -221,11 +281,12 @@ export class RecordingMachine extends EventEmitter {
     const session = this.newSession(this.retryInput.mode)
     session.config = structuredClone(this.retryInput.config)
     this.session = session
-    this.transition('finishing', { sessionId: session.id, mode: session.mode, error: null })
+    this.transition('finishing', { sessionId: session.id, mode: session.mode, error: null, issue: null })
     try { await this.complete(session, this.retryInput) }
     catch (err) { if (this.active(session)) this.fail(session, err) }
   }
   async retryHistory(id: string): Promise<void> {
+    if (this.practiceScope.kind !== 'closed') throw new Error('Exit the practice before retrying history')
     if (this.session || this.disabled) throw new Error("Wait for the current recording to finish processing")
     const row = history.getHistory(id)
     if (!row?.audioLocalPath) throw new Error("No audio was saved for this recording, so it cannot be retried")
@@ -234,7 +295,7 @@ export class RecordingMachine extends EventEmitter {
     session.historyRetry = true
     this.retryInput = null
     this.session = session
-    this.transition('finishing', { sessionId: id, mode: session.mode, error: null })
+    this.transition('finishing', { sessionId: id, mode: session.mode, error: null, issue: null })
     let context: AudioContextSnapshot | null = null
     try { context = row.audioContext ? JSON.parse(row.audioContext) : null } catch { /* older record */ }
     try { await this.complete(session, { pcm: new Float32Array(), mode: session.mode, durationMs: row.duration ?? 0, context, audioPath: row.audioLocalPath }) }
@@ -265,7 +326,8 @@ export class RecordingMachine extends EventEmitter {
     }
     let refined = result.text
     if (result.text && (input.mode === 'ask_anything' || input.mode === 'translation')) {
-      refined = await runVoiceAction({ transcript: result.text, mode: input.mode, context: input.context, config, signal: session.controller.signal })
+      refined = await runVoiceAction({ transcript: result.text, mode: input.mode, context: input.context, config, signal: session.controller.signal,
+        action: session.practice?.target.kind === 'rewrite' ? 'rewrite' : 'question' })
     } else if (result.text) {
       try {
         refined = (await createProviders(config.provider, config.serviceProviders).refinement.refine({ transcript: result.text, mode: input.mode,
@@ -274,7 +336,7 @@ export class RecordingMachine extends EventEmitter {
     }
     this.requireActive(session)
     let delivery: VoiceFlowResult['delivery'] = 'card'
-    if (input.mode !== 'ask_anything' && !session.historyRetry) {
+    if (!session.practice && input.mode !== 'ask_anything' && !session.historyRetry) {
       const outcome = await insertText(refined, { addTrailingSpace: config.addTrailingSpace, isCancelled: () => !this.active(session) })
       delivery = outcome.ok ? 'insert' : 'clipboard'
     }

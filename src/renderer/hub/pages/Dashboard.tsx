@@ -1,89 +1,67 @@
+import { useEffect, useRef, useState } from 'react'
 import { useAppText } from '../../shared/i18n/useAppText'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { z } from 'zod'
 import { shortcutLabels } from '../../../shared/settingsControls'
-import { api, bridge } from '../../shared/utils/bridge'
+import { api } from '../../shared/utils/bridge'
 import { toast } from '../../shared/components/Toast'
 import { useAppSettings } from '../../shared/state/settings'
-import { useRecordingPhase } from '../state/recording'
-import { ActivityHeatmap } from '../components/ActivityHeatmap'
-import { buildActivity, historyActivitySchema, type ActivitySummary } from '../../../shared/activity'
-import { dictationUsageSchema, type DictationUsage } from '../../../shared/usage'
+import { SpeechFlow } from '../components/SpeechFlow'
+import { HomeFooter } from '../components/HomeFooter'
+import { Icon } from '../../shared/components/Icons'
 
-const APPLICATIONS = [
-  { name: 'Gmail', url: 'https://mail.google.com/' },
-  { name: 'Slack', url: 'https://app.slack.com/' },
-  { name: 'ChatGPT', url: 'https://chatgpt.com/' },
-  { name: 'Notion', url: 'https://www.notion.so/' },
-  { name: 'Google Docs', url: 'https://docs.google.com/' }
-]
-const versionSchema = z.object({ appVersion: z.string() })
-type Usage = { status: 'loading' } | { status: 'error' } | { status: 'ready'; stats: DictationUsage; activity: ActivitySummary }
 let hasEntered = false
 
 export function DashboardPage() {
+  const canvas = useRef<HTMLDivElement>(null)
   const t = useAppText()
   const { settings, loaded } = useAppSettings()
   const [animateEntry] = useState(() => !hasEntered)
-  const { phase } = useRecordingPhase()
-  const [usage, setUsage] = useState<Usage>({ status: 'loading' })
-  const [version, setVersion] = useState<string | null>(null)
-  const [activeShortcut, setActiveShortcut] = useState(0)
-  const usageRequest = useRef(0)
-  const mounted = useRef(false)
-  const loadUsage = useCallback(async () => {
-    const request = ++usageRequest.current
-    setUsage(current => current.status === 'ready' ? current : { status: 'loading' })
-    try {
-      const [usageResult, activityResult] = await Promise.all([api.history.usage(), api.history.activity()])
-      const stats = dictationUsageSchema.parse(usageResult)
-      const activity = buildActivity(historyActivitySchema.parse(activityResult))
-      if (mounted.current && request === usageRequest.current) setUsage({ status: 'ready', activity, stats })
-    } catch {
-      if (mounted.current && request === usageRequest.current) setUsage({ status: 'error' })
-    }
-  }, [])
+  useEffect(() => { hasEntered = true }, [])
   useEffect(() => {
-    let active = true
-    hasEntered = true
-    mounted.current = true
-    void loadUsage()
-    void api.app.systemInfo().then((value: unknown) => {
-      const result = versionSchema.safeParse(value)
-      if (active && result.success) setVersion(result.data.appVersion)
-    }).catch(() => undefined)
-    const offHistory = bridge.on('history:changed', loadUsage)
-    window.addEventListener('focus', loadUsage)
-    return () => { active = false; mounted.current = false; offHistory?.(); window.removeEventListener('focus', loadUsage) }
-  }, [loadUsage])
+    const page = canvas.current
+    const shortcuts = page?.querySelector<HTMLElement>('.home-shortcuts')
+    const flow = page?.querySelector<HTMLElement>('.home-speech-flow')
+    const footer = page?.querySelector<HTMLElement>('.home-footer')
+    if (!page || !shortcuts || !flow || !footer) return
+    const alignShortcuts = () => {
+      if (innerWidth <= 680) { page.style.removeProperty('--home-shortcut-shift'); return }
+      const pill = [...flow.querySelectorAll<SVGPathElement>('path[fill="rgb(254,254,233)"]')]
+        .map(path => path.getBoundingClientRect()).find(rect => rect.height > 0)
+      if (!pill) return
+      const row = shortcuts.getBoundingClientRect()
+      const previous = parseFloat(page.style.getPropertyValue('--home-shortcut-shift')) || 0
+      const naturalTop = row.top - previous
+      const targetTop = (pill.bottom + footer.getBoundingClientRect().top - row.height) / 2
+      page.style.setProperty('--home-shortcut-shift', `${Math.max(0, targetTop - naturalTop)}px`)
+    }
+    const resize = new ResizeObserver(alignShortcuts)
+    ;[page, shortcuts, flow, footer, ...page.querySelectorAll('.home-headline,.home-intro')].forEach(el => resize.observe(el))
+    const ready = new MutationObserver(alignShortcuts)
+    ready.observe(flow, { attributes: true, attributeFilter: ['data-ready'] })
+    page.addEventListener('animationend', alignShortcuts)
+    alignShortcuts()
+    return () => { resize.disconnect(); ready.disconnect(); page.removeEventListener('animationend', alignShortcuts) }
+  }, [])
   const shortcuts = [
     { label: "Dictate", ordinal: '01', binding: settings.shortcut },
     { label: "Translate", ordinal: '02', binding: settings.translationShortcut },
     { label: "Ask anything", ordinal: '03', binding: settings.askAnythingShortcut }
   ]
   const openSettings = () => { void api.page.openSettings('settings').catch(() => toast.error("Could not open settings. Please try again.")) }
-  return <div className={'home-canvas' + (animateEntry ? ' home-enter' : '')} data-recording-phase={phase}>
+  return <div ref={canvas} className={'home-canvas' + (animateEntry ? ' home-enter' : '')}>
     <div className="home-composition">
       <section className="home-manifesto" aria-labelledby="home-title">
-        <h1 className="page-title home-headline" id="home-title" aria-label={t("Speak more. Type less.")}><span>{t("SPEAK MORE.")}</span><span>{t("TYPE LESS.")}</span></h1>
-        <p className="home-intro">{t("Let expression feel as natural as conversation.")}</p>
-        <div className="home-shortcuts" aria-label={t("Voice shortcuts")} onMouseLeave={() => setActiveShortcut(0)}>
-          <span className="home-shortcut-highlight" aria-hidden="true" style={{ transform: `translateY(${activeShortcut * 100}%)` }} />
-          {shortcuts.map((shortcut, index) => <button key={shortcut.ordinal} className="home-shortcut" onMouseEnter={() => setActiveShortcut(index)} onFocus={() => setActiveShortcut(index)} onBlur={() => setActiveShortcut(0)} onClick={openSettings} title={t(`Change ${t(shortcut.label)} shortcut`)}>
-            <span className="home-shortcut-name">{t(shortcut.label)}<small>{shortcut.ordinal}</small></span>
-            <span className="home-shortcut-binding">{!loaded ? <span>{t("Loading")}</span> : !shortcut.binding.enabled ? <span>{t("Disabled")}</span> : shortcutLabels(shortcut.binding.accelerator).map((key, keyIndex) => <kbd key={keyIndex}>{key === 'CommandOrControl' ? t('Command / Control') : key}</kbd>)}</span>
+        <h1 className="page-title home-headline" id="home-title" aria-label={t('Speak freely. Write brilliantly.')}><span>{t('Speak freely.')}</span><span>{t('Write brilliantly.')}</span></h1>
+        <p className="home-intro"><svg className="home-intro-ornament is-left" aria-hidden="true" viewBox="0 0 54 32" fill="none"><path d="M1 16h11m8-4v8m7-12v16m7-11v6m8-3h11" /></svg><span className="home-intro-positioning">{t('SayRel, the next-gen AI voice tool')}</span><span className="home-intro-separator">—</span><span className="home-intro-benefit">{t('turning your raw thoughts into polished text in real time.')}</span><svg className="home-intro-ornament is-right" aria-hidden="true" viewBox="0 0 54 32" fill="none"><path d="M1 16h11m8-4v8m7-12v16m7-11v6m8-3h11" /></svg></p>
+        <SpeechFlow />
+        <div className="home-shortcuts" aria-label={t("Voice shortcuts")}>
+          {shortcuts.map((shortcut, index) => <button key={shortcut.ordinal} className="home-shortcut" onClick={openSettings} title={t(`Change ${t(shortcut.label)} shortcut`)}>
+            <span className="home-shortcut-binding">{!loaded ? <span>{t("Loading")}</span> : !shortcut.binding.enabled ? <span>{t("Disabled")}</span> : shortcutLabels(shortcut.binding.accelerator).map((key, keyIndex) => <span className="home-shortcut-key" key={keyIndex}>{keyIndex > 0 && <span className="home-key-plus" aria-hidden="true">+</span>}<kbd>{key === 'CommandOrControl' ? t('Command / Control') : key}</kbd></span>)}</span>
+            <span className="home-shortcut-copy"><span className="home-shortcut-name">{t(shortcut.label)}</span>{index === 0 && <span className="home-shortcut-detail">{t('Press your shortcut, then speak.')}</span>}</span>
+            <Icon name="arrow" className="home-shortcut-arrow" />
           </button>)}
         </div>
       </section>
-      <ActivityHeatmap state={usage} onRetry={() => void loadUsage()} />
     </div>
-    <section className="home-applications" aria-label={t("Use Sayrel in your everyday apps")}>
-      <p>{t("IN THE APPS YOU KNOW")}</p>
-      <div className="home-stamps">{APPLICATIONS.map((app, index) => <button key={app.name} className="home-stamp" onClick={() => void api.page.openUrl(app.url).catch(() => toast.error("Could not open the app. Please try again."))} aria-label={t("Open " + app.name)} title={t("Open " + app.name)}><span>{app.name}</span><small>0{index + 1}</small><span className="home-stamp-arrow" aria-hidden="true">↗</span></button>)}</div>
-    </section>
-    <footer className="home-footer">
-      <span className="home-credit">Builded By Yohoia</span>
-      <div className="home-version">{version && <span>v{version}</span>}</div>
-    </footer>
+    <HomeFooter />
   </div>
 }

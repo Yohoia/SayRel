@@ -102,7 +102,7 @@ app.whenReady().then(async () => {
     await shot('settings-' + title)
   }
   await clickText('.settings-content button', "Start")
-  await waitFor("!!document.querySelector('.settings-tour')")
+  await waitFor("!!document.querySelector('.tour-feature-cards')")
   await shot('settings-feature-tour'); await closeDialog()
   await clickText('.settings-nav-item', "Settings")
   await win.webContents.executeJavaScript("document.querySelector('button[aria-label=\"Interface language\"]').click()")

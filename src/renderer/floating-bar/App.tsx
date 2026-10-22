@@ -1,6 +1,8 @@
 import { useAppText } from '../shared/i18n/useAppText'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { z } from 'zod'
 import { DEFAULT_SETTINGS, type Settings } from '../../shared/settings'
+import { recordingIssueSchema, recordingStateSchema, type RecordingIssue } from '../../shared/recordingFeedback'
 import { api } from '../shared/utils/bridge'
 import { Waveform } from './Waveform'
 import { startRecorder, type RecorderHandle } from './audio'
@@ -8,28 +10,25 @@ import { RecorderSessionController } from './sessionController'
 import { useHotkeyState } from './useHotkeyState'
 import { ShimmerText } from './ShimmerText'
 import { StatusIcons } from './StatusIcons'
+import { recordingBarAppearance, handsFreeBarAppearance, cancelRecordingActionAppearance, finishRecordingActionAppearance } from './appearance'
 import { Icon } from '../shared/components/Icons'
+import { FloatingAlert } from './FloatingAlert'
 import './styles.css'
 
-type BarStatus =
-  | 'idle-hidden'
-  | 'hover'
-  | 'starting-microphone'
-  | 'recording'
-  | 'recording-dictating'
-  | 'hands-free'
-  | 'hands-free-dictating'
-  | 'error'
-  | 'long-pressing'
+const barPreviewSchema = z.object({
+  status: z.enum(['idle-hidden', 'hover', 'starting-microphone', 'recording', 'recording-dictating', 'hands-free', 'hands-free-dictating', 'error', 'long-pressing']),
+  countdown: z.string().optional(), error: z.string().optional(), mode: z.string().optional(), issue: recordingIssueSchema.optional()
+})
+type BarStatus = z.infer<typeof barPreviewSchema>['status']
 
 const BASE_STYLE = {
   opacity: 0.5,
-  background: 'var(--paper)',
+  background: recordingBarAppearance.background,
   width: 40,
   height: 6,
-  borderRadius: 8,
+  borderRadius: recordingBarAppearance.borderRadius,
   boxShadow:
-    'var(--shadow-popover)',
+    recordingBarAppearance.boxShadow,
   transition: 'all 0.2s cubic-bezier(0.05, 0.6, 0.4, 0.95)',
   willChange: 'opacity, transform, background-color, width, height',
   backfaceVisibility: 'hidden' as const,
@@ -39,10 +38,10 @@ const BASE_STYLE = {
 const SIZES = {
   padX: 6,
   padY: 4,
-  height: 34,
-  width: 70,
-  handsFreeWidth: 116,
-  border: '1px solid var(--line-strong)'
+  height: recordingBarAppearance.height,
+  width: recordingBarAppearance.width,
+  handsFreeWidth: handsFreeBarAppearance.width,
+  border: recordingBarAppearance.border
 }
 
 export function FloatingBarApp() {
@@ -51,6 +50,11 @@ export function FloatingBarApp() {
   const [hover, setHover] = useState(false)
   const [countdown, setCountdown] = useState<string | null>(null)
   const [errorText, setErrorText] = useState<string | null>(null)
+  const [issue, setIssue] = useState<RecordingIssue | null>(null)
+  const [actionBusy, setActionBusy] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [showHoverTip, setShowHoverTip] = useState(false)
+  const alertRef = useRef<HTMLDivElement>(null)
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   const languageChoicesRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -76,9 +80,13 @@ export function FloatingBarApp() {
     })
     let disposed = false
     let receivedState = false
-    const update = (state: any) => {
-      if (disposed || !state) return
+    const update = (value: unknown) => {
+      const parsed = recordingStateSchema.safeParse(value)
+      if (disposed || !parsed.success) return
+      const state = parsed.data
       controller.sync(state)
+      setIssue(state.context.issue ?? null)
+      setActionError(null)
       if (state.context?.mode) setMode(state.context.mode)
       if (state.phase === 'starting') { setStatus('starting-microphone'); setErrorText(null) }
       if (state.phase === 'recording') setStatus(state.context?.handsFree ? 'hands-free' : 'recording')
@@ -87,13 +95,13 @@ export function FloatingBarApp() {
       if (state.phase === 'long_pressing') setStatus('long-pressing')
       if (state.phase === 'error') { setStatus('error'); setErrorText(state.context?.error || "Transcription failed. Please try again.") }
       const timeout = state.context?.recorderTimeoutState
-      if (timeout?.remainingTime > 0 && timeout.timeUntilCountdown <= 0) {
+      if (timeout && timeout.remainingTime > 0 && timeout.timeUntilCountdown <= 0) {
         const total = Math.floor(timeout.remainingTime)
         setCountdown(`${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`)
       } else setCountdown(null)
     }
-    const off = window.sayrel?.on?.('recording-machine:state', (state: any) => { receivedState = true; update(state) })
-    void api.recording.state().then((state: any) => { if (!receivedState) update(state) }).catch(() => undefined)
+    const off = window.sayrel?.on?.('recording-machine:state', (state: unknown) => { receivedState = true; update(state) })
+    void api.recording.state().then((state: unknown) => { if (!receivedState) update(state) }).catch(() => undefined)
     return () => { disposed = true; off?.(); void controller.dispose() }
   }, [])
 
@@ -109,8 +117,11 @@ export function FloatingBarApp() {
         left: window.screenX + rect.left, top: window.screenY + rect.top,
         right: window.screenX + rect.right, bottom: window.screenY + rect.bottom
       }]
-      const choices = languageChoicesRef.current?.getBoundingClientRect()
-      if (choices) regions.push({ left: window.screenX + choices.left, top: window.screenY + choices.top, right: window.screenX + choices.right, bottom: window.screenY + choices.bottom })
+      for (const element of [alertRef.current, languageChoicesRef.current]) {
+        if (!element) continue
+        const bounds = element.getBoundingClientRect()
+        regions.push({ left: window.screenX + bounds.left, top: window.screenY + bounds.top, right: window.screenX + bounds.right, bottom: window.screenY + bounds.bottom })
+      }
       const serialized = JSON.stringify(regions)
       if (serialized === previous) return
       previous = serialized
@@ -123,20 +134,24 @@ export function FloatingBarApp() {
 
   const click = (action: 'start' | 'finish' | 'cancel' | 'retry') => {
     void api.page.floatingBarClick(action).catch((error: unknown) => {
+      setIssue(null)
       setErrorText(error instanceof Error ? error.message : "Could not update the recording status. Please try again.")
       setStatus('error')
     })
   }
 
   // Screenshot fixtures can display a state without starting a real recording.
-  const [preview, setPreview] = useState<{ status: BarStatus; countdown?: string; error?: string; mode?: string } | null>(null)
+  const [preview, setPreview] = useState<z.infer<typeof barPreviewSchema> | null>(null)
   useEffect(() => {
     if (document.documentElement.dataset.uiReview !== 'fixture') return
     const show = (event: Event) => {
-      const detail = (event as CustomEvent).detail
-      const allowed: BarStatus[] = ['idle-hidden', 'hover', 'starting-microphone', 'recording', 'recording-dictating', 'hands-free', 'hands-free-dictating', 'error', 'long-pressing']
+      if (!(event instanceof CustomEvent)) return
+      const detail: unknown = event.detail
       if (detail === null) setPreview(null)
-      else if (allowed.includes(detail?.status)) setPreview(detail)
+      else {
+        const parsed = barPreviewSchema.safeParse(detail)
+        if (parsed.success) setPreview(parsed.data)
+      }
     }
     const params = new URLSearchParams(window.location.search)
     if (params.has('state')) show(new CustomEvent('sayrel:ui-review-floating-bar', { detail: {
@@ -151,11 +166,40 @@ export function FloatingBarApp() {
   const visibleStatus = preview?.status ?? status
   const visibleCountdown = preview?.countdown ?? countdown
   const visibleError = preview?.error ?? errorText
+  const visibleIssue = useMemo<RecordingIssue | null>(() => preview?.issue ?? issue ?? (visibleError ? { kind: 'processing', message: visibleError, canRetry: false } : null), [preview, issue, visibleError])
   const visibleMode = preview?.mode ?? mode
   const style = useMemo(() => computeStyle(visibleStatus, !!visibleCountdown), [visibleStatus, visibleCountdown])
   const refining = visibleStatus === 'recording-dictating' || visibleStatus === 'hands-free-dictating'
-  const handsFree = visibleStatus === 'hands-free'
-  const showWaveform = visibleStatus === 'recording' || handsFree
+  const handsFree = visibleStatus === 'hands-free' || visibleStatus === 'hands-free-dictating'
+  const showWaveform = visibleStatus === 'recording' || visibleStatus === 'hands-free'
+  useEffect(() => {
+    if (!hover || visibleStatus !== 'hover') { setShowHoverTip(false); return }
+    const timer = window.setTimeout(() => setShowHoverTip(true), 250)
+    return () => window.clearTimeout(timer)
+  }, [hover, visibleStatus])
+  const dismissAlert = () => {
+    setActionError(null)
+    if (preview) { setPreview(null); return }
+    click('cancel')
+  }
+  const actOnIssue = async () => {
+    if (!visibleIssue || actionBusy || preview) return
+    setActionBusy(true)
+    setActionError(null)
+    try {
+      if (visibleIssue.kind === 'provider-setup') {
+        await api.page.openHub('/providers')
+        await api.page.floatingBarClick('cancel')
+      } else if (visibleIssue.kind === 'microphone') {
+        await api.page.openHub('/settings')
+        await api.page.floatingBarClick('cancel')
+      } else {
+        await api.page.floatingBarClick(visibleIssue.canRetry ? 'retry' : 'start')
+      }
+    } catch {
+      setActionError('Could not open the next step. Please try again.')
+    } finally { setActionBusy(false) }
+  }
   const onPointerEnter = () => {
     setHover(true)
     if (!preview && status === 'idle-hidden') setStatus('hover')
@@ -168,7 +212,7 @@ export function FloatingBarApp() {
   return (
     <div className="floating-bar-surface">
       <style>{t(`@keyframes loadingMove { 0% { transform: translateX(-27px); } 100% { transform: translateX(54px); } }`)}</style>
-      {visibleStatus === 'error' && visibleError && <div style={errorBubbleStyle}>{t(visibleError)}</div>}
+      {visibleStatus === 'error' && visibleIssue && <FloatingAlert issue={visibleIssue} busy={actionBusy} actionError={actionError} alertRef={alertRef} onDismiss={dismissAlert} onAction={() => void actOnIssue()} />}
       {visibleStatus === 'long-pressing' && <div role="status" style={errorBubbleStyle}>{t("Tap to start. Tap again to finish recording.")}</div>}
       <div
         ref={pillRef}
@@ -178,21 +222,21 @@ export function FloatingBarApp() {
         onPointerLeave={onPointerLeave}
         role={visibleStatus === 'hover' || visibleStatus === 'error' || visibleStatus === 'idle-hidden' ? 'button' : undefined}
         tabIndex={visibleStatus === 'hover' || visibleStatus === 'error' ? 0 : -1}
-        onClick={() => { if (!preview && ['idle-hidden', 'hover', 'error'].includes(status)) click(status === 'error' ? 'retry' : 'start') }}
-        onKeyDown={(event) => { if (!preview && (event.key === 'Enter' || event.key === ' ') && ['hover', 'error'].includes(status)) { event.preventDefault(); click(status === 'error' ? 'retry' : 'start') } }}
+        onClick={() => { if (!preview && ['idle-hidden', 'hover', 'error'].includes(status)) { if (status === 'error') void actOnIssue(); else click('start') } }}
+        onKeyDown={(event) => { if (!preview && (event.key === 'Enter' || event.key === ' ') && ['hover', 'error'].includes(status)) { event.preventDefault(); if (status === 'error') void actOnIssue(); else click('start') } }}
         aria-label={t("Recording status")}
         style={{ ...BASE_STYLE, ...style, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto', cursor: ['idle-hidden', 'hover', 'error'].includes(visibleStatus) ? 'pointer' : undefined }}
       >
         {['voice_command', 'translation'].includes(visibleMode) && <div className={`floating-mode-glow ${visibleMode === 'translation' ? 'is-translation' : ''}`} aria-hidden="true"><div /></div>}
-        {visibleStatus === 'hover' && hover && <span className="floating-tooltip" role="tooltip">{t("Click to start dictating")}</span>}
+        {showHoverTip && <span className="floating-tooltip" role="tooltip">{t("Click to start dictating")}</span>}
         {(visibleStatus === 'hover' || visibleStatus === 'error') && <StatusIcons status={visibleStatus} />}
-        {showWaveform && <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', height: 24, overflow: handsFree ? 'visible' : 'hidden' }}>
-          {handsFree && <button className="floating-action" style={cancelButtonStyle} aria-label={t("Cancel dictation")} onClick={() => { if (!preview) click('cancel') }}><Icon name="close" size={16} /><span className="floating-tooltip" role="tooltip">{t("Cancel")}</span></button>}
-          <div style={{ width: 38, flexShrink: 0, margin: '0 8px' }}><Waveform analyser={recorder?.analyser ?? null} active width={38} /></div>
-          {visibleCountdown && <span style={{ width: 32, marginRight: 8, flexShrink: 0, fontSize: 12, lineHeight: '16px', fontWeight: 400, color: 'var(--ink)' }}>{visibleCountdown}</span>}
-          {handsFree && <button className="floating-action" style={finishButtonStyle} aria-label={t("Finish dictation")} onClick={() => { if (!preview) click('finish') }}><Icon name="check" size={16} /><span className="floating-tooltip" role="tooltip">{t("Finish")}<kbd>{hotkey.shortcutLabel}</kbd></span></button>}
+        {(showWaveform || refining) && <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', height: 24, overflow: handsFree ? 'visible' : 'hidden' }}>
+          {handsFree && <button className="floating-action" style={cancelButtonStyle} disabled={refining} aria-label={t("Cancel dictation")} onClick={() => { if (!preview) click('cancel') }}><Icon name="close" size={16} /><span className="floating-tooltip" role="tooltip">{t("Cancel")}</span></button>}
+          {showWaveform && <div style={{ width: 38, flexShrink: 0, margin: '0 8px' }}><Waveform analyser={recorder?.analyser ?? null} active width={38} /></div>}
+          {visibleCountdown && !refining && <span style={{ width: 32, marginRight: 8, flexShrink: 0, fontSize: 12, lineHeight: '16px', fontWeight: 400, color: 'var(--ink)' }}>{visibleCountdown}</span>}
+          {refining && <RefiningContent />}
+          {handsFree && <button className="floating-action" style={finishButtonStyle} disabled={refining} aria-label={t("Finish dictation")} onClick={() => { if (!preview) click('finish') }}><Icon name="check" size={16} /><span className="floating-tooltip" role="tooltip">{t("Finish")}<kbd>{hotkey.shortcutLabel}</kbd></span></button>}
         </div>}
-        {refining && <RefiningContent />}
         {visibleStatus === 'starting-microphone' && <div style={shimmerOverlayStyle()} />}
       </div>
       {visibleMode === 'translation' && ['starting-microphone', 'recording', 'hands-free'].includes(visibleStatus) && <div ref={languageChoicesRef} className="floating-language-choices" role="group" aria-label={t("Translation targets")}>{settings.translationTargetLanguages.map(code => <button key={code} aria-pressed={settings.translationTargetLanguage === code} onClick={() => { if (!preview) void api.page.floatingBarClick('translation-language', code) }}>{new Intl.DisplayNames([settings.language ?? 'en'], { type: 'language' }).of(code) ?? code}</button>)}</div>}
@@ -205,11 +249,11 @@ function computeStyle(status: BarStatus, hasCountdown: boolean): React.CSSProper
   const base: React.CSSProperties = { ...BASE_STYLE }
   if (status === 'idle-hidden' || status === 'long-pressing') return { ...base, opacity: 0 }
   const refining = status === 'recording-dictating' || status === 'hands-free-dictating'
-  const handsFree = status === 'hands-free'
+  const handsFree = status === 'hands-free' || status === 'hands-free-dictating'
   const starting = status === 'starting-microphone'
   return {
     ...base,
-    width: starting ? 54 : refining ? 92 : (handsFree ? SIZES.handsFreeWidth : SIZES.width) + (hasCountdown && status === 'recording' || hasCountdown && handsFree ? 40 : 0),
+    width: starting ? 54 : refining ? (handsFree ? SIZES.handsFreeWidth : SIZES.width + 12) : (handsFree ? SIZES.handsFreeWidth : SIZES.width) + (hasCountdown && status === 'recording' || hasCountdown && handsFree ? 40 : 0),
     height: starting ? 12 : SIZES.height,
     padding: handsFree || refining ? '4px' : '4px 6px',
     background: 'var(--paper)',
@@ -241,12 +285,12 @@ function RefiningContent() {
   }, [])
   return <>
     <div aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 8, overflow: 'hidden', pointerEvents: 'none' }}><div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${progress}%`, background: 'var(--fill-selected)' }} /></div>
-    <div style={{ position: 'relative', zIndex: 1, width: 90, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ShimmerText active fontSize={14} fontWeight={450} lineHeight="16px" speed={64} shimmerWidth={24} waitMs={300} angle={90} dim="var(--ink-tertiary)" high="var(--ink)" blur={3.4}>{t("Thinking")}</ShimmerText></div>
+    <div style={{ position: 'relative', zIndex: 1, flex: 1, minWidth: 0, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ShimmerText active fontSize={14} fontWeight={450} lineHeight="16px" speed={64} shimmerWidth={24} waitMs={300} angle={90} dim="var(--ink-tertiary)" high="var(--ink)" blur={3.4}>{t("Thinking")}</ShimmerText></div>
   </>
 }
 
-const cancelButtonStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: 24, height: 24, padding: 4, borderRadius: 3, background: 'var(--fill-selected)', color: 'var(--ink)', transition: 'width .2s ease-in-out,height .2s ease-in-out,opacity .1s,transform .2s ease-in-out' }
-const finishButtonStyle: React.CSSProperties = { ...cancelButtonStyle, background: 'var(--accent)', color: 'var(--accent-ink)', zIndex: 2 }
+const cancelButtonStyle = cancelRecordingActionAppearance
+const finishButtonStyle = finishRecordingActionAppearance
 
 const errorBubbleStyle: React.CSSProperties = {
   marginBottom: 12,

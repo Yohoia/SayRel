@@ -4,12 +4,14 @@ import { api, bridge } from '../shared/utils/bridge'
 import { TitleBar } from './components/TitleBar'
 import { HubHeader } from './components/HubHeader'
 import { DashboardPage } from './pages/Dashboard'
+import { StatisticsPage } from './pages/Statistics'
 import { HistoryPage } from './pages/History'
 import { DictionaryPage } from './pages/Dictionary'
 import { SettingsPage } from './pages/Settings'
 import { ProvidersPage } from './pages/Providers'
 import { SettingsModalHost } from './components/SettingsModal'
 import { AppSettingsProvider } from '../shared/state/settings'
+import { FeatureTourProvider } from './components/FeatureTour'
 import { ToastViewport } from '../shared/components/Toast'
 import '../shared/styles/hub.css'
 import '../shared/styles/home.css'
@@ -35,12 +37,14 @@ export function HubApp() {
 
   return (
     <AppSettingsProvider>
+      <FeatureTourProvider onOpenProviders={() => { setSettingsOpen(null); void api.page.openHub('/providers') }}>
       <div className="app-shell instrument-home">
         <TitleBar />
         <HubHeader onOpenSettings={(section = 'settings') => setSettingsOpen(section)} />
         <main className={'app-content' + (home ? ' is-home' : '')}>
             <Routes>
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/statistics" element={<StatisticsPage />} />
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/dictionary" element={<DictionaryPage />} />
               <Route path="/settings" element={<SettingsPage />} />
@@ -55,6 +59,7 @@ export function HubApp() {
         />
         <ToastViewport />
       </div>
+      </FeatureTourProvider>
     </AppSettingsProvider>
   )
 }

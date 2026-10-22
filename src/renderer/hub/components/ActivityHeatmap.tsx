@@ -41,12 +41,8 @@ export function ActivityHeatmap({ state, onRetry }: { state: ActivityState; onRe
   return <section className="home-activity" aria-label={t('Recording activity')} aria-busy={state.status === 'loading'}>
     <UsageStats stats={state.status === 'ready' ? state.stats : null} />
     <div className="activity-panel" data-state={state.status}>
-      <div className="activity-metrics">{metrics.map(metric => <div className="activity-metric" key={metric.label}>
-        <div><strong>{state.status === 'ready' ? metric.value.toLocaleString(locale) : '—'}</strong><span>{t(metric.value === 1 ? 'day' : 'days')}</span></div>
-        <p>{t(metric.label)}</p>
-      </div>)}</div>
       <div className="activity-calendar">
-        <span className="activity-period">{t('Last 26 weeks')}</span>
+        <span className="sr-only">{t('Last 26 weeks')}</span>
         <div className="activity-months" aria-hidden="true">{activity.days.map((day, index) => !day.future && ((index === 0 && activity.days[6].date.getMonth() === day.date.getMonth()) || day.date.getDate() === 1)
           ? <span key={day.key} style={{ gridColumn: Math.floor(index / 7) + 1 }}>{monthFormat.format(day.date)}</span> : null)}</div>
         <div className="activity-weekdays" aria-hidden="true">{activity.days.slice(0, 7).map(day => <span key={day.key}>{weekdayFormat.format(day.date)}</span>)}</div>
@@ -69,6 +65,10 @@ export function ActivityHeatmap({ state, onRetry }: { state: ActivityState; onRe
         {state.status === 'error' ? <button className="activity-retry" onClick={onRetry}>{t('Retry')}</button>
           : <div className="activity-legend" aria-label={t('Color shows recordings per day: 0, 1–2, 3–5, 6–9, 10 or more.')}><span>{t('Less')}</span>{[0, 1, 2, 3, 4].map(level => <i data-level={level} key={level} />)}<span>{t('More')}</span></div>}
       </div>
+      <div className="activity-metrics">{metrics.map(metric => <div className="activity-metric" key={metric.label}>
+        <div><strong>{state.status === 'ready' ? metric.value.toLocaleString(locale) : '—'}</strong><span>{t(metric.value === 1 ? 'day' : 'days')}</span></div>
+        <p>{t(metric.label)}</p>
+      </div>)}</div>
     </div>
   </section>
 }

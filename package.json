@@ -28,8 +28,10 @@
     "verify:providers": "node scripts/verify-providers.mjs",
     "verify:regressions": "ELECTRON_RUN_AS_NODE=1 electron scripts/diagnostics/retention.cjs && node scripts/diagnostics/native-callbacks.cjs && node scripts/diagnostics/opus.cjs && ELECTRON_RUN_AS_NODE=1 electron scripts/diagnostics/packaged-db.cjs",
     "verify:home": "node scripts/ui-build.mjs && electron scripts/diagnostics/home-ui.cjs",
+    "verify:hero": "node scripts/ui-build.mjs && electron scripts/diagnostics/wispr-hero.cjs && electron scripts/diagnostics/home-fit.cjs",
     "verify:activity": "ELECTRON_RUN_AS_NODE=1 electron scripts/diagnostics/activity.cjs",
-    "verify:language": "node scripts/ui-build.mjs && electron scripts/diagnostics/language-ui.cjs"
+    "verify:language": "node scripts/ui-build.mjs && electron scripts/diagnostics/language-ui.cjs",
+    "verify:floating": "node scripts/ui-build.mjs && electron scripts/diagnostics/floating-interactions.cjs"
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.16",
@@ -48,6 +50,7 @@
     "electron-updater": "^6.3.9",
     "js-yaml": "^4.1.0",
     "koffi": "^2.11.0",
+    "lottie-web": "5.13.0",
     "node-schedule": "^2.1.1",
     "notistack": "^3.0.2",
     "opusscript": "^0.1.1",

@@ -1,0 +1,26 @@
+{
+  "tracks": [
+    {
+      "viewBox": "0 0 1048 594",
+      "path": "M0.597656 50.924805 \nC17.4612 143.2965 61.94 299.86 398.60 360.27 \nC594.00 395.31 772.77 285.92 668.74 149.27 \nC564.71 12.62 340.74 270.96 667.04 470.42 \nC719.69 506.55 817.468 561.26 1046.43 565.235",
+      "copy": "Umm, hope your week has started well…I was talking to Cheyene earlier but reception was really bad and I think their going to handle the first part of the project, but I’m not totally sure. Also, I told the team the the new timeline should be ready by Friday, although it’s probably going to slip. There’s been a lot of back and forth and honestly the the whole thing’s been kind of chaotic, like nobody really knows what’s going on so can you check in with them and see if the notes from yesterday’s meeting were sent out, or if they’re still waiting. I think Cheyene mentioned it but didn’t confirm, and now I’m a little lost.",
+      "travel": -2947,
+      "duration": 35
+    },
+    {
+      "viewBox": "0 0 1024 620",
+      "path": "M2.04309 563.872C111.592 558.268 316.491 554.016 517.963 490.064C703.017 431.323 875.319 444.531 1021.88 453.216",
+      "copy": "Hope your week is off to a good start. I was talking to Cheyene earlier, but the reception was really bad. I think they’re going to handle the first part of the project, but I’m not totally sure. I also told the team the new timeline should be ready by Friday — although it might slip. There’s been a lot of back and forth, and honestly, the whole thing has been a bit chaotic. It feels like nobody really knows what’s going on. Can you check in with them and see if the notes from yesterday’s meeting were sent out, or if they’re still waiting? I think Cheyene mentioned it, but didn’t confirm — and now I’m a little lost!",
+      "travel": -4018,
+      "duration": 60
+    }
+  ],
+  "provenance": {
+    "archive": "683e1e4368e08951ef7080d5_Flow header animation_toasts_trimmed v2.lottie",
+    "archiveSha256": "6d81a11bbddb069cddad3cc71fc1b16884330be035031da8090f0c6adf7994cd",
+    "animationSha256": "3def4cc61a5cf13c459b62989a51bd6275918d4c1479c1b3409e090f66c19e8a",
+    "font": "682fbd676708c4fa3708edc8_Figtree-SemiBold.woff2",
+    "fontSha256": "9808b0f0b98b4622e8e2a6bc5e2a226431c4e5209b6aa7242793c827e7565ab2",
+    "playerVersion": "5.13.0"
+  }
+}

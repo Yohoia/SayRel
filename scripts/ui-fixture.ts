@@ -1,3 +1,4 @@
+import lottie from 'lottie-web/build/player/lottie_svg'
 import { DEFAULT_SETTINGS, mergeSettings } from '../src/shared/settings'
 import { providerActionSchema, updateProviderState } from '../src/shared/providers'
 import { buildDictationUsage } from '../src/shared/usage'
@@ -129,3 +130,6 @@ const bridge = {
 ;(window as any).sayrel = bridge
 ;(window as any).ipcRenderer = bridge
 document.documentElement.dataset.uiReview = 'fixture'
+
+// Offline-only access to the same player used by the homepage for frame verification.
+Object.assign(window, { __heroPlayer: lottie })

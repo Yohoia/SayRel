@@ -1,5 +1,6 @@
 import { onboardingWindow, openHub } from '../windows'
-import { BrowserWindow, globalShortcut, shell } from 'electron'
+import { BrowserWindow, globalShortcut, shell, webContents, type WebContents } from 'electron'
+import { practiceTargetSchema, type PracticeResult } from '../../shared/featureTour'
 import { join } from 'node:path'
 import { settings } from '../lib/settings'
 import { keyboard, util, input, context } from '../lib/native'
@@ -14,6 +15,38 @@ import type { Handler } from './index'
 const log = createLogger('ipc:misc')
 
 export function registerMiscHandlers(handle: (c: string, f: Handler) => void): void {
+  const practiceOwners = new Set<number>()
+  const trackPracticeOwner = (sender: WebContents) => {
+    const ownerId = sender.id
+    if (practiceOwners.has(ownerId)) return
+    practiceOwners.add(ownerId)
+    const cleanup = () => {
+      recordingMachine.setPracticeTarget(ownerId, null)
+      practiceOwners.delete(ownerId)
+      sender.removeListener('destroyed', cleanup)
+      sender.removeListener('render-process-gone', cleanup)
+    }
+    sender.once('destroyed', cleanup)
+    sender.once('render-process-gone', cleanup)
+  }
+  handle('feature-tour:set-target', (event, raw: unknown) => {
+    const target = raw === null ? null : practiceTargetSchema.parse(raw)
+    const ownerId = event.sender.id
+    recordingMachine.setPracticeTarget(ownerId, target)
+    if (target) trackPracticeOwner(event.sender)
+    return true
+  })
+  handle('feature-tour:start', event => recordingMachine.startPractice(event.sender.id))
+  handle('feature-tour:block', event => { recordingMachine.blockPractice(event.sender.id); trackPracticeOwner(event.sender); return true })
+  handle('feature-tour:finish', event => recordingMachine.finishPractice(event.sender.id))
+  handle('page:set-hub-window-button-visibility', (event, visible: unknown) => {
+    if (typeof visible !== 'boolean') return false
+    if (process.platform === 'darwin') BrowserWindow.fromWebContents(event.sender)?.setWindowButtonVisibility(visible)
+    return true
+  })
+  recordingMachine.on('practice-result', ({ ownerId, ...result }: PracticeResult & { ownerId: number }) => {
+    webContents.fromId(ownerId)?.send('feature-tour:result', result)
+  })
   handle('page:close-onboarding', () => {
     onboardingWindow.closeWindow()
     openHub('main')

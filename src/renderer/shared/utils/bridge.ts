@@ -12,6 +12,11 @@ export const bridge: Bridge =
   typeof window !== 'undefined' ? (window.sayrel ?? window.ipcRenderer) : ({} as Bridge)
 
 export const api = {
+  featureTour: {
+    setTarget: (target: import('../../../shared/featureTour').PracticeTarget | null): Promise<unknown> => bridge.invoke('feature-tour:set-target', target),
+    start: (): Promise<unknown> => bridge.invoke('feature-tour:start'),
+    onResult: (cb: (value: unknown) => void): (() => void) => bridge.on('feature-tour:result', cb)
+  },
   settings: {
     get: () => bridge.invoke('store:use', 'get'),
     patch: (partial: unknown) => bridge.invoke('store:use', 'patch', partial),
