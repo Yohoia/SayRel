@@ -63,6 +63,7 @@ Swift 全局监听 + Electron 录音会话
 npm run typecheck
 npm run verify:voice
 npm run verify:settings
+npm run verify:tour
 npm run verify:providers
 npm run verify:ui
 npm run verify:brand

@@ -1,10 +1,10 @@
 import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { z } from 'zod'
 import { TOUR_FEATURES, TOUR_STEPS, practiceResultSchema, type TourFeature, type TourStep } from '../../../shared/featureTour'
 import { recordingStateSchema } from '../../../shared/recordingFeedback'
 import type { SettingsTextKey } from '../../../shared/interfaceText'
 import { api, bridge } from '../../shared/utils/bridge'
+import { startShortcutCapture, type ShortcutCapture } from '../../shared/shortcutCapture'
 import { useAppSettings } from '../../shared/state/settings'
 import { useAppText } from '../../shared/i18n/useAppText'
 import { Modal } from '../../shared/components/Modal'
@@ -63,8 +63,6 @@ function TourTitle({ translationKey }: { translationKey: SettingsTextKey }) {
   return <h1>{parts.length === 3 ? <><span>{parts[1]}</span>{parts[2]}</> : text}</h1>
 }
 
-const shortcutEventSchema = z.object({ sessionId: z.number().int().positive(), combination: z.string(), pressed: z.boolean() })
-const shortcutCaptureStartSchema = z.object({ native: z.boolean(), sessionId: z.number().int().positive() })
 function sameShortcut(actual: string, expected: string) {
   if (actual === expected) return true
   return actual.split('+').map(part => expected.includes(part) ? part : part.replace(/^(Left|Right)(?=Shift|Control|Alt|Command)/, '')).sort().join('+') === expected.split('+').sort().join('+')
@@ -81,9 +79,6 @@ function FeatureStep({ feature, step, onNext, onBack, onFinish, onProviders }: {
   const [pressed, setPressed] = useState(false)
   const [tested, setTested] = useState(false)
   const [captureError, setCaptureError] = useState<string | null>(null)
-  const [nativeCapture, setNativeCapture] = useState(true)
-  const captureReady = useRef(false)
-  const captureSessionId = useRef<number | null>(null)
   useEffect(() => {
     if (step.kind === 'example') return
     void bridge.invoke('feature-tour:block').catch((error: unknown) => setCaptureError(error instanceof Error ? error.message : 'Finish the current recording first'))
@@ -92,44 +87,41 @@ function FeatureStep({ feature, step, onNext, onBack, onFinish, onProviders }: {
   useEffect(() => {
     if (step.kind !== 'shortcut' || shortcutDialog) return
     let disposed = false
-    const pendingEvents: z.infer<typeof shortcutEventSchema>[] = []
-    const receive = (event: z.infer<typeof shortcutEventSchema>) => {
-      if (disposed) return
-      if (captureSessionId.current === null) { pendingEvents.push(event); return }
-      if (event.sessionId !== captureSessionId.current || !sameShortcut(event.combination, binding.accelerator)) return
-      setPressed(event.pressed)
-      if (event.pressed) setTested(true)
+    let capture: ShortcutCapture | null = null
+    const stop = () => {
+      const session = capture
+      capture = null
+      void session?.stop()
+      setPressed(false)
     }
-    const off = bridge.on('keyboard:shortcut-captured', (raw: unknown) => {
-      const event = shortcutEventSchema.safeParse(raw)
-      if (event.success) receive(event.data)
-    })
-    void bridge.invoke('keyboard:begin-shortcut-capture').then((raw: unknown) => {
-      const result = shortcutCaptureStartSchema.parse(raw)
-      if (disposed) { void bridge.invoke('keyboard:end-shortcut-capture', result.sessionId).catch(() => undefined); return }
-      captureSessionId.current = result.sessionId
-      setNativeCapture(result.native); captureReady.current = true
-      for (const event of pendingEvents.splice(0)) receive(event)
-    }).catch((error: unknown) => { if (!disposed) setCaptureError(error instanceof Error ? error.message : 'Could not record the shortcut. Please try again.') })
+    const start = () => {
+      if (disposed || capture || !document.hasFocus()) return
+      setCaptureError(null)
+      const session = startShortcutCapture({ bridge,
+        shouldPreventDefault: event => event.type === 'shortcut' && sameShortcut(event.combination, binding.accelerator),
+        onEvent: event => {
+          if (disposed || capture !== session) return
+          if (event.type === 'cancel' || !event.pressed) { setPressed(false); return }
+          if (sameShortcut(event.combination, binding.accelerator)) { setPressed(true); setTested(true) }
+        }
+      })
+      capture = session
+      void session.ready.catch((error: unknown) => {
+        if (disposed || capture !== session) return
+        stop()
+        setCaptureError(error instanceof Error ? error.message : 'Could not record the shortcut. Please try again.')
+      })
+    }
+    window.addEventListener('blur', stop)
+    window.addEventListener('focus', start)
+    start()
     return () => {
-      disposed = true; captureReady.current = false; off()
-      const sessionId = captureSessionId.current
-      captureSessionId.current = null; pendingEvents.length = 0
-      if (sessionId !== null) void bridge.invoke('keyboard:end-shortcut-capture', sessionId).catch(() => undefined)
+      disposed = true
+      window.removeEventListener('blur', stop)
+      window.removeEventListener('focus', start)
+      stop()
     }
   }, [step.kind, shortcutDialog, binding.accelerator])
-  useEffect(() => {
-    if (step.kind !== 'shortcut' || nativeCapture || shortcutDialog) return
-    const keydown = (event: KeyboardEvent) => {
-      if (!captureReady.current) return
-      const parts = [event.metaKey ? 'Command' : '', event.ctrlKey ? 'Control' : '', event.altKey ? 'Alt' : '', event.shiftKey ? 'Shift' : '', event.getModifierState('Fn') ? 'Fn' : ''].filter(Boolean)
-      if (!['Meta', 'Control', 'Alt', 'Shift', 'Fn', 'Unidentified'].includes(event.key)) parts.push(event.key === ' ' ? 'Space' : event.key.length === 1 ? event.key.toUpperCase() : event.key)
-      if (sameShortcut(parts.join('+'), binding.accelerator)) { event.preventDefault(); setPressed(true); setTested(true) }
-    }
-    const keyup = () => setPressed(false)
-    window.addEventListener('keydown', keydown); window.addEventListener('keyup', keyup)
-    return () => { window.removeEventListener('keydown', keydown); window.removeEventListener('keyup', keyup) }
-  }, [step.kind, nativeCapture, shortcutDialog, binding.accelerator])
 
   const titleKey = feature === 'dictate' ? 'onboarding__dictation__start_page__title' : feature === 'translate' ? 'onboarding__translation__start_page__title' : 'onboarding__ask_anything__start_page__title'
   const shortcutTitleKey = feature === 'dictate' ? 'onboarding__setup__hotkey_test__title' : feature === 'translate' ? 'onboarding__translation__shortcut__title' : 'onboarding__ask_anything__shortcut__title'

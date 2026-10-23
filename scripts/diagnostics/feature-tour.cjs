@@ -22,6 +22,25 @@ async function shot(name) {
 }
 async function step(kind) { await until(`document.querySelector('.tour-step')?.dataset.step===${JSON.stringify(kind)}`) }
 async function next() { await js("[...document.querySelectorAll('.tour-copy footer button,.tour-intro>.tour-button')].at(-1).click()") }
+async function key(type, key, options = {}) {
+  await js(`window.dispatchEvent(new KeyboardEvent(${JSON.stringify(type)},{key:${JSON.stringify(key)},bubbles:true,cancelable:true,...${JSON.stringify(options)}}))`)
+}
+async function shortcut(combination, pressed, id) {
+  await js(`window.__emit('keyboard:shortcut-captured',{sessionId:${id ?? 'window.__captureId'},combination:${JSON.stringify(combination)},pressed:${pressed}})`)
+}
+async function editShortcut() {
+  await click('.tour-copy footer button')
+  await until("!!document.querySelector('.tour-shortcut-dialog .settings-shortcut-key')")
+  await click('.tour-shortcut-dialog .settings-shortcut-key')
+  await until("!!document.querySelector('.is-recording')")
+  return js('window.__captureId')
+}
+async function returnToShortcut() {
+  const previous = await js('window.__captureId')
+  await click('.tour-shortcut-dialog .tour-button')
+  await until(`!document.querySelector('.tour-shortcut-dialog') && window.__captureId>${previous}`)
+  return js('window.__captureId')
+}
 app.whenReady().then(async()=>{
   mkdirSync(output,{recursive:true})
   session.defaultSession.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']},(_,cb)=>cb({cancel:true}))
@@ -31,7 +50,7 @@ app.whenReady().then(async()=>{
   await win.webContents.debugger.sendCommand('Page.enable')
   await win.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled',{enabled:true})
   await win.webContents.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument',{source:`
-    window.__tourCalls=[];window.__tourListeners=new Map();window.__target=null;window.__captureId=0;
+    window.__tourCalls=[];window.__tourListeners=new Map();window.__target=null;window.__captureId=0;window.__nativeCapture=true;window.__pendingCaptures=new Map();
     window.__emit=(channel,value)=>{for(const cb of window.__tourListeners.get(channel)||[])cb(value)};
     window.__phase=phase=>window.__emit('recording-machine:state',{phase,context:{sessionId:phase==='recording'?'practice-fixture':null,mode:window.__target?.mode,handsFree:true,error:null,issue:null}});
     window.__complete=text=>{window.__phase('idle');window.__emit('feature-tour:result',{targetId:window.__target.id,transcript:'fixture spoken words',text})};
@@ -44,7 +63,12 @@ app.whenReady().then(async()=>{
         if(channel==='feature-tour:block'){window.__target=null;return true}
         if(channel==='feature-tour:start'){if(!window.__target)throw new Error('Missing target');window.__phase('recording');return true}
         if(channel==='feature-tour:finish'){window.__phase('finishing');return true}
-        if(channel==='keyboard:begin-shortcut-capture')return {native:true,sessionId:++window.__captureId};
+        if(channel==='keyboard:begin-shortcut-capture'){
+          const result={native:window.__nativeCapture,sessionId:++window.__captureId};
+          if(window.__failCapture)throw new Error('fixture capture unavailable');
+          if(window.__deferCapture)return new Promise((resolve,reject)=>window.__pendingCaptures.set(result.sessionId,{resolve:()=>resolve(result),reject}));
+          return result;
+        }
         return invoke(channel,...args)
       };this.__tourBridge=value;
     }});
@@ -57,7 +81,172 @@ app.whenReady().then(async()=>{
   await js("[...document.querySelectorAll('.settings-content button')].find(b=>b.textContent==='Start').click()")
   await until("document.querySelectorAll('.tour-feature-card').length===3")
   await shot('picker-english')
-  for(const [feature,shortcut,count] of [['dictate','Fn',4],['translate','Fn+Shift',1],['askAnything','Fn+Space',3]]){
+  await js('window.__nativeCapture=false')
+  await click('.tour-feature-card>.tour-button')
+  await step('intro');await next();await step('shortcut')
+  await click('.tour-copy footer button')
+  await until("!!document.querySelector('.tour-shortcut-dialog .settings-shortcut-key')")
+  await click('.tour-shortcut-dialog .settings-shortcut-key')
+  await until("!!document.querySelector('.is-recording')")
+  await key('keydown','Shift',{code:'ShiftRight',shiftKey:true})
+  await key('keydown','ArrowLeft',{code:'ArrowLeft',shiftKey:true})
+  await key('keyup','ArrowLeft',{code:'ArrowLeft',shiftKey:true})
+  await until("!document.querySelector('.is-recording')")
+  await key('keyup','Shift',{code:'ShiftRight'})
+  assert.equal((await js("window.sayrel.invoke('store:use','get')")).shortcut.accelerator,'RightShift+Left')
+  await click('.tour-shortcut-dialog .tour-button')
+  await until("!document.querySelector('.tour-shortcut-dialog')")
+  await key('keydown','Shift',{code:'ShiftRight',shiftKey:true})
+  await key('keydown','ArrowLeft',{code:'ArrowLeft',shiftKey:true})
+  await until("!!document.querySelector('.tour-shortcut-visual.is-pressed')")
+  await key('keyup','ArrowLeft',{code:'ArrowLeft',shiftKey:true})
+  await until("!document.querySelector('.tour-shortcut-visual.is-pressed')")
+  await key('keyup','Shift',{code:'ShiftRight'})
+  console.log('PASS browser shortcut saved by the editor matches practice with the same sided modifier and arrow key')
+  await key('keydown','Shift',{code:'ShiftLeft',shiftKey:true})
+  await key('keydown','ArrowLeft',{code:'ArrowLeft',shiftKey:true})
+  assert.equal(await js("!!document.querySelector('.tour-shortcut-visual.is-pressed')"),false,'opposite Shift side does not match a saved sided binding')
+  await key('keyup','ArrowLeft',{code:'ArrowLeft',shiftKey:true})
+  await key('keyup','Shift',{code:'ShiftLeft'})
+  await js("document.querySelector('.tour-copy footer button').focus()")
+  win.webContents.sendInputEvent({type:'keyDown',keyCode:'Tab'})
+  win.webContents.sendInputEvent({type:'keyUp',keyCode:'Tab'})
+  await until("document.activeElement===document.querySelector('.tour-copy footer .is-primary')")
+  console.log('PASS practice keeps Tab navigation available while capturing shortcuts')
+
+  await js('window.__nativeCapture=true')
+  for (const combination of ['Fn+RightShift','Mouse4']) {
+    await editShortcut()
+    if(combination.startsWith('Fn+'))await shortcut('Fn',true)
+    await shortcut(combination,true)
+    await shortcut(combination,false)
+    await until("!document.querySelector('.is-recording')")
+    assert.equal((await js("window.sayrel.invoke('store:use','get')")).shortcut.accelerator,combination)
+    await returnToShortcut()
+    await key('keydown','Unidentified')
+    await shortcut(combination,true)
+    await until("!!document.querySelector('.tour-shortcut-visual.is-pressed')")
+    await shortcut(combination,false)
+    await until("!document.querySelector('.tour-shortcut-visual.is-pressed')")
+  }
+  console.log('PASS native Fn chord upgrades and mouse bindings saved by editing match practice')
+
+  await click('.tour-copy footer button')
+  await until("!!document.querySelector('.tour-shortcut-dialog')")
+  await js('window.__deferCapture=true')
+  await click('.tour-shortcut-dialog .settings-shortcut-key')
+  await until("!!document.querySelector('.is-recording')")
+  const oldEditor = await js('window.__captureId')
+  await js('window.__deferCapture=false')
+  const practice = await returnToShortcut()
+  await shortcut('Mouse4',true,oldEditor)
+  await js(`window.__pendingCaptures.get(${oldEditor}).resolve()`)
+  await until(`window.__tourCalls.some(c=>c[0]==='keyboard:end-shortcut-capture'&&c[1]===${oldEditor})`)
+  await shortcut('Mouse4',false,oldEditor)
+  assert.equal(await js("!!document.querySelector('.tour-shortcut-visual.is-pressed')"),false,'late editor input cannot activate practice')
+  assert.equal(await js(`window.__tourCalls.some(c=>c[0]==='keyboard:end-shortcut-capture'&&c[1]===${practice})`),false,'late editor stop preserves the new practice')
+  await shortcut('Mouse4',true,practice)
+  await until("!!document.querySelector('.tour-shortcut-visual.is-pressed')")
+  await shortcut('Mouse4',false,practice)
+  console.log('PASS closing a pending edit releases only that edit and leaves practice active')
+
+  await click('.tour-back');await step('intro')
+  await js('window.__deferCapture=true')
+  await next();await step('shortcut')
+  const oldPractice = await js('window.__captureId')
+  await js('window.__deferCapture=false')
+  const editor = await editShortcut()
+  await shortcut('Control+Z',true,oldPractice)
+  await js(`window.__pendingCaptures.get(${oldPractice}).resolve()`)
+  await until(`window.__tourCalls.some(c=>c[0]==='keyboard:end-shortcut-capture'&&c[1]===${oldPractice})`)
+  await shortcut('Control+Z',false,oldPractice)
+  assert.equal(await js("document.querySelector('.is-recording').innerText"),'Press key or mouse button','old practice input cannot enter the editor draft')
+  assert.equal((await js("window.sayrel.invoke('store:use','get')")).shortcut.accelerator,'Mouse4')
+  await shortcut('Fn+RightShift',true,editor)
+  await shortcut('Fn+RightShift',false,editor)
+  await until("!document.querySelector('.is-recording')")
+  await returnToShortcut()
+  await shortcut('Fn+RightShift',true)
+  await until("!!document.querySelector('.tour-shortcut-visual.is-pressed')")
+  console.log('PASS pending practice cannot update or terminate its replacement editor')
+
+  await js("window.dispatchEvent(new Event('blur'));window.__emit('keyboard:shortcut-captured',{sessionId:window.__captureId,combination:'Fn+RightShift',pressed:true})")
+  await until("!document.querySelector('.tour-shortcut-visual.is-pressed') && window.__tourListeners.get('keyboard:shortcut-captured').size===0")
+  await js("window.__deferCapture=true;window.dispatchEvent(new Event('focus'))")
+  const blurredPractice = await js('window.__captureId')
+  await js("window.dispatchEvent(new Event('blur'))")
+  await js(`window.__pendingCaptures.get(${blurredPractice}).resolve()`)
+  await until(`window.__tourCalls.some(c=>c[0]==='keyboard:end-shortcut-capture'&&c[1]===${blurredPractice})`)
+  assert.equal(await js("window.__tourListeners.get('keyboard:shortcut-captured').size"),0,'blur during initialization removes the subscription')
+  await js("window.__deferCapture=false;window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('focus'))")
+  const resumedPractice = await js('window.__captureId')
+  assert.equal(resumedPractice,blurredPractice+1,'repeated focus does not create competing captures')
+  await shortcut('Fn+RightShift',true,blurredPractice)
+  assert.equal(await js("!!document.querySelector('.tour-shortcut-visual.is-pressed')"),false)
+  await shortcut('Fn+RightShift',true,resumedPractice)
+  await until("!!document.querySelector('.tour-shortcut-visual.is-pressed')")
+  await shortcut('Fn+RightShift',false,resumedPractice)
+  console.log('PASS blur releases ready and pending practice; focus resumes a single fresh capture')
+
+  await click('.tour-back');await step('intro')
+  await js('window.__failCapture=true')
+  await next();await step('shortcut')
+  await until("document.querySelector('.tour-shortcut-question [role=alert]')?.textContent.includes('fixture capture unavailable')")
+  assert.equal(await js("window.__tourListeners.get('keyboard:shortcut-captured').size"),0,'failed initialization releases listeners')
+  await js("window.__failCapture=false;window.dispatchEvent(new Event('focus'))")
+  await until("!document.querySelector('.tour-shortcut-question [role=alert]')")
+  await shortcut('Fn+RightShift',true)
+  await until("!!document.querySelector('.tour-shortcut-visual.is-pressed')")
+  await shortcut('Fn+RightShift',false)
+  console.log('PASS failed practice initialization releases listeners and retries on refocus')
+
+  await win.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled',{enabled:false})
+  await js("window.dispatchEvent(new Event('blur'))")
+  assert.equal(await js('document.hasFocus()'),false,'fixture window is unfocused')
+  const beforeBackgroundUpdate=await js('window.__captureId')
+  await js("window.sayrel.invoke('store:use','patch',{shortcut:{accelerator:'Mouse4'}})")
+  await until("document.querySelector('.tour-shortcut-visual').textContent.includes('Mouse4')")
+  assert.equal(await js('window.__captureId'),beforeBackgroundUpdate,'background settings changes must not restart an unfocused capture')
+  await win.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled',{enabled:true})
+  await js("window.dispatchEvent(new Event('focus'))")
+  await shortcut('Mouse4',true)
+  await until("!!document.querySelector('.tour-shortcut-visual.is-pressed')")
+  await shortcut('Mouse4',false)
+  console.log('PASS background binding changes wait for focus before restarting practice')
+
+  await click('.tour-back');await step('intro')
+  await js('window.__deferCapture=true')
+  await next();await step('shortcut')
+  const bufferedPractice=await js('window.__captureId')
+  await shortcut('Mouse4',true,bufferedPractice)
+  assert.equal(await js("!!document.querySelector('.tour-shortcut-visual.is-pressed')"),false,'input received before readiness waits for adapter selection')
+  await js(`window.__pendingCaptures.get(${bufferedPractice}).resolve()`)
+  await until("!!document.querySelector('.tour-shortcut-visual.is-pressed')")
+  await shortcut('Mouse4',false,bufferedPractice)
+  console.log('PASS practice receives valid native input buffered before initialization completes')
+
+  await click('.tour-back');await step('intro')
+  await next();await step('shortcut')
+  const exitedPractice=await js('window.__captureId')
+  await click('.tour-exit')
+  await until("!!document.querySelector('.tour-feature-cards')")
+  assert.equal(await js("window.__tourListeners.get('keyboard:shortcut-captured').size"),0,'exiting a pending step unsubscribes immediately')
+  await js('window.__deferCapture=false')
+  await click('.tour-feature-card>.tour-button')
+  await step('intro');await next();await step('shortcut')
+  await js(`window.__pendingCaptures.get(${exitedPractice}).reject(new Error('late fixture failure'))`)
+  await shortcut('Mouse4',true,exitedPractice)
+  assert.equal(await js("!!document.querySelector('.tour-shortcut-question [role=alert],.tour-shortcut-visual.is-pressed')"),false,'late errors and input cannot reach the new course')
+  await shortcut('Mouse4',true)
+  await until("!!document.querySelector('.tour-shortcut-visual.is-pressed')")
+  await shortcut('Mouse4',false)
+  console.log('PASS unmounting pending practice isolates its late failure from the next course')
+
+  await click('.tour-exit')
+  await until("!!document.querySelector('.tour-feature-cards')")
+  assert.equal(await js("window.__tourListeners.get('keyboard:shortcut-captured').size"),0,'leaving practice releases capture')
+  await js("window.__nativeCapture=true;window.sayrel.invoke('store:use','patch',{shortcut:{accelerator:'Fn'}})")
+  for(const [feature,savedShortcut,count] of [['dictate','Fn',4],['translate','Fn+Shift',1],['askAnything','Fn+Space',3]]){
     const index=['dictate','translate','askAnything'].indexOf(feature)
     await js(`document.querySelectorAll('.tour-feature-card>.tour-button')[${index}].click()`)
     await step('intro');await shot(feature+'-intro')
@@ -66,10 +255,11 @@ app.whenReady().then(async()=>{
     await next();await step('shortcut')
     await until("window.__tourCalls.some(c=>c[0]==='keyboard:begin-shortcut-capture')")
     const starts=await js("window.__tourCalls.filter(c=>c[0]==='feature-tour:start').length")
-    await js(`window.__emit('keyboard:shortcut-captured',{sessionId:window.__captureId,combination:${JSON.stringify(shortcut)},pressed:true})`)
+    const actualShortcut=feature==='translate'?'Fn+RightShift':savedShortcut
+    await shortcut(actualShortcut,true)
     await until("!!document.querySelector('.tour-shortcut-visual.is-pressed')")
     await shot(feature+'-shortcut-pressed')
-    await js(`window.__emit('keyboard:shortcut-captured',{sessionId:window.__captureId,combination:${JSON.stringify(shortcut)},pressed:false})`)
+    await shortcut(actualShortcut,false)
     assert.equal(await js("window.__tourCalls.filter(c=>c[0]==='feature-tour:start').length"),starts,'shortcut test never opens microphone')
     await next()
     if(feature==='translate'){

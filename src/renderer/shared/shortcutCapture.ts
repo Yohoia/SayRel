@@ -62,9 +62,10 @@ function browserCombination(event: KeyboardEvent, heldModifiers: Map<string, str
   return parts.join('+')
 }
 
-export function startShortcutCapture({ bridge, onEvent, target = window }: {
+export function startShortcutCapture({ bridge, onEvent, shouldPreventDefault = () => true, target = window }: {
   bridge: ShortcutCaptureBridge
   onEvent: (event: ShortcutCaptureEvent) => void
+  shouldPreventDefault?: (event: ShortcutCaptureEvent) => boolean
   target?: BrowserTarget
 }): ShortcutCapture {
   let active = true
@@ -83,6 +84,11 @@ export function startShortcutCapture({ bridge, onEvent, target = window }: {
     if (!session) pending.push(entry)
     else publish(entry)
   }
+  const preventDefault = (event: KeyboardEvent, input: ShortcutCaptureEvent) => {
+    if (!shouldPreventDefault(input)) return
+    event.preventDefault()
+    event.stopPropagation()
+  }
 
   const unsubscribe = bridge.on('keyboard:shortcut-captured', raw => {
     const parsed = shortcutEventSchema.safeParse(raw)
@@ -96,8 +102,7 @@ export function startShortcutCapture({ bridge, onEvent, target = window }: {
   const keydown = (event: KeyboardEvent) => {
     if (!active || event.repeat || event.isComposing) return
     if (event.key === 'Escape') {
-      event.preventDefault()
-      event.stopPropagation()
+      preventDefault(event, { type: 'cancel' })
       onEvent({ type: 'cancel' })
       return
     }
@@ -105,17 +110,17 @@ export function startShortcutCapture({ bridge, onEvent, target = window }: {
     if (modifier) heldModifiers.set(event.code, modifier)
     const combination = browserCombination(event, heldModifiers)
     if (!combination) return
-    event.preventDefault()
-    event.stopPropagation()
-    enqueue({ source: 'browser', event: { type: 'shortcut', combination, pressed: true } })
+    const input: ShortcutCaptureEvent = { type: 'shortcut', combination, pressed: true }
+    preventDefault(event, input)
+    enqueue({ source: 'browser', event: input })
   }
   const keyup = (event: KeyboardEvent) => {
     if (!active || event.isComposing) return
     const combination = browserCombination(event, heldModifiers)
     if (combination) {
-      event.preventDefault()
-      event.stopPropagation()
-      if (combination !== 'Escape') enqueue({ source: 'browser', event: { type: 'shortcut', combination, pressed: false } })
+      const input: ShortcutCaptureEvent = combination === 'Escape' ? { type: 'cancel' } : { type: 'shortcut', combination, pressed: false }
+      preventDefault(event, input)
+      if (input.type === 'shortcut') enqueue({ source: 'browser', event: input })
     }
     heldModifiers.delete(event.code)
   }
