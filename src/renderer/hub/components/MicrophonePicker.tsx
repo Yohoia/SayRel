@@ -74,9 +74,9 @@ export function MicrophonePicker({ autoOpen = false }: { autoOpen?: boolean }) {
         const state = recordingStateSchema.parse(value)
         if (disposed) return
         if (!['idle', 'error'].includes(state.phase)) { toast.info(t('Finish the current recording first')); return }
-        preview = startMicrophonePreview({
+        preview = startMicrophonePreview({ audio: {
           ...(selected ? { deviceId: { exact: selected } } : {}), noiseSuppression: true
-        })
+        } })
         const meter = await preview.ready
         if (disposed || !meter) return
         refresh()

@@ -9,7 +9,8 @@ import HelpOutlineRounded from '@mui/icons-material/HelpOutlineRounded'
 import { api } from '../shared/utils/bridge'
 import { toast } from '../shared/components/Toast'
 import { VoiceInstrument } from '../shared/components/VoiceInstrument'
-import { startRecorder, type RecorderHandle } from '../floating-bar/audio'
+import { startMicrophonePreview } from '../shared/audio/microphonePreview'
+import { useAppSettings } from '../shared/state/settings'
 import '../shared/styles/secondary.css'
 
 // Keep permission, recording and shortcut semantics while sharing the paper UI.
@@ -17,6 +18,7 @@ const STEPS = ['permissions', 'microphone', 'shortcut', 'done'] as const
 type Step = (typeof STEPS)[number]
 export function OnboardingApp() {
   const t = useAppText()
+  const { settings, loaded } = useAppSettings()
   const [step, setStep] = useState<Step>('permissions')
   const [mic, setMic] = useState(false)
   const [accessibility, setAccessibility] = useState(false)
@@ -38,17 +40,19 @@ export function OnboardingApp() {
     return () => { window.removeEventListener('focus', refresh); window.clearInterval(interval) }
   }, [])
   useEffect(() => {
-    if (step !== 'microphone') return
+    if (step !== 'microphone' || !loaded) return
     let cancelled = false
-    let recorder: RecorderHandle | null = null
     setMicReady(false)
-    api.settings.get().then((s: any) => startRecorder({ deviceId: s?.micDevice, onChunk: () => undefined, onLevel: setLevel })).then(async (handle: RecorderHandle) => {
-      if (cancelled) { await handle.stop(); return }
-      recorder = handle
-      setMicReady(true)
+    setLevel(0)
+    const preview = startMicrophonePreview({ audio: {
+      deviceId: settings.micDevice ? { exact: settings.micDevice } : undefined,
+      echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1
+    }, onLevel: setLevel })
+    void preview.ready.then(analyser => {
+      if (!cancelled && analyser) setMicReady(true)
     }).catch(() => { if (!cancelled) { toast.error("Microphone unavailable. Please check your settings.") } })
-    return () => { cancelled = true; void recorder?.stop() }
-  }, [step])
+    return () => { cancelled = true; void preview.stop() }
+  }, [step, loaded, settings.micDevice])
   useEffect(() => api.recording.onState((state: any) => {
     const active = state?.phase === 'recording' || state?.phase === 'starting'
     setPressed(active)
