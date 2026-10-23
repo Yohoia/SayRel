@@ -31,7 +31,7 @@ app.whenReady().then(async()=>{
   await win.webContents.debugger.sendCommand('Page.enable')
   await win.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled',{enabled:true})
   await win.webContents.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument',{source:`
-    window.__tourCalls=[];window.__tourListeners=new Map();window.__target=null;
+    window.__tourCalls=[];window.__tourListeners=new Map();window.__target=null;window.__captureId=0;
     window.__emit=(channel,value)=>{for(const cb of window.__tourListeners.get(channel)||[])cb(value)};
     window.__phase=phase=>window.__emit('recording-machine:state',{phase,context:{sessionId:phase==='recording'?'practice-fixture':null,mode:window.__target?.mode,handsFree:true,error:null,issue:null}});
     window.__complete=text=>{window.__phase('idle');window.__emit('feature-tour:result',{targetId:window.__target.id,transcript:'fixture spoken words',text})};
@@ -44,7 +44,7 @@ app.whenReady().then(async()=>{
         if(channel==='feature-tour:block'){window.__target=null;return true}
         if(channel==='feature-tour:start'){if(!window.__target)throw new Error('Missing target');window.__phase('recording');return true}
         if(channel==='feature-tour:finish'){window.__phase('finishing');return true}
-        if(channel==='keyboard:begin-shortcut-capture')return {native:true};
+        if(channel==='keyboard:begin-shortcut-capture')return {native:true,sessionId:++window.__captureId};
         return invoke(channel,...args)
       };this.__tourBridge=value;
     }});
@@ -66,10 +66,10 @@ app.whenReady().then(async()=>{
     await next();await step('shortcut')
     await until("window.__tourCalls.some(c=>c[0]==='keyboard:begin-shortcut-capture')")
     const starts=await js("window.__tourCalls.filter(c=>c[0]==='feature-tour:start').length")
-    await js(`window.__emit('keyboard:shortcut-captured',{combination:${JSON.stringify(shortcut)},pressed:true})`)
+    await js(`window.__emit('keyboard:shortcut-captured',{sessionId:window.__captureId,combination:${JSON.stringify(shortcut)},pressed:true})`)
     await until("!!document.querySelector('.tour-shortcut-visual.is-pressed')")
     await shot(feature+'-shortcut-pressed')
-    await js(`window.__emit('keyboard:shortcut-captured',{combination:${JSON.stringify(shortcut)},pressed:false})`)
+    await js(`window.__emit('keyboard:shortcut-captured',{sessionId:window.__captureId,combination:${JSON.stringify(shortcut)},pressed:false})`)
     assert.equal(await js("window.__tourCalls.filter(c=>c[0]==='feature-tour:start').length"),starts,'shortcut test never opens microphone')
     await next()
     if(feature==='translate'){

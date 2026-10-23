@@ -9,6 +9,7 @@ const empty = params.get('state') === 'empty'
 const listeners = new Map<string, Set<(...args: any[]) => void>>()
 const emit = (channel: string, ...args: any[]) => listeners.get(channel)?.forEach((cb) => cb(...args))
 let settings = mergeSettings(JSON.parse(localStorage.getItem('sayrel-ui-settings') || 'null') ?? DEFAULT_SETTINGS)
+let shortcutCaptureSessionId = 0
 let words = JSON.parse(localStorage.getItem('sayrel-ui-words') || 'null') ?? (empty ? [] : [
   { id: 'word-1', word: 'Sayrel', source: 'manual', language: 'en', createdAt: '2026-10-19' },
   { id: 'word-2', word: 'Figma', source: 'auto', language: 'en', createdAt: '2026-10-19' },
@@ -127,7 +128,7 @@ const bridge = {
       if (channel === 'permission:update-show-app-in-dock') patchSettings({ partial: { showInDock: z.boolean().parse(args[0]) } })
       return true
     }
-    if (channel === 'keyboard:begin-shortcut-capture') return { native: false }
+    if (channel === 'keyboard:begin-shortcut-capture') return { native: false, sessionId: ++shortcutCaptureSessionId }
     if (channel === 'audio:get-devices-async') return [{ deviceId: 'default', label: 'MacBook Pro Microphone', isDefault: true }]
     if (channel === 'troubleshooting:get-system-info') return { appVersion: '1.0.0', platform: 'darwin', arch: 'arm64' }
     if (channel === 'page:get-interactive-card-payload') return { title:'Help me organize this idea', answer:'Clear writing starts with one simple sentence.\n\nSpeak naturally and let the words take shape as you think.', createdAt:Date.now() }

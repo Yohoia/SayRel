@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ReactNode, KeyboardEvent } from 'react'
+import type { ReactNode } from 'react'
 import { DEFAULT_SETTINGS, type ShortcutBinding } from '../../../shared/settings'
 import { bindingsFor, shortcutLabels, normalizeTranslationTargets, SHORTCUT_KEYS, validateShortcut, type ShortcutKey } from '../../../shared/settingsControls'
-import { api } from '../../shared/utils/bridge'
+import { startShortcutCapture } from '../../shared/shortcutCapture'
 import { Modal } from '../../shared/components/Modal'
 import { toast } from '../../shared/components/Toast'
 import { useAppSettings } from '../../shared/state/settings'
@@ -23,7 +23,8 @@ export function ShortcutEditor({ settingKey }: { settingKey: ShortcutKey }) {
   const [editing, setEditing] = useState<number | null>(null)
   const [draft, setDraft] = useState('')
   const capture = useRef('')
-  const captureMode = useRef<'pending' | 'native' | 'browser'>('pending')
+  const editGeneration = useRef(0)
+  const savingGeneration = useRef<number | null>(null)
   const container = useRef<HTMLDivElement>(null)
   const bindings = bindingsFor(settings, settingKey)
   const latest = useRef({ settings, bindings, editing })
@@ -34,51 +35,46 @@ export function ShortcutEditor({ settingKey }: { settingKey: ShortcutKey }) {
   const finish = useRef((accelerator: string) => {})
   finish.current = accelerator => {
     const current = latest.current
-    if (current.editing === null || !accelerator) return
+    const generation = editGeneration.current
+    if (current.editing === null || !accelerator || savingGeneration.current === generation) return
     const used = SHORTCUT_KEYS.flatMap(key => bindingsFor(current.settings, key).filter((_, i) => key !== settingKey || i !== current.editing).map(binding => binding.accelerator))
     if (current.settings.commandShortcut.enabled) used.push(current.settings.commandShortcut.accelerator)
     const problem = validateShortcut(accelerator, used)
     if (problem) { toast.error(t(problem)); return }
     const next = [...current.bindings]
     next[current.editing] = { accelerator, enabled: true, style: 'toggle' }
-    void save(next).then(() => { setEditing(null) }).catch(() => undefined)
+    savingGeneration.current = generation
+    void save(next).then(() => {
+      if (editGeneration.current === generation) setEditing(null)
+    }).catch(() => undefined).finally(() => {
+      if (savingGeneration.current === generation) savingGeneration.current = null
+    })
   }
   useEffect(() => {
     if (editing === null) return
     let disposed = false
-    captureMode.current = 'pending'
-    const off = window.sayrel.on('keyboard:shortcut-captured', (event: { combination: string; pressed: boolean }) => {
+    const session = startShortcutCapture({ bridge: window.sayrel, onEvent: event => {
       if (disposed) return
-      if (event.combination === 'Escape') { setEditing(null); return }
+      if (event.type === 'cancel') { cancel(); return }
+      if (savingGeneration.current === editGeneration.current) return
       if (event.pressed) { capture.current = event.combination; setDraft(event.combination) }
       else if (event.combination !== 'Escape') finish.current(capture.current)
-    })
-    void window.sayrel.invoke('keyboard:begin-shortcut-capture').then((result: { native: boolean }) => { if (!disposed) captureMode.current = result.native ? 'native' : 'browser' }).catch(() => { if (!disposed) { setEditing(null); toast.error("Could not record the shortcut. Please try again.") } })
-    const away = (event: PointerEvent) => { if (!container.current?.contains(event.target as Node)) setEditing(null) }
-    const blur = () => setEditing(null)
+    } })
+    const cancel = () => { disposed = true; void session.stop(); setEditing(null) }
+    void session.ready.catch(() => { if (!disposed) { setEditing(null); toast.error("Could not record the shortcut. Please try again.") } })
+    const away = (event: PointerEvent) => { if (!container.current?.contains(event.target as Node)) cancel() }
+    const blur = cancel
+    const element = container.current
+    const focusout = (event: FocusEvent) => { if (!(event.relatedTarget instanceof Node) || !element?.contains(event.relatedTarget)) cancel() }
+    element?.addEventListener('focusout', focusout)
     window.addEventListener('blur', blur)
     document.addEventListener('pointerdown', away)
-    return () => { disposed = true; off?.(); document.removeEventListener('pointerdown', away); window.removeEventListener('blur', blur); void window.sayrel.invoke('keyboard:end-shortcut-capture') }
+    return () => { disposed = true; element?.removeEventListener('focusout', focusout); document.removeEventListener('pointerdown', away); window.removeEventListener('blur', blur); void session.stop() }
   }, [editing])
-  function begin(index: number) { capture.current = ''; setDraft(''); setEditing(index) }
-  function keyDown(event: KeyboardEvent) {
-    if (editing === null) return
-    event.preventDefault(); event.stopPropagation()
-    if (event.key === 'Escape') { setEditing(null); return }
-    if (captureMode.current !== 'browser') return
-    const parts: string[] = []
-    if (event.getModifierState('Fn')) parts.push('Fn')
-    if (event.metaKey) parts.push('Command')
-    if (event.ctrlKey) parts.push('Control')
-    if (event.altKey) parts.push('Alt')
-    if (event.shiftKey) parts.push(event.code === 'ShiftRight' ? 'RightShift' : 'LeftShift')
-    const names: Record<string, string> = { ' ': 'Space', ArrowLeft: 'Left', ArrowRight: 'Right', ArrowUp: 'Up', ArrowDown: 'Down' }
-    if (!['Meta', 'Control', 'Alt', 'Shift', 'Fn', 'Unidentified'].includes(event.key)) parts.push(names[event.key] ?? (event.key.length === 1 ? event.key.toUpperCase() : event.key))
-    if (parts.length) { capture.current = parts.join('+'); setDraft(capture.current) }
-  }
+  function begin(index: number) { editGeneration.current++; capture.current = ''; setDraft(''); setEditing(index) }
   return <div className="settings-shortcuts" ref={container}>
     {[...bindings, ...(editing === bindings.length ? [{ accelerator: '', enabled: true, style: 'toggle' as const }] : [])].map((binding, index) => <div className="settings-shortcut-item" key={index}>
-      <button className={`settings-shortcut-key ${editing === index ? 'is-recording' : ''}`} aria-label={t("Change shortcut")} onClick={() => begin(index)} onBlur={event => { if (!container.current?.contains(event.relatedTarget as Node)) setEditing(null) }} onKeyDown={keyDown} onKeyUp={event => { if (editing === index) { event.preventDefault(); event.stopPropagation(); if (captureMode.current === 'browser') finish.current(capture.current) } }}>
+      <button className={`settings-shortcut-key ${editing === index ? 'is-recording' : ''}`} aria-label={t("Change shortcut")} onClick={() => begin(index)}>
         {editing === index ? (draft ? <KeyCaps value={draft} /> : <span>{t("Press key or mouse button")}</span>) : <KeyCaps value={binding.accelerator} />}
       </button>
       {editing === index && index === 0 ? <button className="settings-shortcut-action" aria-label={t("Reset shortcut")} title={t("Reset shortcut")} onClick={() => finish.current(DEFAULT_SETTINGS[settingKey].accelerator)}>↺</button> : editing !== index && (settingKey !== 'shortcut' || bindings.length > 1) && <button className="settings-shortcut-action" aria-label={t("Disable shortcut")} title={t("Disable shortcut")} onClick={() => { void save(bindings.filter((_, i) => i !== index)).catch(() => undefined) }}>×</button>}

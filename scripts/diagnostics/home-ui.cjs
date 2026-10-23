@@ -62,10 +62,10 @@ app.whenReady().then(async () => {
   win.webContents.debugger.attach('1.3'); console.log('debugger attached'); await win.webContents.debugger.sendCommand('Page.enable')
   await win.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled', { enabled:true })
   await win.webContents.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: `
-    window.__homeCalls = []; window.__homeSubscribers = new Map(); window.__homeFail = false;
+    window.__homeCalls = []; window.__homeSubscribers = new Map(); window.__homeFail = false; window.__homeCaptureId = 0;
     Object.defineProperty(window, 'sayrel', { configurable:true, get(){return this.__homeBridge}, set(value){
       const invoke=value.invoke.bind(value), on=value.on.bind(value);
-      value.invoke=async(channel,...args)=>{window.__homeCalls.push([channel,...args]);if(channel==='db:history-usage'&&window.__homeUsageOverride)return window.__homeUsageOverride;if(channel==='keyboard:begin-shortcut-capture'&&window.__homeNative)return {native:true};if(['db:history-list','db:history-activity','db:history-usage'].includes(channel)&&window.__homeFail)throw new Error('fixture history failure');return invoke(channel,...args)};
+      value.invoke=async(channel,...args)=>{window.__homeCalls.push([channel,...args]);if(channel==='db:history-usage'&&window.__homeUsageOverride)return window.__homeUsageOverride;if(channel==='keyboard:begin-shortcut-capture')return {native:!!window.__homeNative,sessionId:++window.__homeCaptureId};if(['db:history-list','db:history-activity','db:history-usage'].includes(channel)&&window.__homeFail)throw new Error('fixture history failure');return invoke(channel,...args)};
       value.on=(channel,cb)=>{const listeners=window.__homeSubscribers.get(channel)||new Set();listeners.add(cb);window.__homeSubscribers.set(channel,listeners);const off=on(channel,cb);return()=>{listeners.delete(cb);off()}};
       this.__homeBridge=value;
     }});
@@ -156,14 +156,14 @@ app.whenReady().then(async () => {
   await shot('shortcut-settings')
   await js("window.__homeNative=true; document.querySelectorAll('.settings-shortcut-key')[2].click()")
   await until("window.__homeCalls.some(c=>c[0]==='keyboard:begin-shortcut-capture') && !!document.querySelector('.is-recording')")
-  await js("(() => { const button=document.querySelector('.is-recording');button.dispatchEvent(new KeyboardEvent('keydown',{key:'Unidentified',bubbles:true}));button.dispatchEvent(new KeyboardEvent('keyup',{key:'Unidentified',bubbles:true}));window.__homeSubscribers.get('keyboard:shortcut-captured').forEach(cb=>cb({combination:'Fn+RightShift',pressed:true}));window.__homeSubscribers.get('keyboard:shortcut-captured').forEach(cb=>cb({combination:'Fn+RightShift',pressed:false})); })()")
+  await js("(() => { const button=document.querySelector('.is-recording');button.dispatchEvent(new KeyboardEvent('keydown',{key:'Unidentified',bubbles:true}));button.dispatchEvent(new KeyboardEvent('keyup',{key:'Unidentified',bubbles:true}));window.__homeSubscribers.get('keyboard:shortcut-captured').forEach(cb=>cb({sessionId:window.__homeCaptureId,combination:'Fn+RightShift',pressed:true}));window.__homeSubscribers.get('keyboard:shortcut-captured').forEach(cb=>cb({sessionId:window.__homeCaptureId,combination:'Fn+RightShift',pressed:false})); })()")
   await until("!document.querySelector('.is-recording') && document.querySelectorAll('.settings-shortcuts')[2].innerText.includes('Right Shift')")
   assert.equal((await js("window.sayrel.invoke('store:use','get')")).askAnythingShortcut.accelerator,'Fn+RightShift')
   await js("window.sayrel.invoke('store:use','patch',{askAnythingShortcut:{accelerator:'Fn+Space'}})")
   await js("window.sayrel.invoke('store:use','patch',{shortcut:{enabled:false}})")
   await js("document.querySelector('.settings-shortcuts .settings-add').click()")
   await until("!!document.querySelector('.is-recording')")
-  await js("(() => {const button=document.querySelector('.is-recording');button.dispatchEvent(new KeyboardEvent('keydown',{key:'Unidentified',bubbles:true}));button.dispatchEvent(new KeyboardEvent('keyup',{key:'Unidentified',bubbles:true}));window.__homeSubscribers.get('keyboard:shortcut-captured').forEach(cb=>cb({combination:'Fn',pressed:true}));window.__homeSubscribers.get('keyboard:shortcut-captured').forEach(cb=>cb({combination:'Fn',pressed:false}));})()")
+  await js("(() => {const button=document.querySelector('.is-recording');button.dispatchEvent(new KeyboardEvent('keydown',{key:'Unidentified',bubbles:true}));button.dispatchEvent(new KeyboardEvent('keyup',{key:'Unidentified',bubbles:true}));window.__homeSubscribers.get('keyboard:shortcut-captured').forEach(cb=>cb({sessionId:window.__homeCaptureId,combination:'Fn',pressed:true}));window.__homeSubscribers.get('keyboard:shortcut-captured').forEach(cb=>cb({sessionId:window.__homeCaptureId,combination:'Fn',pressed:false}));})()")
   await until("!document.querySelector('.is-recording') && document.querySelectorAll('.settings-shortcut-key')[0].innerText==='Fn'")
   assert.equal((await js("window.sayrel.invoke('store:use','get')")).shortcut.accelerator,'Fn')
   await shot('native-fn-capture')

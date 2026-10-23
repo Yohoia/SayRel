@@ -63,7 +63,8 @@ function TourTitle({ translationKey }: { translationKey: SettingsTextKey }) {
   return <h1>{parts.length === 3 ? <><span>{parts[1]}</span>{parts[2]}</> : text}</h1>
 }
 
-const shortcutEventSchema = z.object({ combination: z.string(), pressed: z.boolean() })
+const shortcutEventSchema = z.object({ sessionId: z.number().int().positive(), combination: z.string(), pressed: z.boolean() })
+const shortcutCaptureStartSchema = z.object({ native: z.boolean(), sessionId: z.number().int().positive() })
 function sameShortcut(actual: string, expected: string) {
   if (actual === expected) return true
   return actual.split('+').map(part => expected.includes(part) ? part : part.replace(/^(Left|Right)(?=Shift|Control|Alt|Command)/, '')).sort().join('+') === expected.split('+').sort().join('+')
@@ -82,6 +83,7 @@ function FeatureStep({ feature, step, onNext, onBack, onFinish, onProviders }: {
   const [captureError, setCaptureError] = useState<string | null>(null)
   const [nativeCapture, setNativeCapture] = useState(true)
   const captureReady = useRef(false)
+  const captureSessionId = useRef<number | null>(null)
   useEffect(() => {
     if (step.kind === 'example') return
     void bridge.invoke('feature-tour:block').catch((error: unknown) => setCaptureError(error instanceof Error ? error.message : 'Finish the current recording first'))
@@ -90,17 +92,31 @@ function FeatureStep({ feature, step, onNext, onBack, onFinish, onProviders }: {
   useEffect(() => {
     if (step.kind !== 'shortcut' || shortcutDialog) return
     let disposed = false
+    const pendingEvents: z.infer<typeof shortcutEventSchema>[] = []
+    const receive = (event: z.infer<typeof shortcutEventSchema>) => {
+      if (disposed) return
+      if (captureSessionId.current === null) { pendingEvents.push(event); return }
+      if (event.sessionId !== captureSessionId.current || !sameShortcut(event.combination, binding.accelerator)) return
+      setPressed(event.pressed)
+      if (event.pressed) setTested(true)
+    }
     const off = bridge.on('keyboard:shortcut-captured', (raw: unknown) => {
       const event = shortcutEventSchema.safeParse(raw)
-      if (disposed || !event.success || !sameShortcut(event.data.combination, binding.accelerator)) return
-      setPressed(event.data.pressed)
-      if (event.data.pressed) setTested(true)
+      if (event.success) receive(event.data)
     })
     void bridge.invoke('keyboard:begin-shortcut-capture').then((raw: unknown) => {
-      const result = z.object({ native: z.boolean() }).parse(raw)
-      if (!disposed) { setNativeCapture(result.native); captureReady.current = true }
+      const result = shortcutCaptureStartSchema.parse(raw)
+      if (disposed) { void bridge.invoke('keyboard:end-shortcut-capture', result.sessionId).catch(() => undefined); return }
+      captureSessionId.current = result.sessionId
+      setNativeCapture(result.native); captureReady.current = true
+      for (const event of pendingEvents.splice(0)) receive(event)
     }).catch((error: unknown) => { if (!disposed) setCaptureError(error instanceof Error ? error.message : 'Could not record the shortcut. Please try again.') })
-    return () => { disposed = true; captureReady.current = false; off(); void bridge.invoke('keyboard:end-shortcut-capture').catch(() => undefined) }
+    return () => {
+      disposed = true; captureReady.current = false; off()
+      const sessionId = captureSessionId.current
+      captureSessionId.current = null; pendingEvents.length = 0
+      if (sessionId !== null) void bridge.invoke('keyboard:end-shortcut-capture', sessionId).catch(() => undefined)
+    }
   }, [step.kind, shortcutDialog, binding.accelerator])
   useEffect(() => {
     if (step.kind !== 'shortcut' || nativeCapture || shortcutDialog) return

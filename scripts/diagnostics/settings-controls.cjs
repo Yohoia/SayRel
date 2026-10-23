@@ -63,13 +63,14 @@ test('extra shortcuts actually register; removal and disabled modes unregister t
 })
 const { EventEmitter } = require('node:events')
 const window = new EventEmitter(), sender = new EventEmitter()
-sender.id = 17; sender.isDestroyed = () => false; sender.send = () => {}
-let disabled = false, captureEnabled = false, listeners = 0
+sender.id = 17; sender.isDestroyed = () => false
+let disabled = false, captureEnabled = false, listeners = 0, keyListener = null, sentEvents = [], failCaptureStart = false
+sender.send = (...args) => sentEvents.push(args)
 Object.assign(mocks.electron, { BrowserWindow: { fromWebContents: () => window } })
 mocks.electron.globalShortcut.unregisterAll = () => electronShortcuts.clear()
 Object.assign(mocks['../lib/native'].keyboard, {
-  setShortcutCaptureEnabled(value) { captureEnabled = Boolean(value) },
-  onKey() { listeners++; return () => { listeners-- } }
+  setShortcutCaptureEnabled(value) { if (value && failCaptureStart) throw new Error('capture initialization failed'); captureEnabled = Boolean(value) },
+  onKey(callback) { listeners++; keyListener = callback; return () => { listeners--; keyListener = null } }
 })
 mocks['../services/recordingMachine'] = { recordingMachine: Object.assign(new EventEmitter(), {
   getState: () => ({ phase: 'idle' }), isDisabled: () => disabled,
@@ -87,11 +88,36 @@ test('shortcut capture suspends dictation and releases all listeners on window b
 })
 test('only the owning window can end capture; renderer crash restores prior disabled state', () => {
   disabled = true
-  handlers.get('keyboard:begin-shortcut-capture')({ sender })
-  handlers.get('keyboard:end-shortcut-capture')({ sender: { id: 18 } })
+  const first = handlers.get('keyboard:begin-shortcut-capture')({ sender })
+  const second = handlers.get('keyboard:begin-shortcut-capture')({ sender })
+  assert.notEqual(first.sessionId, second.sessionId)
+  const other = new EventEmitter(); other.id = 18; other.isDestroyed = () => false; other.send = () => {}
+  assert.throws(() => handlers.get('keyboard:begin-shortcut-capture')({ sender: other }), /owned by another window/)
+  handlers.get('keyboard:end-shortcut-capture')({ sender: { id: 18 } }, second.sessionId)
+  handlers.get('keyboard:end-shortcut-capture')({ sender }, first.sessionId)
   assert.equal(captureEnabled, true)
+  assert.equal(listeners, 1, 'stale end requests do not release a newer capture')
+  keyListener({ combination: 'Fn', pressed: true, capture: true })
+  assert.equal(sentEvents.at(-1)[0], 'keyboard:shortcut-captured')
+  assert.equal(sentEvents.at(-1)[1].sessionId, second.sessionId)
   sender.emit('render-process-gone')
   assert.equal(captureEnabled, false); assert.equal(disabled, true); assert.equal(listeners, 0)
+})
+
+test('failed capture initialization restores shortcuts and permits a fresh owner', () => {
+  disabled = false
+  failCaptureStart = true
+  assert.throws(() => handlers.get('keyboard:begin-shortcut-capture')({ sender }), /capture initialization failed/)
+  assert.equal(disabled, false)
+  assert.equal(listeners, 0)
+  assert.ok(electronShortcuts.size > 0, 'fallback shortcuts are restored')
+  failCaptureStart = false
+  const other = new EventEmitter(); other.id = 18; other.isDestroyed = () => false; other.send = () => {}
+  const result = handlers.get('keyboard:begin-shortcut-capture')({ sender: other })
+  handlers.get('keyboard:end-shortcut-capture')({ sender: other }, result.sessionId)
+  handlers.get('keyboard:end-shortcut-capture')({ sender: other }, result.sessionId)
+  assert.equal(listeners, 0)
+  assert.equal(disabled, false)
 })
 
 test('saved Fn keycodes migrate across primary and additional bindings', () => {

@@ -61,38 +61,58 @@ export function registerMiscHandlers(handle: (c: string, f: Handler) => void): v
   handle('dictionary:remove', (_e, id: string) => removeWord(id))
 
   // ---- keyboard ----------------------------------------------------------
-  let captureOwner: number | null = null
-  let endCapture: (() => void) | null = null
+  let capture: { ownerId: number; sessionId: number; stop: () => void } | null = null
+  let captureSequence = 0
   handle('keyboard:begin-shortcut-capture', event => {
-    endCapture?.()
+    if (capture !== null && capture.ownerId !== event.sender.id) throw new Error('Shortcut capture is owned by another window')
     const state = recordingMachine.getState()
     if (!['idle', 'error'].includes(state.phase)) throw new Error("Finish the current recording first")
-    captureOwner = event.sender.id
+    capture?.stop()
+    const ownerId = event.sender.id
+    const sessionId = ++captureSequence
     const previousDisabled = recordingMachine.isDisabled()
-    recordingMachine.setDisabled(true)
-    globalShortcut.unregisterAll()
     const window = BrowserWindow.fromWebContents(event.sender)
-    const off = keyboard.onKey(key => {
-      if (!event.sender.isDestroyed() && (key.capture || !keyboard.setShortcutCaptureEnabled)) event.sender.send('keyboard:shortcut-captured', key)
-    })
-    keyboard.setShortcutCaptureEnabled?.(1)
+    let off: (() => void) | null = null
     const cleanup = () => {
-      off()
-      keyboard.setShortcutCaptureEnabled?.(0)
-      recordingMachine.setDisabled(previousDisabled)
-      refreshShortcutRegistrations()
+      if (capture?.ownerId !== ownerId || capture.sessionId !== sessionId) return
+      capture = null
       window?.removeListener('blur', cleanup)
       event.sender.removeListener('destroyed', cleanup)
       event.sender.removeListener('render-process-gone', cleanup)
-      captureOwner = null; endCapture = null
+      try {
+        off?.()
+      } finally {
+        try {
+          keyboard.setShortcutCaptureEnabled?.(0)
+        } finally {
+          recordingMachine.setDisabled(previousDisabled)
+          refreshShortcutRegistrations()
+        }
+      }
     }
-    endCapture = cleanup
-    window?.once('blur', cleanup)
-    event.sender.once('destroyed', cleanup)
-    event.sender.once('render-process-gone', cleanup)
-    return { native: keyboard.running && Boolean(keyboard.setShortcutCaptureEnabled) }
+    capture = { ownerId, sessionId, stop: cleanup }
+    try {
+      recordingMachine.setDisabled(true)
+      globalShortcut.unregisterAll()
+      off = keyboard.onKey(key => {
+        if (capture?.ownerId === ownerId && capture.sessionId === sessionId && !event.sender.isDestroyed() && (key.capture || !keyboard.setShortcutCaptureEnabled)) {
+          event.sender.send('keyboard:shortcut-captured', { ...key, sessionId })
+        }
+      })
+      window?.once('blur', cleanup)
+      event.sender.once('destroyed', cleanup)
+      event.sender.once('render-process-gone', cleanup)
+      keyboard.setShortcutCaptureEnabled?.(1)
+      return { native: keyboard.running && Boolean(keyboard.setShortcutCaptureEnabled), sessionId }
+    } catch (error) {
+      cleanup()
+      throw error
+    }
   })
-  handle('keyboard:end-shortcut-capture', event => { if (captureOwner === event.sender.id) endCapture?.(); return true })
+  handle('keyboard:end-shortcut-capture', (event, requestedSessionId: unknown) => {
+    if (capture?.ownerId === event.sender.id && capture.sessionId === requestedSessionId) capture.stop()
+    return true
+  })
 
   handle('keyboard:start-keyboard-listener', () => {
     if (!keyboard.available) return { ok: false, reason: 'helper-unavailable' }

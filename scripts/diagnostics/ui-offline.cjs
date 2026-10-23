@@ -65,7 +65,7 @@ app.whenReady().then(async () => {
     await waitFor("!document.querySelector('.settings-subdialog')")
     assert.equal(await win.webContents.executeJavaScript("!!document.querySelector('.settings-modal')"), true)
   }
-  assert.equal(await win.webContents.executeJavaScript("[...document.querySelectorAll('.settings-group-title')].map(node => node.innerText).join(',')"), "Shortcuts,Language,Audio,General")
+  assert.equal(await win.webContents.executeJavaScript("[...document.querySelectorAll('.settings-group-title')].map(node => node.innerText).join(',')"), "System permissions,Shortcuts,Language,Audio,General")
   assert.equal(await win.webContents.executeJavaScript("document.body.innerText.includes('Sayrel 本地配置')"), false)
   await clickText('.settings-content button', "Select language variants")
   await waitFor("document.querySelectorAll('.settings-variant').length === 5")
