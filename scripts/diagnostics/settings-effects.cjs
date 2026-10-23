@@ -2,10 +2,14 @@
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm')
 const ts = require('typescript'), assert = require('node:assert/strict')
 const root = path.resolve(__dirname, '../..')
-function fixture() {
+function fixture({ platform = 'darwin' } = {}) {
   const handlers = new Map(), modules = new Map(), events = [], actions = [], windows = [[], []]
   let disk = {}, writes = 0, saveFails = false, themeFails = false, languageFails = false, theme = 'system'
+  let loginFails = false, dockFails = false, loginTarget = false, dockVisible = true
+  let nativeRunning = true, nativeAvailable = true, nativeResult = 0, nativeThrows = false, nativeTargets = '[]', fallbackFailure = null
+  const registrations = new Map(), registrationAttempts = []
   let delaySystemLocale = false, finishSystemLocale
+  let delayDockShow = false, finishDockShow
   class Store {
     constructor({ defaults }) { disk = structuredClone(defaults) }
     get(key) { return disk[key] }
@@ -26,8 +30,30 @@ function fixture() {
   }
   const mocks = {
     electron: {
-      app: { getLocale: () => 'fr', setLoginItemSettings() { actions.push('login') }, dock: { show() { actions.push('dock') }, hide() { actions.push('dock') } } },
+      app: { getLocale: () => 'fr', setLoginItemSettings({ openAtLogin }) {
+        actions.push('login')
+        if (loginFails) throw new Error('login unavailable')
+        loginTarget = openAtLogin
+      }, dock: {
+        async show() {
+          actions.push('dock')
+          if (dockFails) throw new Error('Dock unavailable')
+          if (delayDockShow) await new Promise(resolve => { finishDockShow = resolve })
+          dockVisible = true
+        },
+        hide() { actions.push('dock'); if (dockFails) throw new Error('Dock unavailable'); dockVisible = false }
+      } },
       nativeTheme, systemPreferences: {},
+      globalShortcut: {
+        unregister(accelerator) { registrations.delete(accelerator) },
+        register(accelerator, callback) {
+          registrationAttempts.push(accelerator)
+          if (fallbackFailure === 'throw') throw new Error('shortcut registration unavailable')
+          if (fallbackFailure === 'false') return false
+          registrations.set(accelerator, callback)
+          return true
+        }
+      },
       safeStorage: { isEncryptionAvailable: () => true, encryptString: value => Buffer.from(value), decryptString: value => value.toString() }
     },
     'electron-store': { __esModule: true, default: Store },
@@ -36,11 +62,20 @@ function fixture() {
       events.push({ channel, value: structuredClone(value) })
       windows.forEach(window => window.push({ channel, value: structuredClone(value) }))
     } },
-    '../services/shortcutRegistration': { refreshShortcutRegistrations() { actions.push('shortcuts') } },
-    './shortcutRegistration': { refreshShortcutRegistrations() { actions.push('shortcuts') } },
     '../lib/logger': { createLogger: () => ({ warn() {}, error() {}, debug() {} }) },
     './logger': { createLogger: () => ({ warn() {}, error() {}, debug() {} }) },
-    './appIdentity': {}, '../lib/native': {}, '../lib/paths': {}, '../lib/sidecar': {},
+    './appIdentity': {}, '../lib/native': { keyboard: {
+      get running() { return nativeRunning },
+      get updateTargetShortcuts() {
+        return nativeAvailable ? targets => {
+          actions.push('shortcuts')
+          if (nativeThrows) throw new Error('native shortcut update unavailable')
+          if (nativeResult === 0) nativeTargets = targets
+          return nativeResult
+        } : null
+      }
+    } }, '../lib/paths': {}, '../lib/sidecar': {},
+    './recordingMachine': { recordingMachine: {} },
     '../services/contextCapture': {}, '../services/dictionary': {},
     'node:child_process': { execFile(_file, _args, callback) {
       const finish = () => callback(null, { stdout: 'fr', stderr: '' })
@@ -57,7 +92,7 @@ function fixture() {
       if (!id.startsWith('.')) return require(id)
       return load(path.resolve(path.dirname(file), id + '.ts'))
     }
-    vm.runInNewContext(source, { exports, require: req, process: { platform: 'darwin' }, Buffer, structuredClone, console, setTimeout, clearTimeout }, { filename: file })
+    vm.runInNewContext(source, { exports, require: req, process: { platform }, Buffer, structuredClone, console, setTimeout, clearTimeout }, { filename: file })
     return exports
   }
   load(path.join(root, 'src/main/ipc/system.ts')).registerSystemHandlers((channel, fn) => handlers.set(channel, fn))
@@ -66,12 +101,210 @@ function fixture() {
     events, actions, windows, get writes() { return writes }, get disk() { return disk },
     set saveFails(value) { saveFails = value }, set themeFails(value) { themeFails = value },
     set languageFails(value) { languageFails = value },
+    set loginFails(value) { loginFails = value }, set dockFails(value) { dockFails = value },
+    get loginTarget() { return loginTarget }, get dockVisible() { return dockVisible },
+    set nativeRunning(value) { nativeRunning = value }, set nativeResult(value) { nativeResult = value },
+    set nativeAvailable(value) { nativeAvailable = value },
+    set nativeThrows(value) { nativeThrows = value }, set fallbackFailure(value) { fallbackFailure = value },
+    get nativeTargets() { return JSON.parse(nativeTargets) }, registrations, registrationAttempts,
+    set delayDockShow(value) { delayDockShow = value }, finishDockShow() { finishDockShow() },
     set delaySystemLocale(value) { delaySystemLocale = value },
     finishSystemLocale() { finishSystemLocale() }
   }
 }
 async function test(name, run) { await run(); console.log('PASS ' + name) }
 async function main() {
+  await test('fallback-only publication cannot hide a missing updater after the native backend starts', async () => {
+    const f = fixture()
+    f.nativeRunning = false
+    f.nativeAvailable = false
+    const target = { shortcut: { accelerator: 'Control+K' } }
+    await f.invoke('store:use', 'patch', target)
+    assert.ok(f.registrations.has('Control+K'))
+    f.nativeRunning = true
+    await assert.rejects(f.invoke('store:use', 'patch', target), /Settings saved.*shortcuts/)
+    f.nativeAvailable = true
+    await f.invoke('store:use', 'patch', target)
+    assert.ok(f.nativeTargets.includes('Control+K'))
+    assert.equal(f.registrations.size, 0)
+    assert.equal(f.writes, 3)
+  })
+  await test('reset saves once, reapplies default targets and broadcasts one actual settings snapshot', async () => {
+    const f = fixture()
+    await f.invoke('store:use', 'patch', { launchAtLogin: true, showInDock: false, appearancePreference: 'dark', shortcut: { accelerator: 'Control+K' } })
+    const before = f.writes
+    f.actions.length = 0
+    f.events.length = 0
+    const result = await f.invoke('store:use', 'reset')
+    assert.equal(f.writes - before, 1)
+    assert.equal(result.launchAtLogin, false)
+    assert.equal(result.showInDock, true)
+    assert.equal(result.appearancePreference, 'system')
+    assert.equal(result.shortcut.accelerator, 'Fn')
+    assert.equal(f.loginTarget, false)
+    assert.equal(f.dockVisible, true)
+    assert.ok(f.nativeTargets.includes('Fn'))
+    assert.equal(f.actions.join(','), 'appearance,shortcuts,login,dock')
+    assert.equal(f.events.filter(event => event.channel === 'store:changed').length, 1)
+    assert.deepEqual(f.events.at(-1).value, structuredClone(result))
+  })
+  await test('Dock preferences still save and synchronize on platforms without a Dock', async () => {
+    const f = fixture({ platform: 'linux' })
+    assert.equal(await f.invoke('permission:update-show-app-in-dock', false), true)
+    assert.equal(f.writes, 1)
+    assert.equal(f.events.at(-1).value.showInDock, false)
+    assert.equal(f.actions.length, 0)
+    assert.deepEqual(f.windows[0], f.windows[1])
+  })
+  await test('a delayed Dock show cannot undo a newer saved hide preference', async () => {
+    const f = fixture()
+    f.delayDockShow = true
+    const pending = f.invoke('store:use', 'patch', { showInDock: true })
+    await f.invoke('permission:update-show-app-in-dock', false)
+    assert.equal(f.dockVisible, false)
+    f.finishDockShow()
+    await pending
+    assert.equal((await f.invoke('store:use', 'get')).showInDock, false)
+    assert.equal(f.dockVisible, false)
+    assert.equal(f.events.at(-1).value.showInDock, false)
+    assert.deepEqual(f.windows[0], f.windows[1])
+  })
+  await test('login and Dock failures preserve saved state, report incomplete actions and allow the same target retry', async () => {
+    for (const [channel, args, field, target, failure] of [
+      ['store:use', ['patch', { launchAtLogin: true }], 'launchAtLogin', true, 'loginFails'],
+      ['permission:update-auto-launch', [true], 'launchAtLogin', true, 'loginFails'],
+      ['store:use', ['patch', { showInDock: false }], 'showInDock', false, 'dockFails'],
+      ['permission:update-show-app-in-dock', [true], 'showInDock', true, 'dockFails']
+    ]) {
+      const f = fixture()
+      f[failure] = true
+      await assert.rejects(f.invoke(channel, ...args), /Settings saved, but (launch at startup|Dock visibility) could not be applied/)
+      assert.equal(f.writes, 1)
+      assert.equal((await f.invoke('store:use', 'get'))[field], target)
+      assert.equal(f.events.at(-1).value[field], target)
+      assert.deepEqual(f.windows[0], f.windows[1])
+      f[failure] = false
+      await f.invoke(channel, ...args)
+      assert.equal(f.writes, 2)
+      assert.equal(f.events.filter(event => event.channel === 'store:changed').length, 2)
+      assert.equal(field === 'launchAtLogin' ? f.loginTarget : f.dockVisible, target)
+      assert.equal(f.actions.join(','), field === 'launchAtLogin' ? 'login,login' : 'dock,dock')
+    }
+  })
+  await test('each shortcut field republishes native targets without touching login items or Dock', async () => {
+    for (const field of ['shortcut', 'commandShortcut', 'translationShortcut', 'askAnythingShortcut', 'additionalShortcuts']) {
+      const f = fixture()
+      const binding = { accelerator: 'Control+K', enabled: true, style: 'toggle' }
+      const value = field === 'additionalShortcuts' ? { shortcut: [binding] } : binding
+      await f.invoke('store:use', 'patch', { [field]: value })
+      assert.equal(f.writes, 1)
+      assert.ok(f.nativeTargets.includes('Control+K'), field)
+      assert.equal(f.actions.join(','), 'shortcuts')
+      assert.equal(f.events.filter(event => event.channel === 'store:changed').length, 1)
+    }
+  })
+  await test('fallback shortcut rejection and exceptions report failure and retry saved targets', async () => {
+    for (const failure of ['false', 'throw']) {
+      const f = fixture()
+      f.nativeRunning = false
+      f.fallbackFailure = failure
+      const target = { shortcut: { accelerator: 'Control+K' } }
+      await assert.rejects(f.invoke('store:use', 'patch', target), /Settings saved.*shortcuts/)
+      assert.equal(f.writes, 1)
+      assert.equal(f.events.at(-1).value.shortcut.accelerator, 'Control+K')
+      assert.equal(f.registrations.size, 0)
+      assert.ok(f.registrationAttempts.includes('Control+K'))
+      f.fallbackFailure = null
+      await f.invoke('store:use', 'patch', target)
+      assert.equal(f.writes, 2)
+      assert.ok(f.registrations.has('Control+K'))
+      assert.equal(f.registrationAttempts.filter(value => value === 'Control+K').length, 2)
+    }
+  })
+  await test('native shortcut exceptions can be retried and a working fallback tolerates an inactive native updater failure', async () => {
+    const f = fixture()
+    const target = { shortcut: { accelerator: 'Control+K' } }
+    f.nativeThrows = true
+    await assert.rejects(f.invoke('store:use', 'patch', target), /Settings saved.*shortcuts/)
+    f.nativeThrows = false
+    await f.invoke('store:use', 'patch', target)
+    assert.ok(f.nativeTargets.includes('Control+K'))
+    const fallback = fixture()
+    fallback.nativeRunning = false
+    fallback.nativeResult = -1
+    await fallback.invoke('store:use', 'patch', target)
+    assert.ok(fallback.registrations.has('Control+K'))
+    assert.equal(fallback.writes, 1)
+  })
+  await test('independent effect failures are all reported while the actual saved snapshot reaches every window', async () => {
+    const f = fixture()
+    f.nativeResult = -1
+    f.loginFails = true
+    f.dockFails = true
+    await assert.rejects(f.invoke('store:use', 'patch', {
+      shortcut: { accelerator: 'Control+K' }, launchAtLogin: true, showInDock: false
+    }), error => /shortcuts/.test(error.message) && /launch at startup/.test(error.message) && /Dock visibility/.test(error.message))
+    assert.equal(f.writes, 1)
+    assert.equal(f.actions.join(','), 'shortcuts,login,dock')
+    assert.equal(f.events.at(-1).value.launchAtLogin, true)
+    assert.equal(f.events.at(-1).value.showInDock, false)
+    assert.equal(f.events.at(-1).value.shortcut.accelerator, 'Control+K')
+    assert.deepEqual(f.windows[0], f.windows[1])
+  })
+  await test('failed native shortcut publication reports the saved state and retries the same target', async () => {
+    const f = fixture()
+    const target = { shortcut: { accelerator: 'Control+K' } }
+    f.nativeResult = -1
+    await assert.rejects(f.invoke('store:use', 'patch', target), /Settings saved.*shortcuts/)
+    assert.equal(f.writes, 1)
+    assert.equal((await f.invoke('store:use', 'get')).shortcut.accelerator, 'Control+K')
+    assert.equal(f.events.at(-1).value.shortcut.accelerator, 'Control+K')
+    assert.deepEqual(f.nativeTargets, [])
+    f.nativeResult = 0
+    await f.invoke('store:use', 'patch', target)
+    assert.equal(f.writes, 2)
+    assert.ok(f.nativeTargets.includes('Control+K'))
+    assert.equal(f.actions.join(','), 'shortcuts,shortcuts')
+    assert.deepEqual(f.windows[0], f.windows[1])
+  })
+  await test('generic and compatible Dock changes each save once and only apply the saved visibility', async () => {
+    const f = fixture()
+    await f.invoke('store:use', 'patch', { showInDock: false })
+    assert.equal(f.writes, 1)
+    assert.equal(f.dockVisible, false)
+    assert.equal(await f.invoke('permission:update-show-app-in-dock', true), true)
+    assert.equal(f.writes, 2)
+    assert.equal(f.dockVisible, true)
+    assert.equal(f.actions.join(','), 'dock,dock')
+    assert.equal(f.events.filter(event => event.channel === 'store:changed').length, 2)
+    assert.equal(f.events.at(-1).value.showInDock, true)
+    assert.deepEqual(f.windows[0], f.windows[1])
+  })
+  await test('generic and compatible login changes each save once and only apply the saved login target', async () => {
+    const f = fixture()
+    await f.invoke('store:use', 'patch', { launchAtLogin: true })
+    assert.equal(f.writes, 1)
+    assert.equal(f.loginTarget, true)
+    assert.equal(await f.invoke('permission:update-auto-launch', false), true)
+    assert.equal(f.writes, 2)
+    assert.equal(f.loginTarget, false)
+    assert.equal(f.actions.join(','), 'login,login')
+    assert.equal(f.events.filter(event => event.channel === 'store:changed').length, 2)
+    assert.equal(f.events.at(-1).value.launchAtLogin, false)
+    assert.deepEqual(f.windows[0], f.windows[1])
+  })
+  await test('audio and history settings save and broadcast without changing shortcuts, login items or Dock', async () => {
+    const f = fixture()
+    const result = await f.invoke('store:use', 'patch', { micDevice: 'test-microphone', historyEnabled: false })
+    assert.equal(result.micDevice, 'test-microphone')
+    assert.equal(result.historyEnabled, false)
+    assert.equal(f.writes, 1)
+    assert.deepEqual(f.actions, [])
+    assert.equal(f.events.length, 1)
+    assert.equal(f.events[0].channel, 'store:changed')
+    assert.equal(f.events[0].value.historyEnabled, false)
+    assert.deepEqual(f.windows[0], f.windows[1])
+  })
   await test('generic language changes save once, notify windows and leave unrelated OS settings alone', async () => {
     const f = fixture()
     const result = await f.invoke('store:use', 'patch', { language: 'zh-CN' })
@@ -121,7 +354,9 @@ async function main() {
   await test('failed persistence leaves the saved snapshot and all effects untouched', async () => {
     for (const [channel, args] of [
       ['store:use', ['patch', { language: 'zh-CN', appearancePreference: 'dark' }]],
-      ['i18n:set-language', ['zh-CN']], ['appearance:set-preference', ['dark']]
+      ['i18n:set-language', ['zh-CN']], ['appearance:set-preference', ['dark']],
+      ['store:use', ['patch', { launchAtLogin: true, showInDock: false, shortcut: { accelerator: 'Control+K' } }]],
+      ['permission:update-auto-launch', [true]], ['permission:update-show-app-in-dock', [false]]
     ]) {
       const f = fixture()
       const before = structuredClone(await f.invoke('store:use', 'get'))
@@ -137,6 +372,10 @@ async function main() {
     const f = fixture()
     await assert.rejects(f.invoke('appearance:set-preference', 'sepia'))
     await assert.rejects(f.invoke('store:use', 'patch', { language: 42 }))
+    await assert.rejects(f.invoke('store:use', 'patch', { launchAtLogin: 'yes' }))
+    await assert.rejects(f.invoke('store:use', 'patch', { showInDock: 'no' }))
+    await assert.rejects(f.invoke('permission:update-auto-launch', 'yes'))
+    await assert.rejects(f.invoke('permission:update-show-app-in-dock', 'no'))
     assert.equal(f.writes, 0)
     assert.equal(f.events.length, 0)
     assert.equal(f.actions.length, 0)

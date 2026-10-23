@@ -12,6 +12,7 @@ import {
 import { WINDOWS } from '../../shared/constants'
 import { recordingMachine } from '../services/recordingMachine'
 import { settings } from '../lib/settings'
+import { patchSettings } from '../services/settingsEffects'
 import { util } from '../lib/native'
 import { createLogger } from '../lib/logger'
 import type { Handler } from './index'
@@ -97,8 +98,8 @@ export function registerWindowHandlers(handle: (c: string, f: Handler) => void):
     return true
   })
 
-  handle('page:complete-onboarding', () => {
-    settings.patch({ onboardingCompleted: true })
+  handle('page:complete-onboarding', async () => {
+    await patchSettings({ onboardingCompleted: true })
     onboardingWindow.closeWindow()
     openHub('main')
     return true
@@ -122,7 +123,7 @@ export function registerWindowHandlers(handle: (c: string, f: Handler) => void):
     switch (action) {
       case 'translation-language': {
         if (typeof payload !== 'string' || !recordingMachine.selectTranslationLanguage(payload)) return false
-        broadcast('store:changed', settings.patch({ translationTargetLanguage: payload }))
+        await patchSettings({ translationTargetLanguage: payload })
         return true
       }
       case 'start':

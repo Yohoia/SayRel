@@ -1,5 +1,6 @@
 import lottie from 'lottie-web/build/player/lottie_svg'
-import { DEFAULT_SETTINGS, mergeSettings } from '../src/shared/settings'
+import { z } from 'zod'
+import { DEFAULT_SETTINGS, mergeSettings, type Settings } from '../src/shared/settings'
 import { providerActionSchema, updateProviderState } from '../src/shared/providers'
 import { buildDictationUsage } from '../src/shared/usage'
 
@@ -40,6 +41,14 @@ Object.assign(fixtureMedia, {
   }
 })
 Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: fixtureMedia })
+function patchSettings({ partial }: { partial: Partial<Settings> }) {
+  settings = mergeSettings({ ...settings, ...partial, provider: { ...settings.provider, ...partial.provider } })
+  localStorage.setItem('sayrel-ui-settings', JSON.stringify(settings))
+  if ('language' in partial) emit('i18n:language-changed', settings.language ?? 'en')
+  if ('appearancePreference' in partial) emit('appearance:color-mode-changed', { colorMode: settings.appearancePreference, resolved: settings.appearancePreference === 'dark' ? 'dark' : 'light' })
+  emit('store:changed', settings)
+  return settings
+}
 const bridge = {
   on(channel: string, cb: (...args: any[]) => void) { const set = listeners.get(channel) ?? new Set(); set.add(cb); listeners.set(channel, set); return () => set.delete(cb) },
   async invoke(channel: string, ...args: any[]): Promise<any> {
@@ -59,14 +68,8 @@ const bridge = {
       return settings.serviceProviders
     }
     if (channel === 'store:use') {
-      if (args[0] === 'patch') {
-        settings = mergeSettings({ ...settings, ...args[1], provider: { ...settings.provider, ...args[1]?.provider } })
-        localStorage.setItem('sayrel-ui-settings', JSON.stringify(settings))
-        if ('language' in args[1]) emit('i18n:language-changed', settings.language ?? 'en')
-        if ('appearancePreference' in args[1]) emit('appearance:color-mode-changed', { colorMode: settings.appearancePreference, resolved: settings.appearancePreference === 'dark' ? 'dark' : 'light' })
-        emit('store:changed', settings)
-      }
-      if (args[0] === 'reset') settings = mergeSettings(DEFAULT_SETTINGS)
+      if (args[0] === 'patch') return patchSettings({ partial: args[1] ?? {} })
+      if (args[0] === 'reset') return patchSettings({ partial: DEFAULT_SETTINGS })
       return settings
     }
     if (channel === 'db:history-list' || channel === 'db:history-latest') {
@@ -114,11 +117,16 @@ const bridge = {
       entry.word = args[1]; localStorage.setItem('sayrel-ui-words', JSON.stringify(words)); return entry
     }
     if (channel === 'appearance:get-state') return { resolved: settings.appearancePreference === 'dark' ? 'dark' : 'light' }
-    if (channel === 'appearance:set-preference') { emit('appearance:color-mode-changed', { resolved: args[0] === 'dark' ? 'dark' : 'light' }); return true }
+    if (channel === 'appearance:set-preference') { patchSettings({ partial: { appearancePreference: args[0] } }); return { colorMode: settings.appearancePreference, resolved: settings.appearancePreference === 'dark' ? 'dark' : 'light' } }
     if (channel === 'i18n:get-language') return settings.language
-    if (channel === 'i18n:set-language') { settings.language = args[0]; emit('store:changed', settings); emit('i18n:language-changed', args[0]); return args[0] }
-    if (channel === 'page:floating-bar-click' && args[0] === 'translation-language') { settings.translationTargetLanguage = args[1]; emit('store:changed', settings); return true }
-    if (channel.startsWith('permission:')) { if (params.get('fail') === 'permission') { if (channel === 'permission:check-with-child-process') return false; throw new Error('Could not request permission') }; return true }
+    if (channel === 'i18n:set-language') { patchSettings({ partial: { language: args[0] } }); return settings.language }
+    if (channel === 'page:floating-bar-click' && args[0] === 'translation-language') { patchSettings({ partial: { translationTargetLanguage: args[1] } }); return true }
+    if (channel.startsWith('permission:')) {
+      if (params.get('fail') === 'permission') { if (channel === 'permission:check-with-child-process') return false; throw new Error('Could not request permission') }
+      if (channel === 'permission:update-auto-launch') patchSettings({ partial: { launchAtLogin: z.boolean().parse(args[0]) } })
+      if (channel === 'permission:update-show-app-in-dock') patchSettings({ partial: { showInDock: z.boolean().parse(args[0]) } })
+      return true
+    }
     if (channel === 'keyboard:begin-shortcut-capture') return { native: false }
     if (channel === 'audio:get-devices-async') return [{ deviceId: 'default', label: 'MacBook Pro Microphone', isDefault: true }]
     if (channel === 'troubleshooting:get-system-info') return { appVersion: '1.0.0', platform: 'darwin', arch: 'arm64' }

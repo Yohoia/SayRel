@@ -23,28 +23,41 @@ export function toElectronAccelerator(value: string): string | null {
 }
 
 /** Re-publish edited bindings and keep exactly one keyboard input backend. */
-export function refreshShortcutRegistrations(): void {
+export function refreshShortcutRegistrations(): boolean {
+  let applied = true
   const bindings = shortcutBindings().filter(({ binding }) => binding?.enabled && binding.accelerator)
   const targets = JSON.stringify([...new Set(bindings.map(({ binding }) => binding.accelerator))])
   if (targets !== lastTargets) {
-    keyboard.updateTargetShortcuts?.(targets)
-    resetHotkeyState()
-    lastTargets = targets
+    try {
+      const result = keyboard.updateTargetShortcuts?.(targets)
+      if ((result !== undefined && result !== 0) || (keyboard.running && result === undefined)) {
+        throw new Error('Native shortcut targets could not be applied')
+      }
+      resetHotkeyState()
+      if (result === 0) lastTargets = targets
+    } catch (error) {
+      log.warn('failed to publish native shortcut targets', error)
+      applied = !keyboard.running
+    }
   }
   for (const accelerator of registered) globalShortcut.unregister(accelerator)
   registered.clear()
-  if (keyboard.running) return
+  if (keyboard.running) return applied
   for (const { binding } of bindings) {
     const accelerator = toElectronAccelerator(binding.accelerator)
-    if (!accelerator || registered.has(accelerator)) continue
+    if (!accelerator) { applied = false; continue }
+    if (registered.has(accelerator)) continue
     try {
       if (globalShortcut.register(accelerator, () => handleFallbackShortcut(binding.accelerator))) {
         registered.add(accelerator)
       } else {
         log.warn(`shortcut already in use: ${accelerator}`)
+        applied = false
       }
     } catch (err) {
       log.warn(`failed to register ${accelerator}`, err)
+      applied = false
     }
   }
+  return applied
 }

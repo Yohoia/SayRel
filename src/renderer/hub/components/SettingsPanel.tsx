@@ -125,8 +125,7 @@ function GeneralSection() {
         <Toggle
           value={settings.launchAtLogin}
           onChange={(v) => {
-            void patch({ launchAtLogin: v })
-            void api.permission.updateAutoLaunch(v)
+            void patch({ launchAtLogin: v }).catch(() => undefined)
           }}
         />
       </Row>
@@ -134,8 +133,7 @@ function GeneralSection() {
         <Toggle
           value={settings.showInDock}
           onChange={(v) => {
-            void patch({ showInDock: v })
-            void api.app.setDock?.(v)
+            void patch({ showInDock: v }).catch(() => undefined)
           }}
         />
       </Row>
@@ -155,8 +153,8 @@ function AudioSection({ autoOpen }: { autoOpen: boolean }) {
   const { settings, patch } = useAppSettings()
   return <>
     <Row label="Microphone" hint="Choose your preferred microphone for Sayrel to capture your voice."><MicrophonePicker autoOpen={autoOpen} /></Row>
-    <Row label="Interaction sounds" hint="Play sounds for key actions like start/stop."><Toggle value={settings.playSoundOnRecord} onChange={value => void patch({ playSoundOnRecord: value })} /></Row>
-    <Row label="Mute when dictating" hint="Automatically silence other active audio during dictation."><Toggle value={settings.muteWhileDictating} onChange={value => void patch({ muteWhileDictating: value })} /></Row>
+    <Row label="Interaction sounds" hint="Play sounds for key actions like start/stop."><Toggle value={settings.playSoundOnRecord} onChange={value => { void patch({ playSoundOnRecord: value }).catch(() => undefined) }} /></Row>
+    <Row label="Mute when dictating" hint="Automatically silence other active audio during dictation."><Toggle value={settings.muteWhileDictating} onChange={value => { void patch({ muteWhileDictating: value }).catch(() => undefined) }} /></Row>
   </>
 }
 

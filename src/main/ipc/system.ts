@@ -179,17 +179,12 @@ export function registerSystemHandlers(handle: (c: string, f: Handler) => void):
     }
     return true
   })
-  handle('permission:update-auto-launch', (_e, enabled: boolean) => {
-    app.setLoginItemSettings({ openAtLogin: Boolean(enabled) })
-    settings.patch({ launchAtLogin: Boolean(enabled) })
+  handle('permission:update-auto-launch', async (_e, enabled: unknown) => {
+    await patchSettings({ launchAtLogin: z.boolean().parse(enabled) })
     return true
   })
-  handle('permission:update-show-app-in-dock', (_e, show: boolean) => {
-    if (process.platform === 'darwin' && app.dock) {
-      if (show) app.dock.show()
-      else app.dock.hide()
-    }
-    settings.patch({ showInDock: Boolean(show) })
+  handle('permission:update-show-app-in-dock', async (_e, show: unknown) => {
+    await patchSettings({ showInDock: z.boolean().parse(show) })
     return true
   })
 

@@ -1,7 +1,7 @@
 import { providerActionSchema, providerConfigurationIssue, updateProviderState } from '../../shared/providers'
 import { settings } from '../lib/settings'
 import { listProviderModels, testProvider } from '../services/providers'
-import { broadcast } from '../windows'
+import { patchSettings } from '../services/settingsEffects'
 import type { Handler } from './index'
 
 export function registerProviderHandlers(handle: (channel: string, fn: Handler) => void): void {
@@ -18,8 +18,7 @@ export function registerProviderHandlers(handle: (channel: string, fn: Handler) 
       return testProvider(action.profile, action.model)
     }
     const state = updateProviderState(settings.get().serviceProviders, action)
-    const next = settings.patch({ serviceProviders: state })
-    broadcast('store:changed', next)
+    const next = await patchSettings({ serviceProviders: state })
     return next.serviceProviders
   })
 }

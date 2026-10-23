@@ -43,6 +43,17 @@ async function clearToasts() {
   await until("!document.querySelector('.sayrel-toast')")
 }
 
+async function toggleSetting({ label }) {
+  const expression = `[...document.querySelectorAll('.settings-row')].find(row => row.querySelector('.settings-row-label')?.textContent === ${JSON.stringify(label)})?.querySelector('[role="switch"]')`
+  await until(`!!(${expression})`)
+  await js(`${expression}.scrollIntoView({ block: 'center' })`)
+  await js(`${expression}.click()`)
+}
+
+async function readToggle({ label, target = win }) {
+  return js(`[...document.querySelectorAll('.settings-row')].find(row => row.querySelector('.settings-row-label')?.textContent === ${JSON.stringify(label)})?.querySelector('[role="switch"]')?.getAttribute('aria-checked')`, target)
+}
+
 async function createWindow() {
   const target = new BrowserWindow({ width: 1080, height: 750, show: false, webPreferences: { backgroundThrottling: false } })
   await target.loadURL('about:blank')
@@ -52,8 +63,10 @@ async function createWindow() {
     if (location.protocol === 'file:') localStorage.setItem('sayrel-ui-settings', JSON.stringify({ language: 'en', appearancePreference: 'light' }));
     window.__settingsCalls = [];
     window.__settingsMessages = [];
+    window.__settingsUnhandled = [];
+    window.addEventListener('unhandledrejection', event => window.__settingsUnhandled.push(String(event.reason)));
     window.__settingsListeners = new Map();
-    window.__settingsFaults = { save: false, appearance: false, holdGet: false, holdPatch: false };
+    window.__settingsFaults = { save: false, appearance: false, login: false, dock: false, shortcuts: false, holdGet: false, holdPatch: false };
     window.__settingsFaults.holdGet = new URLSearchParams(location.search).has('hold-settings-get');
     window.__settingsEmit = (channel, value) => {
       for (const listener of window.__settingsListeners.get(channel) || []) listener(value);
@@ -84,10 +97,25 @@ async function createWindow() {
           window.__settingsFaults.appearance = false;
           window.__settingsSuppressAppearance = true;
         }
+        const failLogin = patch && 'launchAtLogin' in args[1] && window.__settingsFaults.login;
+        const failDock = patch && 'showInDock' in args[1] && window.__settingsFaults.dock;
+        const failShortcuts = patch && window.__settingsFaults.shortcuts && ['shortcut', 'translationShortcut', 'askAnythingShortcut', 'commandShortcut', 'additionalShortcuts'].some(key => key in args[1]);
         const result = await invoke(channel, ...args);
         if (failAppearance) {
           window.__settingsSuppressAppearance = false;
           throw new Error('Settings saved, but appearance could not be applied. Please try again.');
+        }
+        if (failLogin) {
+          window.__settingsFaults.login = false;
+          throw new Error('Settings saved, but launch at startup could not be applied. Please try again.');
+        }
+        if (failDock) {
+          window.__settingsFaults.dock = false;
+          throw new Error('Settings saved, but Dock visibility could not be applied. Please try again.');
+        }
+        if (failShortcuts) {
+          window.__settingsFaults.shortcuts = false;
+          throw new Error('Settings saved, but shortcuts could not be applied. Please try again.');
         }
         const holdGet = channel === 'store:use' && args[0] === 'get' && window.__settingsFaults.holdGet;
         if (holdGet || patch && window.__settingsFaults.holdPatch) {
@@ -121,6 +149,92 @@ app.whenReady().then(async () => {
   await until("document.documentElement.dataset.colorMode === 'dark' && !!document.querySelector('.sayrel-toast.is-success')")
   assert.deepEqual(await js("window.__settingsCalls.filter(call => call[0] === 'store:use' && call[1] === 'patch' || call[0] === 'appearance:set-preference')"), [['store:use', 'patch', { appearancePreference: 'dark' }]], 'appearance selection saves through one settings entry')
   console.log('PASS appearance selection saves and applies through one settings entry')
+
+  await openSettings()
+  await toggleSetting({ label: 'Launch at startup' })
+  await until("!!document.querySelector('.sayrel-toast.is-success')")
+  assert.deepEqual(await js("window.__settingsCalls.filter(call => call[0] === 'store:use' && call[1] === 'patch' || call[0] === 'permission:update-auto-launch')"), [['store:use', 'patch', { launchAtLogin: true }]], 'startup toggle saves through one settings entry')
+  console.log('PASS startup toggle saves through one settings entry')
+
+  await openSettings()
+  await toggleSetting({ label: 'Show app in dock' })
+  await until("!!document.querySelector('.sayrel-toast.is-success')")
+  assert.deepEqual(await js("window.__settingsCalls.filter(call => call[0] === 'store:use' && call[1] === 'patch' || call[0] === 'permission:update-show-app-in-dock')"), [['store:use', 'patch', { showInDock: false }]], 'Dock toggle saves through one settings entry')
+  console.log('PASS Dock toggle saves through one settings entry')
+
+  await openSettings()
+  await js('window.__settingsFaults.save = true')
+  await toggleSetting({ label: 'Interaction sounds' })
+  await until("document.querySelector('.sayrel-toast.is-error .toast-message')?.textContent === 'Could not save. Please try again.'")
+  await js('new Promise(resolve => setTimeout(resolve, 100))')
+  assert.deepEqual(await js('window.__settingsUnhandled'), [], 'handled save rejection must not escape as an unhandled promise')
+  assert.equal(await readToggle({ label: 'Interaction sounds' }), 'true', 'failed sound setting remains unchanged')
+  console.log('PASS audio save rejection is handled and preserves the visible setting')
+
+  await openSettings()
+  await js('window.__settingsFaults.shortcuts = true')
+  await js("[...document.querySelectorAll('.settings-row')].find(row => row.querySelector('.settings-row-label')?.textContent === 'Translate').querySelector('[aria-label=\"Disable shortcut\"]').click()")
+  await until("document.querySelector('.sayrel-toast.is-error .toast-message')?.textContent === 'Settings saved, but shortcuts could not be applied. Please try again.'")
+  assert.equal(await js("window.sayrel.invoke('store:use', 'get').then(settings => settings.translationShortcut.enabled)"), false, 'shortcut disable remains saved after a registration failure')
+  assert.equal(await js("[...document.querySelectorAll('.settings-row')].find(row => row.querySelector('.settings-row-label')?.textContent === 'Translate').querySelectorAll('.settings-shortcut-key').length"), 0, 'shortcut editor displays the actual saved disabled state')
+  assert.equal(await js("document.querySelectorAll('.sayrel-toast.is-success').length"), 0, 'registration failure never displays success')
+  await js('new Promise(resolve => setTimeout(resolve, 100))')
+  assert.deepEqual(await js('window.__settingsUnhandled'), [], 'shortcut disable handles the saved-but-not-applied rejection')
+  console.log('PASS shortcut disable retains saved state and reports registration failure without an unhandled rejection')
+
+  await openSettings()
+  await js("[...document.querySelectorAll('.settings-row')].find(row => row.querySelector('.settings-row-label')?.textContent === 'Translation targets').querySelector('.settings-picker').click()")
+  await until("!!document.querySelector('.settings-subdialog')")
+  await js("document.querySelector('.settings-subdialog .settings-add').click()")
+  await until("!!document.querySelector('[role=listbox]')")
+  await js('window.__settingsFaults.save = true')
+  await js("[...document.querySelectorAll('[role=option]')].find(option => option.textContent === 'Japanese').click()")
+  await until("document.querySelector('.sayrel-toast.is-error .toast-message')?.textContent === 'Could not save. Please try again.'")
+  assert.deepEqual(await js("window.sayrel.invoke('store:use', 'get').then(settings => settings.translationTargetLanguages)"), ['en'], 'failed translation target save preserves the current target')
+  assert.equal(await js("document.querySelectorAll('.settings-language-item').length"), 1, 'failed translation target save does not add an unsaved target')
+  await js('new Promise(resolve => setTimeout(resolve, 100))')
+  assert.deepEqual(await js('window.__settingsUnhandled'), [], 'translation target selection handles save rejection')
+  await clearToasts()
+  await js("[...document.querySelectorAll('[role=option]')].find(option => option.textContent === 'Japanese').click()")
+  await until("!!document.querySelector('.sayrel-toast.is-success') && !document.querySelector('[role=listbox]')")
+  assert.deepEqual(await js("window.sayrel.invoke('store:use', 'get').then(settings => settings.translationTargetLanguages)"), ['en', 'ja'], 'retry adds the same chosen translation target')
+  console.log('PASS translation target save failure preserves state and allows retry without an unhandled rejection')
+
+  for (const { label, key, initial, next } of [
+    { label: 'Launch at startup', key: 'launchAtLogin', initial: false, next: true },
+    { label: 'Show app in dock', key: 'showInDock', initial: true, next: false }
+  ]) {
+    await openSettings()
+    await js('window.__settingsFaults.save = true')
+    await toggleSetting({ label })
+    await until("document.querySelector('.sayrel-toast.is-error .toast-message')?.textContent === 'Could not save. Please try again.'")
+    assert.equal(await readToggle({ label }), String(initial), 'failed save preserves ' + label)
+    assert.equal(await js("document.querySelectorAll('.sayrel-toast.is-success').length"), 0, 'failed save never displays success')
+    await clearToasts()
+    await toggleSetting({ label })
+    await until("!!document.querySelector('.sayrel-toast.is-success')")
+    assert.equal(await readToggle({ label }), String(next), 'the same requested target can be saved after retry')
+    assert.deepEqual(await js("window.__settingsCalls.filter(call => call[0] === 'store:use' && call[1] === 'patch')"), [['store:use', 'patch', { [key]: next }], ['store:use', 'patch', { [key]: next }]], 'retry sends the same requested target once more')
+    assert.deepEqual(await js('window.__settingsUnhandled'), [], 'save rejection is handled by the UI')
+    console.log('PASS ' + label + ' save failure preserves state and allows the same target retry')
+  }
+
+  for (const { label, key, next, fault, message } of [
+    { label: 'Launch at startup', key: 'launchAtLogin', next: true, fault: 'login', message: 'Settings saved, but launch at startup could not be applied. Please try again.' },
+    { label: 'Show app in dock', key: 'showInDock', next: false, fault: 'dock', message: 'Settings saved, but Dock visibility could not be applied. Please try again.' }
+  ]) {
+    await openSettings()
+    await js(`window.__settingsFaults[${JSON.stringify(fault)}] = true`)
+    await toggleSetting({ label })
+    await until(`document.querySelector('.sayrel-toast.is-error .toast-message')?.textContent === ${JSON.stringify(message)}`)
+    assert.equal(await readToggle({ label }), String(next), 'the UI receives the actual saved target despite an effect failure')
+    assert.equal(await js(`window.sayrel.invoke('store:use', 'get').then(settings => settings[${JSON.stringify(key)}])`), next, 'the settings interface exposes the saved target')
+    assert.equal(await js("document.querySelectorAll('.sayrel-toast.is-success').length"), 0, 'effect failure never displays success')
+    assert.equal(await js("document.querySelectorAll('.sayrel-toast.is-error').length"), 1, 'effect failure displays one explicit error')
+    await js('new Promise(resolve => setTimeout(resolve, 100))')
+    assert.deepEqual(await js('window.__settingsUnhandled'), [], 'effect rejection is handled by the UI')
+    console.log('PASS ' + label + ' effect failure reports partial completion and retains the saved target')
+  }
 
   await openSettings()
   await js('window.__settingsFaults.save = true')
@@ -174,6 +288,8 @@ app.whenReady().then(async () => {
   await openSettings()
   peer = await createWindow()
   await openSettings({}, peer)
+  await toggleSetting({ label: 'Launch at startup' })
+  await toggleSetting({ label: 'Show app in dock' })
   await select('Appearance', 'Dark')
   await until("document.documentElement.dataset.colorMode === 'dark'")
   await select('Interface language', new Intl.DisplayNames(['zh-CN'], { type: 'language' }).of('zh-CN'))
@@ -187,7 +303,9 @@ app.whenReady().then(async () => {
   await until("document.documentElement.lang === 'zh-CN' && document.documentElement.dataset.colorMode === 'dark'", peer)
   assert.equal(await js("document.querySelector('.home-navigation a').textContent", peer), '首页', 'the second window receives the selected language')
   assert.equal(await js("[...document.querySelectorAll('.hub-select')].find(control => control.getAttribute('aria-label') === '外观')?.textContent", peer), '黑暗', 'the second settings window receives the saved appearance')
-  console.log('PASS two open settings windows converge on language and appearance broadcast snapshots')
+  assert.equal(await readToggle({ label: '登录时启动应用', target: peer }), 'true', 'the second settings window receives the saved startup preference')
+  assert.equal(await readToggle({ label: '在Dock中显示应用', target: peer }), 'false', 'the second settings window receives the saved Dock preference')
+  console.log('PASS two open settings windows converge on language, appearance, startup, and Dock broadcast snapshots')
 }).catch(error => { console.error(error); process.exitCode = 1 }).finally(() => {
   peer?.destroy()
   win?.destroy()

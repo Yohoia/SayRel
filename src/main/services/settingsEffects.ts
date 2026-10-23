@@ -13,7 +13,9 @@ const log = createLogger('settings-effects')
 
 const preferences = z.object({
   language: z.string().nullable().optional(),
-  appearancePreference: z.enum(['light', 'dark', 'system']).optional()
+  appearancePreference: z.enum(['light', 'dark', 'system']).optional(),
+  launchAtLogin: z.boolean().optional(),
+  showInDock: z.boolean().optional()
 })
 
 export async function patchSettings(partial: DeepPartial<Settings>): Promise<Settings> {
@@ -58,13 +60,21 @@ async function applyEffects({ next, fields }: { next: Settings; fields: string[]
       broadcast(IPC.APPEARANCE_COLOR_MODE_CHANGED, getAppearanceState())
     } })
   }
-  // Other settings retain their existing effects until their callers are migrated.
-  if (fields.some(field => field !== 'language' && field !== 'appearancePreference')) {
-    await apply({ effect: 'shortcuts', run: refreshShortcutRegistrations })
+  if (['shortcut', 'commandShortcut', 'translationShortcut', 'askAnythingShortcut', 'additionalShortcuts'].some(field => fields.includes(field))) {
+    await apply({ effect: 'shortcuts', run: () => {
+      if (!refreshShortcutRegistrations()) throw new Error('Shortcut registration did not complete')
+    } })
+  }
+  if (fields.includes('launchAtLogin')) {
     await apply({ effect: 'login', run: () => app.setLoginItemSettings({ openAtLogin: settings.get().launchAtLogin }) })
+  }
+  if (fields.includes('showInDock')) {
     await apply({ effect: 'dock', run: async () => {
       if (process.platform === 'darwin' && app.dock) {
-        if (settings.get().showInDock) await app.dock.show()
+        if (settings.get().showInDock) {
+          await app.dock.show()
+          if (!settings.get().showInDock) app.dock.hide()
+        }
         else app.dock.hide()
       }
     } })

@@ -10,7 +10,7 @@ const mocks = {
   '../lib/settings': { settings: { get: () => config } },
   '../windows': { windows: {} },
   './recordingMachine': { recordingMachine: {} },
-  '../lib/native': { keyboard: { get running() { return nativeRunning }, updateTargetShortcuts(value) { targets = value } } },
+  '../lib/native': { keyboard: { get running() { return nativeRunning }, updateTargetShortcuts(value) { targets = value; return 0 } } },
   electron: { globalShortcut: { unregister(value) { electronShortcuts.delete(value) }, register(value, callback) { electronShortcuts.set(value, callback); return true } } }
 }
 function load(file) {
