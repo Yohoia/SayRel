@@ -1,30 +1,4 @@
-import { useEffect, useId, useState } from 'react'
-
-// DWYvEY4x:126–254, Rf:8974–9043. Only the two gradient colors are themed.
-export function useMicrophoneVolume(analyser: AnalyserNode | null) {
-  const [volume, setVolume] = useState(0)
-  useEffect(() => {
-    if (!analyser) { setVolume(0); return }
-    const meter = analyser.context.createAnalyser()
-    meter.fftSize = 1024
-    meter.smoothingTimeConstant = .8
-    analyser.connect(meter)
-    const samples = new Float32Array(new ArrayBuffer(meter.frequencyBinCount * 4))
-    let smoothed = 0
-    let timer = 0
-    const start = window.setTimeout(() => { timer = window.setInterval(() => {
-      meter.getFloatTimeDomainData(samples)
-      const rms = Math.sqrt(samples.reduce((sum, value) => sum + value * value, 0) / samples.length)
-      const db = rms > 0 ? 20 * Math.log10(rms) : -Infinity
-      const next = Math.min(1, Math.max(0, (Math.max(-50, db) + 50) / 50) * 2)
-      smoothed += (next - smoothed) * (next > smoothed ? .5 : .1)
-      if (smoothed < .001) smoothed = 0
-      setVolume(smoothed)
-    }, 30) }, 100)
-    return () => { window.clearTimeout(start); window.clearInterval(timer); analyser.disconnect(meter); meter.disconnect() }
-  }, [analyser])
-  return volume
-}
+import { useId } from 'react'
 
 export function VolumeGlow({ volume }: { volume: number }) {
   const id = useId().replace(/:/g, '_')

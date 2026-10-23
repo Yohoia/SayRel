@@ -15,6 +15,7 @@ fs.mkdirSync(output, { recursive: true })
 const files = {
   floating: 'dist/renderer/static/js/DFvLNtQv.mjs',
   shared: 'dist/renderer/static/js/DWYvEY4x.js',
+  microphone: 'dist/renderer/static/js/2XHPuyUf.js',
   card: 'dist/renderer/static/js/DTGF8R6e.mjs',
   'card-component': 'dist/renderer/static/js/BYNd6ENk.js',
   main: 'dist/main/index.js'

@@ -14,7 +14,7 @@ import { recordingBarAppearance, handsFreeBarAppearance, cancelRecordingActionAp
 import { FloatingAlert } from './FloatingAlert'
 import { FloatingAction } from './FloatingAction'
 import { ModeIndicator } from './ModeIndicator'
-import { useMicrophoneVolume } from './VolumeGlow'
+import { useMicrophoneVolume } from '../shared/audio/useMicrophoneVolume'
 import { useProcessingAnimation } from './useProcessingAnimation'
 import './styles.css'
 
