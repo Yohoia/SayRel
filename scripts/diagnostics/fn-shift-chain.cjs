@@ -54,6 +54,17 @@ function floatingActions(machine) {
   }).registerWindowHandlers((channel, handler) => handlers.set(channel, handler))
   return action => handlers.get('page:floating-bar-click')({}, action)
 }
+function nativeKeys(machine) {
+  let longPress = null
+  const keys = load('src/main/services/hotkeys.ts', { './recordingMachine': { recordingMachine: machine } }, {
+    setTimeout(callback, delay) { assert.equal(delay, 600); longPress = callback; return callback },
+    clearTimeout(callback) { if (longPress === callback) longPress = null }
+  })
+  return { ...keys,
+    tap(combination = 'Fn') { keys.handleKeyEvent({ combination, pressed: true }); keys.handleKeyEvent({ combination, pressed: false }) },
+    hold() { assert.ok(longPress, 'a physical toggle press arms the hold timer'); const callback = longPress; longPress = null; callback() }
+  }
+}
 async function recorderChain(machine) {
   const handlers = new Map(), listeners = new Map(), exposed = {}, deliveries = [], tracks = [], contexts = [], processors = []
   const event = { sender: { id: 7 } }
@@ -122,6 +133,90 @@ async function recorderChain(machine) {
   }
 }
 ;(async () => {
+  await test('native setup rejection stays hands-free false after physical release', async () => {
+    const m = new RecordingMachine(), states = [], starts = []
+    const keys = load('src/main/services/hotkeys.ts', { './recordingMachine': { recordingMachine: m } })
+    m.on('state', state => states.push(state)); m.on('start', event => starts.push(event))
+    config.serviceProviders = { profiles: [], transcription: null, refinement: null }
+    keys.handleKeyEvent({ combination: 'Fn', pressed: true })
+    keys.handleKeyEvent({ combination: 'Fn', pressed: false })
+    assert.equal(m.getState().phase, 'error')
+    assert.equal(m.getState().context.sessionId, null)
+    assert.equal(m.getState().context.handsFree, false)
+    assert.equal(starts.length, 0)
+    assert.ok(states.every(state => !state.context.handsFree))
+    keys.resetHotkeyState(); m.cancel()
+  })
+  await test('a rejected native gesture cannot restart after another entry completes a recording', async () => {
+    const m = new RecordingMachine(), starts = []
+    const keys = load('src/main/services/hotkeys.ts', { './recordingMachine': { recordingMachine: m } })
+    m.on('start', event => starts.push(event))
+    m.setPracticeTarget(7, { id: 'question', kind: 'question', mode: 'ask_anything', selectedText: '' })
+    keys.handleKeyEvent({ combination: 'Fn', pressed: true })
+    assert.equal(m.getState().phase, 'idle')
+    await m.startPractice(7)
+    const id = m.getState().context.sessionId
+    m.markStreaming(id); m.pushPcm(new Float32Array([.25]), id)
+    const finished = m.finishPractice(7); m.markStopped(id); await finished
+    keys.handleKeyEvent({ combination: 'Fn+Space', pressed: true, replacedCombination: 'Fn' })
+    const phase = m.getState().phase
+    keys.resetHotkeyState(); m.cancel()
+    assert.equal(phase, 'idle')
+    assert.equal(starts.length, 1)
+  })
+  await test('old native releases, hold timers and upgrades cannot affect a new floating capture', async () => {
+    for (const action of ['release', 'cancelled-release', 'long-press', 'upgrade']) {
+      const m = new RecordingMachine(), keys = nativeKeys(m), floating = floatingActions(m)
+      config.shortcut.style = action.includes('release') ? 'hold' : 'toggle'
+      try {
+        keys.handleKeyEvent({ combination: 'Fn', pressed: true })
+        await floating('cancel'); await floating('start')
+        const id = m.getState().context.sessionId
+        if (action === 'long-press') keys.hold()
+        else if (action === 'upgrade') keys.handleKeyEvent({ combination: 'Fn+Shift', pressed: true, replacedCombination: 'Fn' })
+        else keys.handleKeyEvent({ combination: 'Fn', pressed: false, cancelled: action === 'cancelled-release' })
+        assert.equal(m.getState().context.sessionId, id, action)
+        assert.equal(m.getState().context.mode, 'voice_transcript', action)
+        assert.equal(m.getState().context.handsFree, true, action)
+        assert.equal(m.getState().phase, 'starting', action)
+      } finally { keys.resetHotkeyState(); m.cancel(); config.shortcut.style = 'toggle' }
+    }
+  })
+  await test('native presses rejected by disabled and practice scope never publish capture or hands-free', async () => {
+    for (const restriction of ['disabled', 'blocked', 'mismatched']) {
+      const m = new RecordingMachine(), keys = nativeKeys(m), states = [], starts = []
+      m.on('state', state => states.push(state)); m.on('start', event => starts.push(event))
+      if (restriction === 'disabled') m.setDisabled(true)
+      if (restriction === 'blocked') m.blockPractice(7)
+      if (restriction === 'mismatched') m.setPracticeTarget(7, { id: 'question', kind: 'question', mode: 'ask_anything', selectedText: '' })
+      keys.handleKeyEvent({ combination: 'Fn', pressed: true })
+      keys.hold()
+      keys.handleKeyEvent({ combination: 'Fn', pressed: false })
+      assert.equal(m.getState().phase, 'idle', restriction)
+      assert.equal(m.getState().context.sessionId, null, restriction)
+      assert.equal(starts.length, 0, restriction)
+      assert.ok(states.every(state => !state.context.handsFree), restriction)
+      keys.resetHotkeyState(); m.cancel()
+    }
+  })
+  await test('release of a native stop gesture cannot finish a later recording', async () => {
+    const m = new RecordingMachine(), keys = nativeKeys(m), floating = floatingActions(m)
+    try {
+      keys.handleKeyEvent({ combination: 'Fn', pressed: true })
+      keys.handleKeyEvent({ combination: 'Fn', pressed: false })
+      const first = m.getState().context.sessionId
+      m.markStreaming(first); m.pushPcm(new Float32Array([.25]), first)
+      config.shortcut.style = 'hold'
+      keys.handleKeyEvent({ combination: 'Fn', pressed: true })
+      const finished = m.finish(); m.markStopped(first); await finished
+      await floating('start')
+      const next = m.getState().context.sessionId
+      keys.handleKeyEvent({ combination: 'Fn', pressed: false })
+      assert.equal(m.getState().phase, 'starting')
+      assert.equal(m.getState().context.sessionId, next)
+      assert.equal(m.getState().context.handsFree, true)
+    } finally { keys.resetHotkeyState(); m.cancel(); config.shortcut.style = 'toggle' }
+  })
   await test('intro and completion pages block microphone shortcuts without disabling later normal recordings', async () => {
     const m=new RecordingMachine()
     m.blockPractice(7)
@@ -221,15 +316,17 @@ async function recorderChain(machine) {
   })
   await test('upgrading Fn to translation without a writing model stops capture and keeps the setup alert', async () => {
     config.serviceProviders.refinement = null
-    const machine = new RecordingMachine()
-    await machine.start('voice_transcript')
-    machine.switchMode('translation')
+    const machine = new RecordingMachine(), keys = nativeKeys(machine)
+    keys.handleKeyEvent({ combination: 'Fn', pressed: true })
+    keys.handleKeyEvent({ combination: 'Fn+Shift', pressed: true, replacedCombination: 'Fn' })
+    keys.handleKeyEvent({ combination: 'Fn+Shift', pressed: false })
     const state = machine.getState()
     assert.equal(state.phase, 'error')
     assert.equal(state.context.mode, 'translation')
     assert.equal(state.context.issue.service, 'refinement')
     assert.equal(state.context.sessionId, null)
-    machine.cancel()
+    assert.equal(state.context.handsFree, false)
+    keys.resetHotkeyState(); machine.cancel()
   })
   await test('old defaults migrate Fn+Shift to translation and tap gestures', () => {
     const migrated = mergeSettings({ shortcut: { accelerator: 'Fn', style: 'hold', enabled: true }, commandShortcut: { accelerator: 'Fn+Shift', style: 'hold', enabled: true } })
@@ -377,9 +474,9 @@ async function recorderChain(machine) {
     }
   })
   await test('long press cancels capture, release clears hint, hold binding still works', async () => {
-    const m = new RecordingMachine(), keys = load('src/main/services/hotkeys.ts', { './recordingMachine': { recordingMachine: m } })
+    const m = new RecordingMachine(), keys = nativeKeys(m)
     keys.handleKeyEvent({ combination: 'Fn', pressed: true })
-    await new Promise(resolve => setTimeout(resolve, 640))
+    keys.hold()
     assert.equal(m.getState().phase, 'long_pressing')
     keys.handleKeyEvent({ combination: 'Fn', pressed: false }); assert.equal(m.getState().phase, 'idle')
     config.shortcut.style = 'hold'
@@ -422,25 +519,69 @@ async function recorderChain(machine) {
     assert.equal(stopped, 1); assert.deepEqual(samples, [.25, .5, .75]); assert.equal(m.getState().phase, 'idle')
     off(); forwardBroadcast = () => {}; await controller.dispose()
   })
-  await test('floating and fallback run real IPC/preload/controller/capture, drain the tail and deliver once', async () => {
-    for (const entry of ['floating', 'fallback']) {
+  await test('native, floating and fallback run real IPC/preload/controller/capture, drain the tail and deliver once', async () => {
+    for (const entry of ['native', 'floating', 'fallback']) {
       const m = new RecordingMachine(), chain = await recorderChain(m), results = [], before = inserted.length
-      const keys = load('src/main/services/hotkeys.ts', { './recordingMachine': { recordingMachine: m } })
+      const keys = nativeKeys(m)
       m.on('result', result => results.push(result))
       let samples
       transcribe = async ({ pcm }) => { samples = [...pcm]; return { result: { text: entry + ' tail' }, ogg: Buffer.alloc(0) } }
-      if (entry === 'floating') await chain.action('start'); else keys.handleFallbackShortcut('Fn')
+      if (entry === 'floating') await chain.action('start')
+      else if (entry === 'fallback') keys.handleFallbackShortcut('Fn')
+      else keys.tap()
       await chain.settle('recording')
       assert.equal(m.getState().context.handsFree, true)
       chain.feed()
-      if (entry === 'floating') await chain.action('finish'); else keys.handleFallbackShortcut('Fn+Space')
+      if (entry === 'floating') await chain.action('finish')
+      else if (entry === 'fallback') keys.handleFallbackShortcut('Fn+Space')
+      else keys.tap()
       await chain.settle('idle')
       assert.equal(samples.length, 682, 'capture drains the partial 48k to 16k resampling block')
       assert.ok(samples.every(value => value === .25))
       assert.equal(results.length, 1); assert.equal(inserted.length, before + 1); assert.equal(inserted.at(-1), entry + ' tail')
       assert.ok(chain.tracks.every(track => track.stopped === 1)); assert.ok(chain.contexts.every(context => context.closed))
-      await chain.dispose()
+      keys.resetHotkeyState(); await chain.dispose()
     }
+  })
+  await test('native Fn upgrades during device open and recording process only the final mode in the same session', async () => {
+    for (const phase of ['starting', 'recording']) for (const [chord, mode] of [['Fn+Shift', 'translation'], ['Fn+Space', 'ask_anything']]) {
+      const m = new RecordingMachine(), chain = await recorderChain(m), keys = nativeKeys(m), starts = [], results = [], processedModes = []
+      m.on('start', event => starts.push(event)); m.on('result', result => results.push(result))
+      transcribe = async options => { processedModes.push(options.mode); return { result: { text: 'mode upgrade' }, ogg: Buffer.alloc(0) } }
+      let release
+      try {
+        if (phase === 'starting') release = chain.pauseOpen()
+        keys.handleKeyEvent({ combination: 'Fn', pressed: true })
+        if (phase === 'recording') await chain.settle('recording')
+        const id = m.getState().context.sessionId
+        keys.handleKeyEvent({ combination: chord, pressed: true, replacedCombination: 'Fn' })
+        keys.handleKeyEvent({ combination: chord, pressed: false })
+        assert.equal(m.getState().context.sessionId, id)
+        assert.equal(m.getState().context.mode, mode)
+        assert.equal(starts.length, 1); assert.equal(processedModes.length, 0)
+        release?.(); release = null
+        await chain.settle('recording'); chain.feed()
+        keys.tap(chord)
+        await chain.settle('idle')
+        assert.deepEqual(processedModes, [mode]); assert.equal(results.length, 1)
+        assert.equal(results[0].id, id); assert.equal(results[0].mode, mode)
+        assert.equal(chain.tracks.length, 1)
+      } finally { release?.(); keys.resetHotkeyState(); await chain.dispose() }
+    }
+  })
+  await test('native hold release while opening the device finishes without late capture or results', async () => {
+    const m = new RecordingMachine(), chain = await recorderChain(m), keys = nativeKeys(m), results = [], states = []
+    m.on('result', result => results.push(result)); m.on('state', state => states.push(state))
+    let release = chain.pauseOpen()
+    config.shortcut.style = 'hold'
+    try {
+      keys.handleKeyEvent({ combination: 'Fn', pressed: true }); await flush()
+      keys.handleKeyEvent({ combination: 'Fn', pressed: false })
+      assert.equal(m.getState().phase, 'finishing')
+      release(); release = null; await chain.settle('idle')
+      assert.equal(results.length, 0); assert.ok(states.every(state => state.phase !== 'recording'))
+      assert.ok(chain.tracks.every(track => track.stopped === 1)); assert.ok(chain.contexts.every(context => context.closed))
+    } finally { release?.(); keys.resetHotkeyState(); await chain.dispose(); config.shortcut.style = 'toggle' }
   })
   await test('finishing during delayed device open accepts no late started event or result', async () => {
     const m = new RecordingMachine(), chain = await recorderChain(m), states = [], results = []
@@ -455,41 +596,58 @@ async function recorderChain(machine) {
     assert.ok(chain.tracks.every(track => track.stopped === 1)); assert.ok(chain.contexts.every(context => context.closed))
     await chain.dispose()
   })
-  await test('floating retry reprocesses the captured audio with the original provider snapshot', async () => {
-    const m = new RecordingMachine(), chain = await recorderChain(m), snapshot = structuredClone(config.serviceProviders), before = inserted.length
-    transcribe = async () => { throw new Error('temporary failure') }
-    await chain.action('start'); await chain.settle('recording'); chain.feed()
-    await chain.action('finish')
-    assert.equal(m.getState().phase, 'error')
-    const opened = chain.tracks.length
-    config.serviceProviders = { profiles: [], transcription: null, refinement: null }
-    transcribe = async options => {
-      assert.deepEqual(options.config.serviceProviders, snapshot)
-      assert.equal(options.pcm.length, 682)
-      return { result: { text: 'retry snapshot' }, ogg: Buffer.alloc(0) }
+  await test('native and floating retry reprocess the captured audio with the original provider snapshot', async () => {
+    for (const entry of ['native', 'floating']) {
+      config.serviceProviders = structuredClone(readyProviders)
+      const m = new RecordingMachine(), chain = await recorderChain(m), keys = nativeKeys(m), snapshot = structuredClone(config.serviceProviders), before = inserted.length
+      try {
+        transcribe = async () => { throw new Error('temporary failure') }
+        if (entry === 'floating') await chain.action('start')
+        else keys.tap()
+        await chain.settle('recording'); chain.feed()
+        if (entry === 'floating') await chain.action('finish')
+        else keys.tap()
+        await chain.settle('error')
+        const opened = chain.tracks.length
+        config.serviceProviders = { profiles: [], transcription: null, refinement: null }
+        transcribe = async options => {
+          assert.deepEqual(options.config.serviceProviders, snapshot)
+          assert.equal(options.pcm.length, 682)
+          return { result: { text: 'retry snapshot' }, ogg: Buffer.alloc(0) }
+        }
+        await chain.action('retry')
+        assert.equal(m.getState().phase, 'idle'); assert.equal(chain.tracks.length, opened)
+        assert.equal(inserted.length, before + 1); assert.equal(inserted.at(-1), 'retry snapshot')
+      } finally { keys.resetHotkeyState(); await chain.dispose() }
     }
-    await chain.action('retry')
-    assert.equal(m.getState().phase, 'idle'); assert.equal(chain.tracks.length, opened)
-    assert.equal(inserted.length, before + 1); assert.equal(inserted.at(-1), 'retry snapshot')
-    await chain.dispose()
   })
-  await test('floating cancellation isolates a pending result and practice delivery stays with its owner', async () => {
-    const m = new RecordingMachine(), chain = await recorderChain(m), gate = deferred(), before = inserted.length, beforeRows = rows.length
-    transcribe = () => gate.promise
-    await chain.action('start'); await chain.settle('recording'); chain.feed()
-    const oldFinish = chain.action('finish'); await flush(); await chain.action('cancel')
-    m.setPracticeTarget(7, { id: 'owned-dictation', kind: 'dictation', mode: 'voice_transcript' })
-    await chain.action('start'); await chain.settle('recording')
-    const id = m.getState().context.sessionId
-    gate.resolve({ result: { text: 'stale result' }, ogg: Buffer.alloc(0) }); await oldFinish
-    assert.equal(m.getState().context.sessionId, id); assert.equal(inserted.length, before); assert.equal(chain.deliveries.length, 0)
-    transcribe = async () => ({ result: { text: 'owned practice' }, ogg: Buffer.alloc(0) })
-    chain.feed(); await chain.action('finish')
-    assert.equal(inserted.length, before); assert.equal(rows.length, beforeRows)
-    assert.equal(chain.deliveries.length, 1); assert.equal(chain.deliveries[0].ownerId, 7)
-    assert.equal(chain.deliveries[0].channel, 'feature-tour:result'); assert.equal(chain.deliveries[0].result.targetId, 'owned-dictation')
-    assert.equal(chain.deliveries[0].result.text, 'owned practice')
-    await chain.dispose()
+  await test('native and floating cancellation isolate pending results and deliver practice only to its owner', async () => {
+    for (const entry of ['native', 'floating']) {
+      const m = new RecordingMachine(), chain = await recorderChain(m), keys = nativeKeys(m), gate = deferred(), before = inserted.length, beforeRows = rows.length
+      try {
+        transcribe = () => gate.promise
+        if (entry === 'floating') await chain.action('start'); else keys.tap()
+        await chain.settle('recording'); chain.feed()
+        let oldFinish
+        if (entry === 'floating') oldFinish = chain.action('finish')
+        else { keys.tap(); assert.equal(m.getState().phase, 'finishing'); oldFinish = m.finish() }
+        await flush(); await chain.action('cancel')
+        m.setPracticeTarget(7, { id: 'owned-dictation', kind: 'dictation', mode: 'voice_transcript' })
+        if (entry === 'floating') await chain.action('start'); else keys.tap()
+        await chain.settle('recording')
+        const id = m.getState().context.sessionId
+        gate.resolve({ result: { text: 'stale result' }, ogg: Buffer.alloc(0) }); await oldFinish
+        assert.equal(m.getState().context.sessionId, id); assert.equal(inserted.length, before); assert.equal(chain.deliveries.length, 0)
+        transcribe = async () => ({ result: { text: 'owned practice' }, ogg: Buffer.alloc(0) })
+        chain.feed()
+        if (entry === 'floating') await chain.action('finish'); else keys.tap()
+        await chain.settle('idle')
+        assert.equal(inserted.length, before); assert.equal(rows.length, beforeRows)
+        assert.equal(chain.deliveries.length, 1); assert.equal(chain.deliveries[0].ownerId, 7)
+        assert.equal(chain.deliveries[0].channel, 'feature-tour:result'); assert.equal(chain.deliveries[0].result.targetId, 'owned-dictation')
+        assert.equal(chain.deliveries[0].result.text, 'owned practice')
+      } finally { gate.resolve({ result: { text: 'cleanup' }, ogg: Buffer.alloc(0) }); keys.resetHotkeyState(); await chain.dispose() }
+    }
   })
   await test('floating start rejected by configuration cannot publish hands-free or capture', async () => {
     const m = new RecordingMachine(), action = floatingActions(m), states = [], starts = []
@@ -552,13 +710,13 @@ async function recorderChain(machine) {
   })
   await test('floating and fallback cannot restart or end the native long-press hint', async () => {
     const m = new RecordingMachine(), action = floatingActions(m)
-    const keys = load('src/main/services/hotkeys.ts', { './recordingMachine': { recordingMachine: m } })
-    await m.start(); m.setLongPressing()
+    const keys = nativeKeys(m)
+    keys.handleKeyEvent({ combination: 'Fn', pressed: true }); keys.hold()
     await action('start'); await action('retry'); keys.handleFallbackShortcut('Fn'); await flush()
     assert.equal(m.getState().phase, 'long_pressing')
     assert.equal(m.getState().context.sessionId, null)
     assert.equal(m.getState().context.handsFree, false)
-    m.cancel()
+    keys.handleKeyEvent({ combination: 'Fn', pressed: false }); keys.resetHotkeyState(); m.cancel()
   })
   await test('accepted floating start publishes hands-free atomically and repeats safely', async () => {
     const m = new RecordingMachine(), action = floatingActions(m), states = [], starts = []

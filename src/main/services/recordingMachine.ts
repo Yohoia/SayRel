@@ -35,7 +35,11 @@ export interface RecordingMachineState { phase: RecorderPhase; context: Recorder
 type MachineEvent =
   | { type: 'PRESS' | 'RELEASE' | 'START' | 'STARTED' | 'FINISH' | 'CANCEL' | 'RETRY' | 'TIMEOUT' }
   | { type: 'TOGGLE'; mode: Mode }
+  | { type: 'SHORTCUT_PRESS' | 'SHORTCUT_UPGRADE'; gestureId: symbol; mode: Mode }
+  | { type: 'SHORTCUT_RELEASE'; gestureId: symbol; action: 'finish' | 'hands-free' | 'cancel' }
+  | { type: 'SHORTCUT_LONG_PRESS'; gestureId: symbol }
   | { type: 'ERROR'; error?: string }
+type ShortcutModeEvent = Extract<MachineEvent, { type: 'SHORTCUT_PRESS' | 'SHORTCUT_UPGRADE' }>
 type Session = {
   id: string; startedAt: number; mode: Mode; frames: Float32Array[]
   context: Promise<AudioContextSnapshot | null>; config: Settings; controller: AbortController
@@ -44,6 +48,9 @@ type Session = {
   completion?: Promise<void>; historyWritten: boolean
   practice: OwnedPracticeTarget | null
 }
+type ShortcutGesture =
+  | { kind: 'pending' | 'ignored' | 'long_pressing'; id: symbol }
+  | { kind: 'recording'; id: symbol; sessionId: string }
 
 /** Main owns session identity; renderer owns the microphone and acknowledges its drain. */
 export class RecordingMachine extends EventEmitter {
@@ -52,6 +59,7 @@ export class RecordingMachine extends EventEmitter {
     handsFree: false, mode: MODES.VOICE_TRANSCRIPT, error: null, issue: null
   } }
   private session: Session | null = null
+  private shortcut: ShortcutGesture | null = null
   private disabled = false
   private practiceScope: { kind: 'closed' } | { kind: 'blocked'; ownerId: number } | ({ kind: 'ready' } & OwnedPracticeTarget) = { kind: 'closed' }
 
@@ -119,7 +127,7 @@ export class RecordingMachine extends EventEmitter {
     if (!this.session || sessionId !== this.session.id) return
     this.fail(this.session, new Error(message))
   }
-  switchMode(mode: Mode): void {
+  private switchMode(mode: Mode): void {
     if (!this.session || !['starting', 'recording'].includes(this.state.phase)) return
     if (this.session.practice && mode !== this.session.practice.target.mode) return
     const issue = recordingSetupIssue(this.session.config, mode)
@@ -133,14 +141,63 @@ export class RecordingMachine extends EventEmitter {
     if (this.session) this.session.config.translationTargetLanguage = language
     return true
   }
-  setHandsFree(handsFree: boolean): void { this.transition(this.state.phase, { handsFree }) }
-  setLongPressing(): void {
+  private setHandsFree(handsFree: boolean): void { this.transition(this.state.phase, { handsFree }) }
+  private setLongPressing(): void {
     if (!['starting', 'recording'].includes(this.state.phase)) return
     this.cancel()
     this.transition('long_pressing')
   }
+  private startShortcut({ gestureId, mode }: ShortcutModeEvent): void {
+    windows.floatingBar.createWindow()
+    windows.floatingBar.show()
+    void this.start(mode)
+    this.shortcut = this.session
+      ? { kind: 'recording', id: gestureId, sessionId: this.session.id }
+      : { kind: 'pending', id: gestureId }
+  }
+  private pressShortcut(event: ShortcutModeEvent): void {
+    this.shortcut = { kind: 'ignored', id: event.gestureId }
+    if (this.disabled || this.state.phase === 'finishing' || this.state.phase === 'long_pressing') return
+    if (this.state.phase === 'starting' || this.state.phase === 'recording') {
+      void this.finish()
+      return
+    }
+    this.startShortcut(event)
+  }
+  private upgradeShortcut(event: ShortcutModeEvent): void {
+    const { gestureId, mode } = event
+    const shortcut = this.shortcut
+    if (!shortcut || shortcut.id !== gestureId || this.disabled) return
+    if (shortcut.kind === 'recording' && this.session?.id === shortcut.sessionId) this.switchMode(mode)
+    else if (shortcut.kind === 'pending' && (this.state.phase === 'idle' || this.state.phase === 'error')) this.startShortcut(event)
+  }
+  private releaseShortcut({ gestureId, action }: Extract<MachineEvent, { type: 'SHORTCUT_RELEASE' }>): Promise<void> | void {
+    const shortcut = this.shortcut
+    if (!shortcut || shortcut.id !== gestureId) return
+    this.shortcut = null
+    if (shortcut.kind === 'long_pressing') {
+      if (this.state.phase === 'long_pressing') this.cancel()
+      return
+    }
+    if (shortcut.kind !== 'recording' || this.session?.id !== shortcut.sessionId) return
+    if (action === 'cancel') return this.cancel()
+    if (this.state.phase !== 'starting' && this.state.phase !== 'recording') return
+    if (action === 'finish') return this.finish()
+    this.setHandsFree(true)
+  }
+  private longPressShortcut(gestureId: symbol): void {
+    const shortcut = this.shortcut
+    if (shortcut?.id !== gestureId || shortcut.kind !== 'recording' || this.session?.id !== shortcut.sessionId) return
+    if (this.state.phase !== 'starting' && this.state.phase !== 'recording') return
+    this.setLongPressing()
+    this.shortcut = { kind: 'long_pressing', id: gestureId }
+  }
   async dispatch(event: MachineEvent): Promise<void> {
     switch (event.type) {
+      case 'SHORTCUT_PRESS': return this.pressShortcut(event)
+      case 'SHORTCUT_UPGRADE': return this.upgradeShortcut(event)
+      case 'SHORTCUT_RELEASE': return this.releaseShortcut(event)
+      case 'SHORTCUT_LONG_PRESS': return this.longPressShortcut(event.gestureId)
       case 'PRESS': return this.start()
       case 'START': return this.start(undefined, { handsFree: true })
       case 'TOGGLE':
@@ -180,6 +237,7 @@ export class RecordingMachine extends EventEmitter {
     if (this.practiceScope.kind === 'blocked' || this.practiceScope.kind === 'ready' && requestedMode !== this.practiceScope.target.mode) return
     const issue = recordingSetupIssue(settings.get(), requestedMode)
     if (issue) { this.showSetupIssue(requestedMode, issue); return }
+    this.shortcut = null
     const session = this.newSession(requestedMode)
     this.session = session
     this.retryInput = null
@@ -267,6 +325,7 @@ export class RecordingMachine extends EventEmitter {
     return session
   }
   cancel(): void {
+    this.shortcut = null
     const session = this.releaseSession()
     this.retryInput = null
     if (session?.historyWritten) history.upsertHistory({ id: session.id, status: HISTORY_STATUS.CANCELLED })
