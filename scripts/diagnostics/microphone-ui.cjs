@@ -7,8 +7,10 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms)),js=code=>win.webContents.execute
 async function until(code){for(let i=0;i<150;i++){if(await js(code))return;await wait(30)}throw new Error('Timed out: '+code)}
 async function settle(){await js('document.fonts.ready');await js('Promise.all(document.getAnimations().filter(a=>Number.isFinite(a.effect?.getComputedTiming().iterations)).map(a=>a.finished.catch(()=>null))).then(()=>true)')}
 async function shot(name){await settle();const clip=await js("(()=>{const r=document.querySelector('.settings-microphone-dialog .modal-card').getBoundingClientRect();return{x:Math.floor(r.x)-24,y:Math.floor(r.y)-24,width:Math.ceil(r.width)+48,height:Math.ceil(r.height)+48}})()");fs.writeFileSync(path.join(output,name+'.png'),(await win.webContents.capturePage(clip)).toPNG());shots.push(name);console.log('PASS '+name)}
+const released="window.__streams.every(s=>s.getTracks().every(t=>t.readyState==='ended'))&&window.__contexts.every(c=>c.state==='closed')"
+const select=index=>js(`document.querySelectorAll('.settings-mic-option')[${index}].click()`)
 const open=()=>js("(()=>{const button=document.querySelectorAll('.settings-picker')[1];button.focus();button.click()})()")
-async function close(){await js("document.querySelector('.settings-microphone-dialog .modal-close').click()");await until("!document.querySelector('.settings-microphone-dialog')");await until("window.__streams.every(s=>s.getTracks().every(t=>t.readyState==='ended'))&&window.__contexts.every(c=>c.state==='closed')");assert.equal(await js("document.activeElement===document.querySelectorAll('.settings-picker')[1]"),true,'dialog restores focus to its opener')}
+async function close(){await js("document.querySelector('.settings-microphone-dialog .modal-close').click()");await until("!document.querySelector('.settings-microphone-dialog')");await until(released);assert.equal(await js("document.activeElement===document.querySelectorAll('.settings-picker')[1]"),true,'dialog restores focus to its opener')}
 const textGeometry=original=>`(()=>{const card=document.querySelector('${original?'#mui-modal':'.settings-microphone-dialog .modal-card'}'),base=card.getBoundingClientRect();
  const nodes=[card.querySelector('${original?'.custom-modal--title':'h2'}'),card.querySelector('${original?'.custom-modal--title+div':'.settings-mic-description'}'),...card.querySelectorAll('${original?'button .MuiTypography-root':'.settings-mic-copy>*'}')];
  return nodes.map(node=>{const range=document.createRange();range.selectNodeContents(node);const r=range.getBoundingClientRect(),s=getComputedStyle(node);return{x:r.x-base.x,y:r.y-base.y,width:r.width,height:r.height,font:s.fontSize,line:s.lineHeight,weight:s.fontWeight}});})()`
@@ -24,12 +26,53 @@ app.whenReady().then(async()=>{
  for(const window of [win,reference])window.webContents.on('console-message',(_,level,message)=>{if(level>=3)errors.push(message)})
  await win.loadURL('about:blank');win.webContents.debugger.attach('1.3');await win.webContents.debugger.sendCommand('Page.enable')
  await win.webContents.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument',{source:`
- window.__contexts=[];window.__gains=[];window.__streams=[];window.__requests=[];window.__calls=[];window.__phase='idle';window.__reject=false;window.__pause=false;
- const RealAudioContext=window.AudioContext;window.AudioContext=class extends RealAudioContext{constructor(...a){super(...a);window.__contexts.push(this)}createGain(){const g=super.createGain();window.__gains.push(g);return g}};
+ window.__contexts=[];window.__gains=[];window.__streams=[];window.__requests=[];window.__calls=[];window.__phase='idle';window.__reject=false;window.__pause=false;window.__failAudio=null;window.__pendingStreams=[];window.__pendingResumes=[];window.__trackStops=[];
+ const RealAudioContext=window.AudioContext;
+ window.AudioContext=class extends RealAudioContext{
+  constructor(...args){
+   if(window.__failAudio==='constructor'&&!window.__creatingFixture)throw new Error('Preview context failed');
+   super(...args);window.__contexts.push(this);
+  }
+  createAnalyser(){
+   if(window.__failAudio==='analyser')throw new Error('Preview analyser failed');
+   return super.createAnalyser();
+  }
+  createMediaStreamSource(stream){
+   if(window.__failAudio==='source')throw new Error('Preview source failed');
+   return super.createMediaStreamSource(stream);
+  }
+  resume(){
+   if(!window.__creatingFixture){
+    if(window.__failAudio==='resume')return Promise.reject(new Error('Preview resume failed'));
+    if(window.__pauseResume)return new Promise((resolve,reject)=>window.__pendingResumes.push(()=>super.resume().then(resolve,reject)));
+   }
+   return super.resume();
+  }
+  createGain(){const gain=super.createGain();window.__gains.push(gain);return gain}
+ };
  Object.defineProperty(window,'sayrel',{configurable:true,get(){return this.__bridge},set(value){const invoke=value.invoke.bind(value);value.invoke=async(channel,...args)=>{window.__calls.push([channel,...args]);if(channel==='audio:get-devices-async')return[{deviceId:'builtin',label:'MacBook Pro Microphone',isDefault:true,transport:'builtin'},{deviceId:'usb',label:'USB Microphone',isDefault:false,transport:'usb'}];if(channel==='recording-machine:state')return{phase:window.__phase,context:{sessionId:null,handsFree:false}};return invoke(channel,...args)};this.__bridge=value}});
  `})
  await win.loadFile(path.join(root,'.build/ui-review/hub.html'));await until("!!document.querySelector('.home-settings')")
- await js(`(()=>{const media=navigator.mediaDevices,original=media.getUserMedia.bind(media);window.__devices=null;const enumerate=media.enumerateDevices.bind(media);media.enumerateDevices=()=>window.__devices===null?enumerate():Promise.resolve(window.__devices);media.getUserMedia=async constraints=>{window.__requests.push(constraints);if(window.__reject)throw new DOMException('Microphone access denied','NotAllowedError');if(window.__pause)await new Promise(resolve=>window.__release=resolve);const stream=await original(constraints);window.__streams.push(stream);return stream};})()`)
+ await js(`(()=>{
+  const media=navigator.mediaDevices,original=media.getUserMedia.bind(media),enumerate=media.enumerateDevices.bind(media);
+  window.__devices=null;
+  media.enumerateDevices=()=>window.__devices===null?enumerate():Promise.resolve(window.__devices);
+  media.getUserMedia=async constraints=>{
+   window.__requests.push(constraints);
+   if(window.__reject)throw new DOMException('Microphone access denied','NotAllowedError');
+   if(window.__missing)throw new DOMException('Device could not open','NotFoundError');
+   if(window.__pause)await new Promise(resolve=>window.__pendingStreams.push(resolve));
+   window.__creatingFixture=true;
+   let stream;
+   try{stream=await original(constraints)}finally{window.__creatingFixture=false}
+   window.__streams.push(stream);
+   for(const track of stream.getTracks()){
+    const stop=track.stop.bind(track),record={count:0};window.__trackStops.push(record);
+    track.stop=()=>{record.count++;stop()};
+   }
+   return stream;
+  };
+ })()`)
  await js("window.sayrel.invoke('store:use','patch',{language:'zh-CN'});document.querySelector('.home-settings').click()")
  await until("document.querySelectorAll('.settings-picker').length===2")
  await reference.loadFile(path.join(root,'.build/typeless-floating/microphone-reference.html'))
@@ -56,17 +99,61 @@ app.whenReady().then(async()=>{
   const point=await js("(()=>{const r=document.querySelectorAll('.settings-mic-option')[2].getBoundingClientRect();return{x:r.x+40,y:r.y+r.height/2}})()");await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type:'mouseMoved',...point});await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...point});await until("!!document.querySelector('.settings-mic-option .MuiTouchRipple-rippleVisible')");await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...point})
   await until("document.querySelectorAll('.settings-mic-option')[2].getAttribute('aria-checked')==='true'&&document.querySelectorAll('.settings-mic-level .is-active').length===6")
   assert.equal(await js("window.__requests.at(-1).audio.deviceId.exact"),'fixture-usb')
-  assert.equal(await js("window.__requests.at(-1).audio.noiseSuppression"),true)
+  assert.deepEqual(await js("window.__requests.at(-1)"),{audio:{deviceId:{exact:'fixture-usb'},noiseSuppression:true},video:false})
+  assert.equal(await js("window.__contexts.filter(c=>c.state!=='closed').length"),2,'one synthetic source and one preview context remain after switching')
+  assert.equal(await js("JSON.parse(localStorage.getItem('sayrel-ui-settings')).micDevice"),'fixture-usb')
   assert.equal(await js("window.__streams.filter(s=>s.getTracks().some(t=>t.readyState==='live')).length"),1)
   await shot('microphone-usb-'+locale);await close()
  }
  await js("window.__devices=Array.from({length:9},(_,i)=>({deviceId:'extra-'+i,kind:'audioinput',label:'External microphone '+i,groupId:'extra'}));navigator.mediaDevices.dispatchEvent(new Event('devicechange'))");await open();await until("document.querySelectorAll('.settings-mic-option').length===10");assert.equal(await js("document.querySelector('.settings-mic-body').getBoundingClientRect().height"),368);await shot('microphone-many-devices');await close();await js("window.__devices=null;navigator.mediaDevices.dispatchEvent(new Event('devicechange'))");
  await js("window.__reject=true");await open();await until("!!document.querySelector('.settings-microphone-dialog')");await wait(150);await close();await js("window.__reject=false")
+ // Each initialization boundary fails against real Web Audio, then succeeds on retry.
+ for(const [failure,message] of [['constructor','Preview context failed'],['analyser','Preview analyser failed'],['source','Preview source failed'],['resume','Preview resume failed']]){
+  await js(`window.__failAudio=${JSON.stringify(failure)}`);await open()
+  await until(`[...document.querySelectorAll('.sayrel-toast.is-error')].some(t=>t.textContent.includes(${JSON.stringify(message)}))`)
+  await until(released)
+  assert.equal(await js("document.querySelectorAll('.settings-mic-level .is-active').length"),0)
+  await close();await js("window.__failAudio=null");await open()
+  await until("document.querySelectorAll('.settings-mic-level .is-active').length===6");await close()
+ }
+ await js("window.__missing=true");await open()
+ await until("[...document.querySelectorAll('.sayrel-toast.is-error')].some(t=>t.textContent.includes('Device could not open'))")
+ await until(released);await close();await js("window.__missing=false");await open()
+ await until("document.querySelectorAll('.settings-mic-level .is-active').length===6");await close()
+ console.log('PASS initialization failures release resources before dismissal and can retry')
+ // A new selection can become ready before the cancelled device-open operation finishes.
+ await js("window.__pause=true");await open();await until("window.__pendingStreams.length===1")
+ await js("window.__pause=false");await select(1)
+ await until("document.querySelectorAll('.settings-mic-option')[1].getAttribute('aria-checked')==='true'&&document.querySelectorAll('.settings-mic-level .is-active').length===6")
+ const liveBeforeLate=await js("window.__streams.length")
+ await js("window.__pendingStreams.shift()()");await until(`window.__streams.length===${liveBeforeLate+1}&&window.__streams.at(-1).getTracks().every(t=>t.readyState==='ended')`)
+ assert.equal(await js("window.__streams.filter(s=>s.getTracks().some(t=>t.readyState==='live')).length"),1)
+ assert.equal(await js("document.querySelectorAll('.settings-mic-option')[1].getAttribute('aria-checked')"),'true')
+ await close()
+ // Readiness waits for resume. Closing during resume releases the stream and context immediately.
+ await js("window.__pauseResume=true");await open();await until("window.__pendingResumes.length===1")
+ assert.equal(await js("document.querySelectorAll('.settings-mic-level .is-active').length"),0)
+ await close();await js("window.__pauseResume=false");await open()
+ await until("document.querySelectorAll('.settings-mic-level .is-active').length===6")
+ await js("window.__pendingResumes.shift()()");await wait(100)
+ assert.equal(await js("window.__streams.filter(s=>s.getTracks().some(t=>t.readyState==='live')).length"),1)
+ assert.equal(await js("document.querySelectorAll('.settings-mic-level .is-active').length"),6)
+ await close()
+ console.log('PASS pending device switch, resume readiness and late resume isolation')
+ // Removing the selected input refreshes the list and falls back to automatic detection.
+ await open();await until("document.querySelectorAll('.settings-mic-level .is-active').length===6")
+ await js("window.__devices=[{deviceId:'fixture-usb',kind:'audioinput',label:'USB Microphone',groupId:'usb'}];navigator.mediaDevices.dispatchEvent(new Event('devicechange'))")
+ await until("document.querySelectorAll('.settings-mic-option').length===2&&document.querySelectorAll('.settings-mic-option')[0].getAttribute('aria-checked')==='true'&&document.querySelectorAll('.settings-mic-level .is-active').length===6")
+ assert.deepEqual(await js("window.__requests.at(-1)"),{audio:{noiseSuppression:true},video:false})
+ assert.equal(await js("window.__streams.filter(s=>s.getTracks().some(t=>t.readyState==='live')).length"),1)
+ await close();await js("window.__devices=null;navigator.mediaDevices.dispatchEvent(new Event('devicechange'))")
+ console.log('PASS device disappearance refreshes the list and previews automatic detection')
  await js("window.__phase='recording'");const count=await js('window.__requests.length');await open();await wait(200);assert.equal(await js('window.__requests.length'),count);await close();await js("window.__phase='idle'")
- await js("window.__pause=true");await open();await until("!!window.__release");await js("document.querySelector('.settings-microphone-dialog .modal-close').click();window.__pause=false;window.__release()")
+ await js("window.__pause=true");await open();await until("window.__pendingStreams.length===1");await js("document.querySelector('.settings-microphone-dialog .modal-close').click();window.__pause=false;window.__pendingStreams.shift()()")
  await until("!document.querySelector('.settings-microphone-dialog')&&window.__streams.every(s=>s.getTracks().every(t=>t.readyState==='ended'))&&window.__contexts.every(c=>c.state==='closed')")
  await js("window.__devices=[];navigator.mediaDevices.dispatchEvent(new Event('devicechange'))");await open();await until("!!document.querySelector('.settings-mic-empty')");assert.equal(await js("document.querySelectorAll('.settings-mic-option').length"),0);await shot('microphone-empty');await close()
- assert.equal(await js("window.__calls.some(c=>['recording-machine:start','audio:ai-voice-flow','audio:opus-compress-by-buffer'].includes(c[0]))"),false)
+ assert.equal(await js("window.__calls.some(c=>['recording-machine:start','audio:ai-voice-flow','audio:opus-compress-by-buffer','db:history-upsert','db:history-save-audio','db:history-upsert-client-metadata','db:history-upsert-mode-meta'].includes(c[0]))"),false)
+ assert.equal(await js("window.__trackStops.every(record=>record.count===1)"),true,'all acquired tracks stop exactly once across closing and later cleanup')
  assert.deepEqual(errors,[])
  fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({comparisons,shots,errors,scope:'Original dialog JSX versus real app with synthetic audio. No physical microphone, native permission changes or provider calls.'},null,2))
  console.log('PASS switching, silence, denial, active-recording guard, late stream cleanup and empty state')

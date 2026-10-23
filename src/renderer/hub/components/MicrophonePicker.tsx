@@ -7,6 +7,7 @@ import { Modal } from '../../shared/components/Modal'
 import { toast } from '../../shared/components/Toast'
 import { useAppSettings } from '../../shared/state/settings'
 import { useMicrophoneVolume } from '../../shared/audio/useMicrophoneVolume'
+import { startMicrophonePreview, type MicrophonePreview } from '../../shared/audio/microphonePreview'
 import { useSettingsText } from './settingsText'
 
 const nativeDevicesSchema = z.array(z.object({
@@ -63,7 +64,7 @@ export function MicrophonePicker({ autoOpen = false }: { autoOpen?: boolean }) {
   useEffect(() => {
     if (!open) return
     let disposed = false
-    let stream: MediaStream | undefined, context: AudioContext | undefined
+    let preview: MicrophonePreview | null = null
     const refresh = () => { void navigator.mediaDevices.enumerateDevices().then(list => {
       if (!disposed) { setDevices(list.filter(device => device.kind === 'audioinput' && device.deviceId !== 'default')); setDevicesLoaded(true) }
     }).catch(() => undefined) }
@@ -73,16 +74,13 @@ export function MicrophonePicker({ autoOpen = false }: { autoOpen?: boolean }) {
         const state = recordingStateSchema.parse(value)
         if (disposed) return
         if (!['idle', 'error'].includes(state.phase)) { toast.info(t('Finish the current recording first')); return }
-        stream = await navigator.mediaDevices.getUserMedia({ audio: {
+        preview = startMicrophonePreview({
           ...(selected ? { deviceId: { exact: selected } } : {}), noiseSuppression: true
-        }, video: false })
-        if (disposed) { stream.getTracks().forEach(track => track.stop()); return }
+        })
+        const meter = await preview.ready
+        if (disposed || !meter) return
         refresh()
-        context = new AudioContext()
-        const meter = context.createAnalyser()
-        context.createMediaStreamSource(stream).connect(meter)
-        await context.resume()
-        if (!disposed) setAnalyser(meter)
+        setAnalyser(meter)
       } catch (failure) {
         if (!disposed) toast.error(t(failure instanceof Error ? failure.message : 'Microphone unavailable'))
       }
@@ -90,8 +88,7 @@ export function MicrophonePicker({ autoOpen = false }: { autoOpen?: boolean }) {
     return () => {
       disposed = true
       setAnalyser(null)
-      stream?.getTracks().forEach(track => track.stop())
-      void context?.close().catch(() => undefined)
+      void preview?.stop()
     }
   }, [open, selected, t])
 
