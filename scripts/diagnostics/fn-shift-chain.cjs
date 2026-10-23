@@ -7,10 +7,10 @@ const deferred = () => { let resolve; const promise = new Promise(r => { resolve
 const broadcasts = [], inserted = [], rows = [], refinementStates = []
 let forwardBroadcast = () => {}
 const logger = { debug(){}, info(){}, warn(){}, error(){} }
-function load(file, overrides = {}) {
+function load(file, overrides = {}, globals = {}) {
   const exports = {}
   const source = ts.transpileModule(fs.readFileSync(path.join(root, file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
-  vm.runInNewContext(source, { exports, require: id => id in overrides ? overrides[id] : id in mocks ? mocks[id] : require(id), process: { env: {} }, console, Buffer, Float32Array, AbortController, URL, structuredClone, queueMicrotask, setTimeout, clearTimeout, setInterval, clearInterval }, { filename: file })
+  vm.runInNewContext(source, { exports, require: id => id in overrides ? overrides[id] : id in mocks ? mocks[id] : require(id), process: { env: {} }, console, Buffer, Float32Array, AbortController, URL, structuredClone, queueMicrotask, setTimeout, clearTimeout, setInterval, clearInterval, ...globals }, { filename: file })
   return exports
 }
 const mocks = { '../lib/logger': { createLogger: () => logger } }
@@ -45,6 +45,82 @@ Object.assign(mocks, {
 const { RecordingMachine } = load('src/main/services/recordingMachine.ts')
 async function test(name, fn) { config.serviceProviders = structuredClone(readyProviders); await fn(); console.log(`PASS ${name}`) }
 async function start(machine) { await machine.start(); const id = machine.getState().context.sessionId; machine.markStreaming(id); machine.pushPcm(new Float32Array([.25]), id); return id }
+function floatingActions(machine) {
+  const handlers = new Map()
+  load('src/main/ipc/windows.ts', {
+    electron: {}, '../services/recordingMachine': { recordingMachine: machine },
+    '../services/settingsEffects': { patchSettings: async partial => Object.assign(config, partial) },
+    '../lib/native': { util: {} }
+  }).registerWindowHandlers((channel, handler) => handlers.set(channel, handler))
+  return action => handlers.get('page:floating-bar-click')({}, action)
+}
+async function recorderChain(machine) {
+  const handlers = new Map(), listeners = new Map(), exposed = {}, deliveries = [], tracks = [], contexts = [], processors = []
+  const event = { sender: { id: 7 } }
+  const register = (channel, handler) => handlers.set(channel, handler)
+  load('src/main/ipc/windows.ts', {
+    electron: {}, '../services/recordingMachine': { recordingMachine: machine },
+    '../services/settingsEffects': { patchSettings: async partial => Object.assign(config, partial) }, '../lib/native': { util: {} }
+  }).registerWindowHandlers(register)
+  load('src/main/ipc/misc.ts', {
+    electron: { webContents: { fromId: ownerId => ({ send: (channel, result) => deliveries.push({ ownerId, channel, result }) }) } },
+    '../services/recordingMachine': { recordingMachine: machine },
+    '../../shared/featureTour': load('src/shared/featureTour.ts'),
+    '../services/hotkeys': { shortcutBindings: () => [] }, '../services/shortcutRegistration': {},
+    '../services/insertion': mocks['./insertion'],
+    '../services/dictionary': { listDictionary: () => [], addWord(){}, updateWord(){}, removeWord(){} },
+    '../lib/native': { keyboard: {}, util: {}, input: {}, context: {} }
+  }).registerMiscHandlers(register)
+  load('src/preload/index.ts', {
+    '../shared/ipc': { IPC: {} },
+    electron: {
+      contextBridge: { exposeInMainWorld: (name, value) => { exposed[name] = value } },
+      ipcRenderer: {
+        on: (channel, callback) => { const set = listeners.get(channel) ?? new Set(); set.add(callback); listeners.set(channel, set) },
+        removeListener: (channel, callback) => listeners.get(channel)?.delete(callback),
+        invoke: async (channel, ...args) => {
+          const handler = handlers.get(channel)
+          assert.ok(handler, 'real IPC handler registered: ' + channel)
+          return handler(event, ...args)
+        }
+      }
+    }
+  })
+  class AudioContext {
+    sampleRate = 48000
+    audioWorklet = { addModule: async () => { throw new Error('Offline ScriptProcessor adapter') } }
+    constructor() { this.closed = false; contexts.push(this) }
+    createMediaStreamSource() { return { connect(){}, disconnect(){} } }
+    createAnalyser() { return { fftSize: 2048, getByteTimeDomainData: samples => samples.fill(128) } }
+    createScriptProcessor() { const node = { connect(){}, disconnect(){}, onaudioprocess: null }; processors.push(node); return node }
+    async resume() {}
+    async close() { this.closed = true }
+  }
+  let openGate = null
+  const { startRecorder } = load('src/renderer/floating-bar/audio.ts', {}, {
+    AudioContext, Uint8Array, requestAnimationFrame: callback => setTimeout(callback, 16), cancelAnimationFrame: clearTimeout,
+    navigator: { mediaDevices: { getUserMedia: async () => {
+      if (openGate) await openGate.promise
+      const track = { stopped: 0, stop() { this.stopped++ } }; tracks.push(track)
+      return { getTracks: () => [track] }
+    } } }
+  })
+  const { RecorderSessionController } = load('src/renderer/floating-bar/sessionController.ts')
+  const controller = new RecorderSessionController({
+    settings: async () => ({ muteWhileDictating: false }), isMuted: async () => false, mute: async () => {}, unmute: async () => {},
+    status: (phase, payload) => exposed.sayrel.recording.status(phase, payload), onRecorder(){}, start: startRecorder
+  })
+  const off = exposed.sayrel.on('recording-machine:state', state => controller.sync(state))
+  forwardBroadcast = (channel, ...args) => listeners.get(channel)?.forEach(listener => listener({}, ...args))
+  const action = action => exposed.sayrel.page.floatingBarClick(action)
+  return {
+    action, deliveries, tracks, contexts,
+    pauseOpen() { openGate = deferred(); return () => { const gate = openGate; openGate = null; gate.resolve() } },
+    feed(value = .25) { processors.at(-1).onaudioprocess({ inputBuffer: { getChannelData: () => new Float32Array(2048).fill(value) } }) },
+    async settle(phase) { for (let i = 0; i < 100; i++) { if (machine.getState().phase === phase) return; await flush() } assert.equal(machine.getState().phase, phase) },
+    async dispose() { machine.cancel(); off(); forwardBroadcast = () => {}; await controller.dispose() }
+  }
+}
 ;(async () => {
   await test('intro and completion pages block microphone shortcuts without disabling later normal recordings', async () => {
     const m=new RecordingMachine()
@@ -77,9 +153,16 @@ async function start(machine) { await machine.start(); const id = machine.getSta
     assert.equal(m.getState().phase,'idle')
     keys.handleKeyEvent({combination:'Fn+Space',pressed:true,replacedCombination:'Fn'})
     assert.equal(m.getState().phase,'starting')
-    assert.equal((await m.session.context).focusedInput.selectedText,'selected passage')
+    let selectedText
+    const previousTranscribe = transcribe
+    transcribe = async options => { selectedText = options.context.focusedInput.selectedText; return previousTranscribe(options) }
     m.setPracticeTarget(8,null)
     assert.equal(m.getState().phase,'starting','another window cannot stop the practice')
+    const id = m.getState().context.sessionId
+    m.markStreaming(id); m.pushPcm(new Float32Array([.25]), id)
+    const finished = m.finish(); m.markStopped(id); await finished
+    assert.equal(selectedText, 'selected passage')
+    transcribe = previousTranscribe
     m.setPracticeTarget(7,null)
     assert.equal(m.getState().phase,'idle')
     keys.resetHotkeyState()
@@ -146,7 +229,6 @@ async function start(machine) { await machine.start(); const id = machine.getSta
     assert.equal(state.context.mode, 'translation')
     assert.equal(state.context.issue.service, 'refinement')
     assert.equal(state.context.sessionId, null)
-    assert.equal(machine.session, null)
     machine.cancel()
   })
   await test('old defaults migrate Fn+Shift to translation and tap gestures', () => {
@@ -160,11 +242,17 @@ async function start(machine) { await machine.start(); const id = machine.getSta
     const machine = new RecordingMachine()
     await machine.start('translation')
     assert.equal(machine.selectTranslationLanguage('ja'), true)
-    assert.equal(machine.session.config.translationTargetLanguage, 'ja')
+    let targetLanguage
+    const previousTranscribe = transcribe
+    transcribe = async options => { targetLanguage = options.config.translationTargetLanguage; return previousTranscribe(options) }
     assert.equal(machine.selectTranslationLanguage('de'), false)
+    const id = machine.getState().context.sessionId
+    machine.markStreaming(id); machine.pushPcm(new Float32Array([.25]), id)
     const finishing = machine.dispatch({ type: 'FINISH' })
     assert.equal(machine.selectTranslationLanguage('en'), false)
-    await machine.dispatch({ type: 'CANCEL' }); await finishing
+    machine.markStopped(id); await finishing
+    assert.equal(targetLanguage, 'ja')
+    transcribe = previousTranscribe
     config.translationTargetLanguages = ['en']
   })
   await test('finishing drains tail before processing and rejects overlapping starts', async () => {
@@ -333,6 +421,168 @@ async function start(machine) { await machine.start(); const id = machine.getSta
     await m.finish()
     assert.equal(stopped, 1); assert.deepEqual(samples, [.25, .5, .75]); assert.equal(m.getState().phase, 'idle')
     off(); forwardBroadcast = () => {}; await controller.dispose()
+  })
+  await test('floating and fallback run real IPC/preload/controller/capture, drain the tail and deliver once', async () => {
+    for (const entry of ['floating', 'fallback']) {
+      const m = new RecordingMachine(), chain = await recorderChain(m), results = [], before = inserted.length
+      const keys = load('src/main/services/hotkeys.ts', { './recordingMachine': { recordingMachine: m } })
+      m.on('result', result => results.push(result))
+      let samples
+      transcribe = async ({ pcm }) => { samples = [...pcm]; return { result: { text: entry + ' tail' }, ogg: Buffer.alloc(0) } }
+      if (entry === 'floating') await chain.action('start'); else keys.handleFallbackShortcut('Fn')
+      await chain.settle('recording')
+      assert.equal(m.getState().context.handsFree, true)
+      chain.feed()
+      if (entry === 'floating') await chain.action('finish'); else keys.handleFallbackShortcut('Fn+Space')
+      await chain.settle('idle')
+      assert.equal(samples.length, 682, 'capture drains the partial 48k to 16k resampling block')
+      assert.ok(samples.every(value => value === .25))
+      assert.equal(results.length, 1); assert.equal(inserted.length, before + 1); assert.equal(inserted.at(-1), entry + ' tail')
+      assert.ok(chain.tracks.every(track => track.stopped === 1)); assert.ok(chain.contexts.every(context => context.closed))
+      await chain.dispose()
+    }
+  })
+  await test('finishing during delayed device open accepts no late started event or result', async () => {
+    const m = new RecordingMachine(), chain = await recorderChain(m), states = [], results = []
+    m.on('state', state => states.push(state)); m.on('result', result => results.push(result))
+    const release = chain.pauseOpen()
+    await chain.action('start'); await flush()
+    const finished = chain.action('finish')
+    assert.equal(m.getState().phase, 'finishing')
+    release(); await finished
+    assert.equal(m.getState().phase, 'idle')
+    assert.equal(results.length, 0); assert.ok(states.every(state => state.phase !== 'recording'))
+    assert.ok(chain.tracks.every(track => track.stopped === 1)); assert.ok(chain.contexts.every(context => context.closed))
+    await chain.dispose()
+  })
+  await test('floating retry reprocesses the captured audio with the original provider snapshot', async () => {
+    const m = new RecordingMachine(), chain = await recorderChain(m), snapshot = structuredClone(config.serviceProviders), before = inserted.length
+    transcribe = async () => { throw new Error('temporary failure') }
+    await chain.action('start'); await chain.settle('recording'); chain.feed()
+    await chain.action('finish')
+    assert.equal(m.getState().phase, 'error')
+    const opened = chain.tracks.length
+    config.serviceProviders = { profiles: [], transcription: null, refinement: null }
+    transcribe = async options => {
+      assert.deepEqual(options.config.serviceProviders, snapshot)
+      assert.equal(options.pcm.length, 682)
+      return { result: { text: 'retry snapshot' }, ogg: Buffer.alloc(0) }
+    }
+    await chain.action('retry')
+    assert.equal(m.getState().phase, 'idle'); assert.equal(chain.tracks.length, opened)
+    assert.equal(inserted.length, before + 1); assert.equal(inserted.at(-1), 'retry snapshot')
+    await chain.dispose()
+  })
+  await test('floating cancellation isolates a pending result and practice delivery stays with its owner', async () => {
+    const m = new RecordingMachine(), chain = await recorderChain(m), gate = deferred(), before = inserted.length, beforeRows = rows.length
+    transcribe = () => gate.promise
+    await chain.action('start'); await chain.settle('recording'); chain.feed()
+    const oldFinish = chain.action('finish'); await flush(); await chain.action('cancel')
+    m.setPracticeTarget(7, { id: 'owned-dictation', kind: 'dictation', mode: 'voice_transcript' })
+    await chain.action('start'); await chain.settle('recording')
+    const id = m.getState().context.sessionId
+    gate.resolve({ result: { text: 'stale result' }, ogg: Buffer.alloc(0) }); await oldFinish
+    assert.equal(m.getState().context.sessionId, id); assert.equal(inserted.length, before); assert.equal(chain.deliveries.length, 0)
+    transcribe = async () => ({ result: { text: 'owned practice' }, ogg: Buffer.alloc(0) })
+    chain.feed(); await chain.action('finish')
+    assert.equal(inserted.length, before); assert.equal(rows.length, beforeRows)
+    assert.equal(chain.deliveries.length, 1); assert.equal(chain.deliveries[0].ownerId, 7)
+    assert.equal(chain.deliveries[0].channel, 'feature-tour:result'); assert.equal(chain.deliveries[0].result.targetId, 'owned-dictation')
+    assert.equal(chain.deliveries[0].result.text, 'owned practice')
+    await chain.dispose()
+  })
+  await test('floating start rejected by configuration cannot publish hands-free or capture', async () => {
+    const m = new RecordingMachine(), action = floatingActions(m), states = [], starts = []
+    m.on('state', state => states.push(state)); m.on('start', event => starts.push(event))
+    config.serviceProviders = { profiles: [], transcription: null, refinement: null }
+    await action('start')
+    assert.equal(m.getState().phase, 'error')
+    assert.equal(m.getState().context.sessionId, null)
+    assert.equal(m.getState().context.handsFree, false)
+    assert.ok(states.every(state => !state.context.handsFree))
+    assert.equal(starts.length, 0)
+    await action('cancel')
+  })
+  await test('floating retry without retained audio respects a rejected start', async () => {
+    const m = new RecordingMachine(), action = floatingActions(m), starts = []
+    m.on('start', event => starts.push(event))
+    config.serviceProviders = { profiles: [], transcription: null, refinement: null }
+    await action('retry')
+    assert.equal(m.getState().phase, 'error')
+    assert.equal(m.getState().context.sessionId, null)
+    assert.equal(m.getState().context.handsFree, false)
+    assert.equal(starts.length, 0)
+    await action('cancel')
+  })
+  await test('floating and fallback respect disabled, blocked and mismatched practice starts', async () => {
+    for (const restriction of ['disabled', 'blocked', 'mismatched']) {
+      const m = new RecordingMachine(), action = floatingActions(m), starts = []
+      const keys = load('src/main/services/hotkeys.ts', { './recordingMachine': { recordingMachine: m } })
+      m.on('start', event => starts.push(event))
+      if (restriction === 'disabled') m.setDisabled(true)
+      if (restriction === 'blocked') m.blockPractice(7)
+      if (restriction === 'mismatched') m.setPracticeTarget(7, { id: 'question', kind: 'question', mode: 'ask_anything', selectedText: '' })
+      await action('start'); await action('retry'); keys.handleFallbackShortcut('Fn'); await flush()
+      assert.equal(m.getState().phase, 'idle', restriction)
+      assert.equal(m.getState().context.sessionId, null, restriction)
+      assert.equal(m.getState().context.handsFree, false, restriction)
+      assert.equal(starts.length, 0, restriction)
+      m.cancel()
+    }
+  })
+  await test('duplicate floating start cannot convert a held capture or restart finishing', async () => {
+    const m = new RecordingMachine(), action = floatingActions(m), starts = []
+    const keys = load('src/main/services/hotkeys.ts', { './recordingMachine': { recordingMachine: m } })
+    m.on('start', event => starts.push(event))
+    await m.start('translation')
+    const id = m.getState().context.sessionId
+    await action('start'); await action('retry')
+    assert.equal(m.getState().context.handsFree, false)
+    assert.equal(m.getState().context.mode, 'translation')
+    const finish = action('finish'), repeated = action('finish')
+    await action('start'); await action('retry'); keys.handleFallbackShortcut('Fn'); await flush()
+    assert.equal(m.getState().phase, 'finishing')
+    assert.equal(m.getState().context.sessionId, id)
+    assert.equal(m.getState().context.handsFree, false)
+    assert.equal(starts.length, 1)
+    m.markStopped(id); await Promise.all([finish, repeated])
+    assert.equal(m.getState().phase, 'idle')
+    await action('cancel'); await action('cancel'); await action('finish')
+    assert.equal(m.getState().phase, 'idle')
+  })
+  await test('floating and fallback cannot restart or end the native long-press hint', async () => {
+    const m = new RecordingMachine(), action = floatingActions(m)
+    const keys = load('src/main/services/hotkeys.ts', { './recordingMachine': { recordingMachine: m } })
+    await m.start(); m.setLongPressing()
+    await action('start'); await action('retry'); keys.handleFallbackShortcut('Fn'); await flush()
+    assert.equal(m.getState().phase, 'long_pressing')
+    assert.equal(m.getState().context.sessionId, null)
+    assert.equal(m.getState().context.handsFree, false)
+    m.cancel()
+  })
+  await test('accepted floating start publishes hands-free atomically and repeats safely', async () => {
+    const m = new RecordingMachine(), action = floatingActions(m), states = [], starts = []
+    m.on('state', state => states.push(state)); m.on('start', event => starts.push(event))
+    await action('start'); await action('start')
+    assert.equal(m.getState().phase, 'starting')
+    assert.equal(starts.length, 1)
+    assert.ok(states.every(state => state.phase === 'starting' && state.context.handsFree))
+    await action('cancel')
+    assert.equal(m.getState().context.sessionId, null)
+    assert.equal(m.getState().context.handsFree, false)
+  })
+  await test('fallback setup rejection never publishes an active session or hands-free state', async () => {
+    const m = new RecordingMachine(), states = [], starts = []
+    const keys = load('src/main/services/hotkeys.ts', { './recordingMachine': { recordingMachine: m } })
+    m.on('state', state => states.push(state)); m.on('start', event => starts.push(event))
+    config.serviceProviders = { profiles: [], transcription: null, refinement: null }
+    keys.handleFallbackShortcut('Fn+Space'); await flush()
+    assert.equal(m.getState().phase, 'error')
+    assert.equal(m.getState().context.sessionId, null)
+    assert.equal(m.getState().context.handsFree, false)
+    assert.equal(starts.length, 0)
+    assert.ok(states.every(state => state.context.handsFree === false))
+    m.cancel()
   })
   await test('fallback toggle finishes even while microphone is starting', async () => {
     const m = new RecordingMachine(), keys = load('src/main/services/hotkeys.ts', { './recordingMachine': { recordingMachine: m } })

@@ -127,8 +127,7 @@ export function registerWindowHandlers(handle: (c: string, f: Handler) => void):
         return true
       }
       case 'start':
-        await recordingMachine.start()
-        recordingMachine.setHandsFree(true)
+        await recordingMachine.dispatch({ type: 'START' })
         return true
       case 'finish':
         await recordingMachine.dispatch({ type: 'FINISH' })

@@ -7,7 +7,7 @@ import { createLogger } from '../lib/logger'
 import { AUDIO, HISTORY_STATUS, MODES, type Mode } from '../../shared/constants'
 import type { AudioContextSnapshot, VoiceFlowResult } from '../../shared/types'
 import type { Settings } from '../../shared/settings'
-import { broadcast, interactiveCardWindow } from '../windows'
+import { broadcast, interactiveCardWindow, windows } from '../windows'
 import { IPC } from '../../shared/ipc'
 import * as history from './history'
 import { listDictionary } from './dictionary'
@@ -32,7 +32,10 @@ export interface RecorderContext {
   issue: RecordingIssue | null
 }
 export interface RecordingMachineState { phase: RecorderPhase; context: RecorderContext }
-type MachineEvent = { type: 'PRESS' | 'RELEASE' | 'STARTED' | 'FINISH' | 'CANCEL' | 'RETRY' | 'TIMEOUT' | 'ERROR'; error?: string }
+type MachineEvent =
+  | { type: 'PRESS' | 'RELEASE' | 'START' | 'STARTED' | 'FINISH' | 'CANCEL' | 'RETRY' | 'TIMEOUT' }
+  | { type: 'TOGGLE'; mode: Mode }
+  | { type: 'ERROR'; error?: string }
 type Session = {
   id: string; startedAt: number; mode: Mode; frames: Float32Array[]
   context: Promise<AudioContextSnapshot | null>; config: Settings; controller: AbortController
@@ -139,6 +142,16 @@ export class RecordingMachine extends EventEmitter {
   async dispatch(event: MachineEvent): Promise<void> {
     switch (event.type) {
       case 'PRESS': return this.start()
+      case 'START': return this.start(undefined, { handsFree: true })
+      case 'TOGGLE':
+        if (this.disabled) return
+        if (this.state.phase === 'starting' || this.state.phase === 'recording') return this.finish()
+        if (this.state.phase === 'idle' || this.state.phase === 'error') {
+          windows.floatingBar.createWindow()
+          windows.floatingBar.show()
+          return this.start(event.mode, { handsFree: true })
+        }
+        return
       case 'RELEASE':
         if (this.state.phase === 'long_pressing') return this.cancel()
         if (['starting', 'recording'].includes(this.state.phase)) return this.finish()
@@ -161,7 +174,7 @@ export class RecordingMachine extends EventEmitter {
     this.transition('error', { sessionId: null, mode, error: issue.message, issue,
       handsFree: false, recorderState: { isStartingMicrophone: false }, recorderTimeoutState: null })
   }
-  async start(mode?: Mode): Promise<void> {
+  async start(mode?: Mode, { handsFree = false }: { handsFree?: boolean } = {}): Promise<void> {
     if (this.disabled || this.session || this.state.phase === 'long_pressing') return
     const requestedMode = mode ?? settings.get().dictationMode
     if (this.practiceScope.kind === 'blocked' || this.practiceScope.kind === 'ready' && requestedMode !== this.practiceScope.target.mode) return
@@ -181,7 +194,7 @@ export class RecordingMachine extends EventEmitter {
       session.context = captureAudioContext().catch(err => { log.warn('context capture failed', err); return null })
     }
     this.transition('starting', { sessionId: session.id, mode: session.mode, error: null, issue: null,
-      handsFree: false, recorderState: { isStartingMicrophone: true }, recorderTimeoutState: null })
+      handsFree, recorderState: { isStartingMicrophone: true }, recorderTimeoutState: null })
     this.countdown = setInterval(() => {
       if (!this.active(session)) return
       const remaining = Math.max(0, 300 - Math.floor((Date.now() - session.startedAt) / 1000))
@@ -274,9 +287,7 @@ export class RecordingMachine extends EventEmitter {
   }
   async retry(): Promise<void> {
     if (!this.retryInput) {
-      await this.start()
-      this.setHandsFree(true)
-      return
+      return this.dispatch({ type: 'START' })
     }
     if (this.session || this.disabled) return
     const session = this.newSession(this.retryInput.mode)

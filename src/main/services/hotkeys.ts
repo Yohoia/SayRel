@@ -90,18 +90,9 @@ export function handleKeyEvent(event: KeyEvent): void {
 
 /** Electron has no global key-up callback: its fallback is explicitly a toggle. */
 export function handleFallbackShortcut(combination: string): void {
-  if (recordingMachine.isDisabled()) return
   const resolved = resolveBinding(combination)
   if (!resolved) return
-  const phase = recordingMachine.getState().phase
-  if (phase === 'starting' || phase === 'recording') {
-    void recordingMachine.dispatch({ type: 'FINISH' })
-  } else if (phase === 'idle' || phase === 'error') {
-    windows.floatingBar.createWindow()
-    windows.floatingBar.show()
-    void recordingMachine.start(resolved.mode)
-    recordingMachine.setHandsFree(true)
-  }
+  void recordingMachine.dispatch({ type: 'TOGGLE', mode: resolved.mode })
 }
 
 export function shortcutBindings(): { binding: ShortcutBinding; mode: Mode }[] {
