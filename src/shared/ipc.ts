@@ -125,6 +125,7 @@ export const IPC = {
   PERMISSION_CHECK_WITH_CHILD_PROCESS: 'permission:check-with-child-process',
   PERMISSION_DIAGNOSE_MICROPHONE: 'permission:diagnose-microphone',
   PERMISSION_REQUEST: 'permission:request',
+  PERMISSION_OPEN_SYSTEM_PREFERENCES: 'permission:open-system-preferences',
   PERMISSION_RESET_ACCESSIBILITY: 'permission:reset-accessibility-permission',
   PERMISSION_UPDATE_AUTO_LAUNCH: 'permission:update-auto-launch',
   PERMISSION_UPDATE_SHOW_APP_IN_DOCK: 'permission:update-show-app-in-dock',

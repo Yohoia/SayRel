@@ -232,6 +232,7 @@ export class RecordingMachine extends EventEmitter {
     }
     if (result.delivery === 'card') {
       interactiveCardWindow.setPayload({ id: result.id, mode: result.mode, title: result.transcript,
+        userPrompt: result.transcript,
         question: result.transcript, selectedText: input.context?.focusedInput?.selectedText ?? null,
         answer: result.refined, createdAt: Date.now() })
       interactiveCardWindow.createWindow()

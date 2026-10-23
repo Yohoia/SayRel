@@ -106,10 +106,11 @@ export function LanguageVariants() {
   </SettingsDialog>}</>
 }
 
-export function TranslationTargets() {
+export function TranslationTargets({ autoOpen = false }: { autoOpen?: boolean }) {
   const { settings, patch } = useAppSettings()
   const t = useSettingsText()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(autoOpen)
+  useEffect(() => { if (autoOpen) setOpen(true) }, [autoOpen])
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState('')
   const drag = useRef<number | null>(null)

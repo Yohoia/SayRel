@@ -167,6 +167,7 @@ const api = {
     closeInteractiveCard: () => invoke('page:close-interactive-card'),
     closeSidebar: () => invoke('page:close-sidebar'),
     completeOnboarding: () => invoke('page:complete-onboarding'),
+    openOnboarding: () => invoke('page:open-onboarding'),
     floatingBarClick: (action: string, payload?: unknown) =>
       invoke('page:floating-bar-click', action, payload),
     floatingBarSetAlwaysOnTop: (value: boolean) =>
@@ -199,6 +200,7 @@ const api = {
     checkWithChildProcess: (kind: string) => invoke('permission:check-with-child-process', kind),
     diagnoseMicrophone: () => invoke('permission:diagnose-microphone'),
     request: (kind: string) => invoke('permission:request', kind),
+    openSystemPreferences: (kind: string) => invoke('permission:open-system-preferences', kind),
     resetAccessibility: () => invoke('permission:reset-accessibility-permission'),
     updateAutoLaunch: (enabled: boolean) => invoke('permission:update-auto-launch', enabled),
     updateShowAppInDock: (show: boolean) => invoke('permission:update-show-app-in-dock', show)

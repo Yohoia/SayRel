@@ -2,6 +2,7 @@ import { BrandLockup } from '../../shared/components/BrandLockup'
 import { useEffect, useRef, useState } from 'react'
 import InfoOutlined from '@mui/icons-material/InfoOutlined'
 import ArrowOutward from '@mui/icons-material/ArrowOutward'
+import ShieldOutlined from '@mui/icons-material/ShieldOutlined'
 import { api } from '../../shared/utils/bridge'
 import { checkForUpdates } from '../../shared/utils/checkForUpdates'
 import { useAppSettings } from '../../shared/state/settings'
@@ -10,6 +11,8 @@ import { useFeatureTour } from './FeatureTour'
 import { interfaceLanguages, useSettingsText, type SettingsTextKey } from './settingsText'
 import '../../shared/styles/settings.css'
 import { HubSelect } from './HubSelect'
+import { SettingsPermissions } from './SettingsPermissions'
+import { toast } from '../../shared/components/Toast'
 
 const SECTIONS = ['settings', 'writing', 'about', 'help'] as const
 type Section = (typeof SECTIONS)[number]
@@ -20,6 +23,7 @@ const TITLES = {
   help: { text: "Help", key: 'hub__help__title' }
 } satisfies Record<Section, { text: string; key: SettingsTextKey }>
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
+  permissions: <ShieldOutlined />,
   shortcuts: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M15.75 6.90015C15.75 6.46773 15.7491 6.18834 15.7317 5.97583C15.715 5.77214 15.6869 5.69651 15.668 5.65943C15.5961 5.51845 15.4816 5.40391 15.3406 5.33203C15.3035 5.31314 15.2279 5.28496 15.0242 5.26831C14.8117 5.25095 14.5323 5.25 14.0999 5.25H3.90015C3.46773 5.25 3.18834 5.25095 2.97583 5.26831C2.77214 5.28496 2.69651 5.31314 2.65943 5.33203C2.51845 5.40391 2.40391 5.51845 2.33203 5.65943C2.31314 5.69651 2.28496 5.77214 2.26831 5.97583C2.25095 6.18834 2.25 6.46773 2.25 6.90015V11.0999C2.25 11.5323 2.25095 11.8117 2.26831 12.0242C2.28496 12.2279 2.31314 12.3035 2.33203 12.3406C2.40391 12.4816 2.51845 12.5961 2.65943 12.668C2.69651 12.6869 2.77214 12.715 2.97583 12.7317C3.18834 12.7491 3.46773 12.75 3.90015 12.75H14.0999C14.5323 12.75 14.8117 12.7491 15.0242 12.7317C15.2279 12.715 15.3035 12.6869 15.3406 12.668C15.4816 12.5961 15.5961 12.4816 15.668 12.3406C15.6869 12.3035 15.715 12.2279 15.7317 12.0242C15.7491 11.8117 15.75 11.5323 15.75 11.0999V6.90015ZM6.00733 9.75C6.42154 9.75 6.75733 10.0858 6.75733 10.5C6.75733 10.9142 6.42154 11.25 6.00733 11.25H6C5.58579 11.25 5.25 10.9142 5.25 10.5C5.25 10.0858 5.58579 9.75 6 9.75H6.00733ZM9.00733 9.75C9.42154 9.75 9.75733 10.0858 9.75733 10.5C9.75733 10.9142 9.42154 11.25 9.00733 11.25H9C8.58579 11.25 8.25 10.9142 8.25 10.5C8.25 10.0858 8.58579 9.75 9 9.75H9.00733ZM12.0073 9.75C12.4215 9.75 12.7573 10.0858 12.7573 10.5C12.7573 10.9142 12.4215 11.25 12.0073 11.25H12C11.5858 11.25 11.25 10.9142 11.25 10.5C11.25 10.0858 11.5858 9.75 12 9.75H12.0073ZM4.50733 6.75C4.92154 6.75 5.25733 7.08579 5.25733 7.5C5.25733 7.91422 4.92154 8.25 4.50733 8.25H4.5C4.08579 8.25 3.75 7.91422 3.75 7.5C3.75 7.08579 4.08579 6.75 4.5 6.75H4.50733ZM7.50733 6.75C7.92154 6.75 8.25733 7.08579 8.25733 7.5C8.25733 7.91422 7.92154 8.25 7.50733 8.25H7.5C7.08579 8.25 6.75 7.91422 6.75 7.5C6.75 7.08579 7.08579 6.75 7.5 6.75H7.50733ZM10.5073 6.75C10.9215 6.75 11.2573 7.08579 11.2573 7.5C11.2573 7.91422 10.9215 8.25 10.5073 8.25H10.5C10.0858 8.25 9.75 7.91422 9.75 7.5C9.75 7.08579 10.0858 6.75 10.5 6.75H10.5073ZM13.5073 6.75C13.9215 6.75 14.2573 7.08579 14.2573 7.5C14.2573 7.91422 13.9215 8.25 13.5073 8.25H13.5C13.0858 8.25 12.75 7.91422 12.75 7.5C12.75 7.08579 13.0858 6.75 13.5 6.75H13.5073ZM17.25 11.0999C17.25 11.5075 17.2508 11.8587 17.2273 12.1465C17.2031 12.4429 17.1492 12.738 17.0046 13.0217C16.789 13.4449 16.4449 13.789 16.0217 14.0046C15.738 14.1492 15.4429 14.2031 15.1465 14.2273C14.8587 14.2508 14.5075 14.25 14.0999 14.25H3.90015C3.49249 14.25 3.14127 14.2508 2.85352 14.2273C2.55708 14.2031 2.262 14.1492 1.97827 14.0046C1.55511 13.789 1.21105 13.4449 0.995365 13.0217C0.850801 12.738 0.796942 12.4429 0.772708 12.1465C0.749198 11.8587 0.750003 11.5075 0.750003 11.0999V6.90015C0.750003 6.49249 0.749198 6.14127 0.772708 5.85352C0.796942 5.55708 0.850801 5.262 0.995365 4.97827C1.21105 4.55511 1.55511 4.21105 1.97827 3.99536C2.262 3.8508 2.55708 3.79694 2.85352 3.77271C3.14127 3.7492 3.49249 3.75 3.90015 3.75H14.0999C14.5075 3.75 14.8587 3.7492 15.1465 3.77271C15.4429 3.79694 15.738 3.8508 16.0217 3.99536C16.4449 4.21105 16.789 4.55511 17.0046 4.97827C17.1492 5.262 17.2031 5.55708 17.2273 5.85352C17.2508 6.14127 17.25 6.49249 17.25 6.90015V11.0999Z" fill="currentColor" /></svg>,
   language: <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.00001 1.47949C13.154 1.47949 16.5209 4.84645 16.5209 9.00042C16.5209 13.1544 13.154 16.5213 9.00001 16.5213C4.84604 16.5213 1.47908 13.1544 1.47908 9.00042C1.47908 4.84645 4.84604 1.47949 9.00001 1.47949ZM3.07241 9.77135C3.37476 12.1192 5.03753 14.0403 7.24596 14.7171C6.30544 13.2299 5.73086 11.5352 5.57353 9.77135H3.07241ZM12.4265 9.77135C12.2691 11.5355 11.6935 13.2298 10.7528 14.7171C12.9618 14.0406 14.6252 12.1196 14.9276 9.77135H12.4265ZM7.12166 9.77135C7.30141 11.5042 7.95084 13.1546 9.00001 14.5438C10.0492 13.1546 10.6986 11.5042 10.8784 9.77135H7.12166ZM10.7528 3.28251C11.6939 4.77004 12.2691 6.46503 12.4265 8.22949H14.9276C14.6252 5.88109 12.962 3.95889 10.7528 3.28251ZM9.00001 3.45578C7.95049 4.84516 7.30144 6.49629 7.12166 8.22949H10.8784C10.6986 6.49629 10.0495 4.84516 9.00001 3.45578ZM7.24596 3.28251C5.03736 3.9592 3.37478 5.88149 3.07241 8.22949H5.57353C5.73089 6.46525 6.3051 4.7699 7.24596 3.28251Z" fill="currentColor" /></svg>,
   audio: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 10.5C8.375 10.5 7.84375 10.2812 7.40625 9.84375C6.96875 9.40625 6.75 8.875 6.75 8.25V3.75C6.75 3.125 6.96875 2.59375 7.40625 2.15625C7.84375 1.71875 8.375 1.5 9 1.5C9.625 1.5 10.1562 1.71875 10.5938 2.15625C11.0312 2.59375 11.25 3.125 11.25 3.75V8.25C11.25 8.875 11.0312 9.40625 10.5938 9.84375C10.1562 10.2812 9.625 10.5 9 10.5ZM8.25 15.75V13.4438C6.95 13.2688 5.875 12.6875 5.025 11.7C4.175 10.7125 3.75 9.5625 3.75 8.25H5.25C5.25 9.2875 5.61563 10.1719 6.34688 10.9031C7.07812 11.6344 7.9625 12 9 12C10.0375 12 10.9219 11.6344 11.6531 10.9031C12.3844 10.1719 12.75 9.2875 12.75 8.25H14.25C14.25 9.5625 13.825 10.7125 12.975 11.7C12.125 12.6875 11.05 13.2688 9.75 13.4438V15.75H8.25ZM9 9C9.2125 9 9.39062 8.92813 9.53438 8.78438C9.67812 8.64063 9.75 8.4625 9.75 8.25V3.75C9.75 3.5375 9.67812 3.35938 9.53438 3.21563C9.39062 3.07188 9.2125 3 9 3C8.7875 3 8.60938 3.07188 8.46562 3.21563C8.32188 3.35938 8.25 3.5375 8.25 3.75V8.25C8.25 8.4625 8.32188 8.64063 8.46562 8.78438C8.60938 8.92813 8.7875 9 9 9Z" fill="currentColor" /></svg>,
@@ -66,8 +70,9 @@ export function SettingsPanel({ section: initialSection = 'settings', onSectionC
       <div ref={contentRef} className="settings-content">
         <h1 className={`settings-title ${section !== 'settings' ? 'settings-title-secondary' : ''}`}>{t(TITLES[section].text, TITLES[section].key)}{section === 'writing' && <span className="settings-info" title={t("Sayrel learns your unique writing style and tone and adapts how your dictation is phrased.")}>ⓘ</span>}</h1>
         {section === 'settings' && <div className="settings-groups">
+          <Group title="System permissions" icon="permissions"><SettingsPermissions /></Group>
           <Group title="Shortcuts" icon="shortcuts"><DictationSection /></Group>
-          <Group title="Language" icon="language"><LanguageSection /></Group>
+          <Group title="Language" icon="language"><LanguageSection autoOpenTranslation={initialSection === 'translation'} /></Group>
           <Group title="Audio" icon="audio"><AudioSection autoOpen={initialSection === 'microphone'} /></Group>
           <Group title="General" icon="general"><GeneralSection /></Group>
         </div>}
@@ -84,14 +89,14 @@ function Group({ title, icon, children }: { title: string; icon: string; childre
   return <section className="settings-group"><h2 className="settings-group-title"><CategoryIcon name={icon} />{t(title)}</h2>{children}</section>
 }
 
-function LanguageSection() {
+function LanguageSection({ autoOpenTranslation }: { autoOpenTranslation: boolean }) {
   const { settings, patch } = useAppSettings()
   const t = useSettingsText()
   return <>
     <Row label="Interface language" hint="Choose the language used in the user interface.">
       <HubSelect label={t("Interface language")} value={settings.language ?? 'en'} options={interfaceLanguages} onChange={async value => { await api.i18n.setLanguage(value); await patch({ language: value }) }} />
     </Row>
-    <Row label="Translation targets" hint="Choose up to 3 target languages for your dictation in translation mode."><TranslationTargets /></Row>
+    <Row label="Translation targets" hint="Choose up to 3 target languages for your dictation in translation mode."><TranslationTargets autoOpen={autoOpenTranslation} /></Row>
     <Row label="Language variants" hint="Choose your preferred language variants for the best experience."><LanguageVariants /></Row>
   </>
 }
@@ -167,7 +172,18 @@ function HelpSection() {
   const t = useSettingsText()
   const openTour = useFeatureTour()
   const { settings } = useAppSettings()
-  return <><Row label="Explore key features" hint="Guided examples for Dictate, Translate, and Ask anything."><button className="settings-pill" onClick={openTour}>{t("Start")}</button></Row><ExternalRow label="Help center" url="https://www.typeless.com/help" /><ExternalRow label="Release notes" url={`https://www.typeless.com/help/release-notes/macos?lang=${settings.language ?? 'en'}`} /></>
+  const [opening, setOpening] = useState(false)
+  const reopenSetup = async () => {
+    setOpening(true)
+    try { await api.page.openOnboarding() }
+    catch { toast.error('Could not open setup. Please try again.') }
+    finally { setOpening(false) }
+  }
+  return <>
+    <Row label="Explore key features" hint="Guided examples for Dictate, Translate, and Ask anything."><button className="settings-pill" onClick={openTour}>{t("Start")}</button></Row>
+    <Row label="Initial setup" hint="Review permissions, test your microphone, and try your shortcut."><button type="button" className="settings-pill" disabled={opening} onClick={() => void reopenSetup()}>{t(opening ? 'Opening…' : 'Reopen setup')}</button></Row>
+    <ExternalRow label="Help center" url="https://www.typeless.com/help" /><ExternalRow label="Release notes" url={`https://www.typeless.com/help/release-notes/macos?lang=${settings.language ?? 'en'}`} />
+  </>
 }
 
 function AboutSection() {

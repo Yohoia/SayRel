@@ -117,6 +117,7 @@ const bridge = {
     if (channel === 'audio:get-devices-async') return [{ deviceId: 'default', label: 'MacBook Pro Microphone', isDefault: true }]
     if (channel === 'troubleshooting:get-system-info') return { appVersion: '1.0.0', platform: 'darwin', arch: 'arm64' }
     if (channel === 'page:get-interactive-card-payload') return { title:'Help me organize this idea', answer:'Clear writing starts with one simple sentence.\n\nSpeak naturally and let the words take shape as you think.', createdAt:Date.now() }
+    if (channel === 'page:is-onboarding-window-visible') return location.pathname.endsWith('/onboarding.html')
     if (channel === 'updater:check-for-update') { await new Promise(resolve => setTimeout(resolve, 700)); return { skipped: 'dev-build' } }
     if (channel === 'clipboard:write-text' && params.get('fail') === 'clipboard') throw new Error('Could not copy')
     if (channel === 'recording-machine:state') return { phase: 'idle', context: { handsFree: false } }

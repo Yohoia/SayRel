@@ -54,6 +54,14 @@
 .settings-row-label { margin: 0; color: var(--ink); font-size: 14px; font-weight: 500; line-height: 20px; }
 .settings-row-hint { margin: 0; color: var(--ink-tertiary); font-size: 14px; font-weight: 400; line-height: 20px; }
 .settings-row-control { flex-shrink: 0; }
+.settings-permissions-note { margin:8px 0 4px; font-size:13px; }
+.settings-permission-row { gap:20px; }
+.settings-permission-actions { display:flex; align-items:center; gap:12px; }
+.settings-permission-actions .settings-pill { min-width:64px; }
+.settings-permission-status { color:var(--ink-tertiary); font-size:12px; white-space:nowrap; }
+.settings-permission-status.is-granted { color:var(--accent); }
+.settings-permission-status.is-granted::before { content:'✓'; margin-right:4px; }
+.settings-permission-optional { margin-left:8px; padding:2px 6px; color:var(--ink-tertiary); background:var(--fill-hover); border-radius:var(--radius-control); font-size:11px; font-weight:400; vertical-align:middle; }
 .settings-select { width: 198px; height: 40px; padding: 8px; border: 1px solid var(--line); border-radius:var(--radius-control); background: transparent; color: var(--ink-soft); font-size: 14px; line-height: 16px; }
 .settings-select:hover { background: var(--paper-alt); }
 .settings-select:focus-visible, .settings-shortcut-key:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

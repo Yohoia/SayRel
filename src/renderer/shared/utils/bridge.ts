@@ -1,4 +1,6 @@
 /** Typed access to the preload bridge. */
+import { z } from 'zod'
+import type { PermissionKind } from '../../../shared/types'
 export type Bridge = any
 
 declare global {
@@ -59,8 +61,9 @@ export const api = {
     unmute: () => bridge.invoke('audio:unmute')
   },
   permission: {
-    check: (kind: string) => bridge.invoke('permission:check-with-child-process', kind),
-    request: (kind: string) => bridge.invoke('permission:request', kind),
+    check: async (kind: PermissionKind): Promise<boolean> => z.boolean().parse(await bridge.invoke('permission:check-with-child-process', kind)),
+    request: async (kind: PermissionKind): Promise<boolean> => z.boolean().parse(await bridge.invoke('permission:request', kind)),
+    openSystemPreferences: async (kind: PermissionKind): Promise<boolean> => z.boolean().parse(await bridge.invoke('permission:open-system-preferences', kind)),
     diagnoseMicrophone: () => bridge.invoke('permission:diagnose-microphone'),
     updateAutoLaunch: (enabled: boolean) =>
       bridge.invoke('permission:update-auto-launch', enabled),
@@ -78,6 +81,8 @@ export const api = {
     openSettings: (section?: string) => bridge.invoke('page:open-settings-modal', section),
     openUrl: (url: string) => bridge.invoke('page:open-url', url),
     completeOnboarding: () => bridge.invoke('page:complete-onboarding'),
+    openOnboarding: (): Promise<unknown> => bridge.invoke('page:open-onboarding'),
+    isOnboardingVisible: async (): Promise<boolean> => z.boolean().parse(await bridge.invoke('page:is-onboarding-window-visible')),
     floatingBarClick: (action: string, payload?: unknown) =>
       bridge.invoke('page:floating-bar-click', action, payload),
     setExpanded: (expanded: boolean) => bridge.invoke('page:floating-bar-set-expanded', expanded),

@@ -5,7 +5,9 @@ import { createHash } from 'node:crypto'
 import { hostname, release, type } from 'node:os'
 import { settings } from '../lib/settings'
 import { paths } from '../lib/paths'
-import { util, input, keyboard } from '../lib/native'
+import { util, keyboard } from '../lib/native'
+import { z } from 'zod'
+import type { PermissionKind } from '../../shared/types'
 import { getAppearanceState, setPreference } from '../services/appearance'
 import {
   getLanguage,
@@ -22,6 +24,7 @@ import { broadcast } from '../windows'
 import type { Handler } from './index'
 
 const log = createLogger('ipc:system')
+const permissionKind = z.enum(['microphone', 'accessibility', 'screenRecording'])
 
 export function registerSystemHandlers(handle: (c: string, f: Handler) => void): void {
   // The diagnostic sidebar requests a snapshot when the user refreshes it.
@@ -147,15 +150,21 @@ export function registerSystemHandlers(handle: (c: string, f: Handler) => void):
   })
 
   // ---- permissions -------------------------------------------------------
-  handle('permission:check-with-child-process', async (_e, kind: string) => {
+  handle('permission:check-with-child-process', async (_e, value: unknown) => {
+    const kind = permissionKind.parse(value)
     const granted = await checkPermission(kind)
     if (kind === 'accessibility' && granted && !keyboard.running) {
-      keyboard.start()
-      refreshShortcutRegistrations()
+      try {
+        keyboard.start()
+        refreshShortcutRegistrations()
+      } catch (error) {
+        log.warn('Permission granted but keyboard listener could not restart', error)
+      }
     }
     return granted
   })
-  handle('permission:request', async (_e, kind: string) => requestPermission(kind))
+  handle('permission:request', async (_e, kind: unknown) => requestPermission(permissionKind.parse(kind)))
+  handle('permission:open-system-preferences', async (_e, kind: unknown) => openPermissionSettings(permissionKind.parse(kind)))
   handle('permission:diagnose-microphone', async () => {
     const status = systemPreferences.getMediaAccessStatus('microphone')
     return {
@@ -246,33 +255,45 @@ function applicationPathFor(bundleId: string): string {
   return '/Applications'
 }
 
-async function checkPermission(kind: string): Promise<boolean> {
+async function checkPermission(kind: PermissionKind): Promise<boolean> {
   switch (kind) {
     case 'microphone':
       return systemPreferences.getMediaAccessStatus('microphone') === 'granted'
     case 'screenRecording':
       return systemPreferences.getMediaAccessStatus('screen') === 'granted'
     case 'accessibility':
-      return (util.checkAccessibilityPermission?.(0) ?? input.checkAccessibilityPermission?.(0) ?? 0) === 1
-    default:
-      return false
+      return systemPreferences.isTrustedAccessibilityClient(false)
   }
 }
 
-async function requestPermission(kind: string): Promise<boolean> {
+async function requestPermission(kind: PermissionKind): Promise<boolean> {
   switch (kind) {
-    case 'microphone':
-      return systemPreferences.askForMediaAccess('microphone')
-    case 'accessibility':
-      return (util.checkAccessibilityPermission?.(1) ?? 0) === 1
-    case 'screenRecording':
-      await shell.openExternal(
-        'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture'
-      )
-      return systemPreferences.getMediaAccessStatus('screen') === 'granted'
-    default:
+    case 'microphone': {
+      const status = systemPreferences.getMediaAccessStatus('microphone')
+      if (status === 'granted') return true
+      if (status === 'not-determined') return systemPreferences.askForMediaAccess('microphone')
+      await openPermissionSettings(kind)
       return false
+    }
+    case 'accessibility':
+      if (systemPreferences.isTrustedAccessibilityClient(true)) return true
+      await openPermissionSettings(kind)
+      return false
+    case 'screenRecording':
+      await openPermissionSettings(kind)
+      return checkPermission(kind)
   }
+}
+
+async function openPermissionSettings(kind: PermissionKind): Promise<boolean> {
+  if (process.platform !== 'darwin') return false
+  const panes = {
+    microphone: 'Privacy_Microphone',
+    accessibility: 'Privacy_Accessibility',
+    screenRecording: 'Privacy_ScreenCapture'
+  } satisfies Record<PermissionKind, string>
+  await shell.openExternal(`x-apple.systempreferences:com.apple.preference.security?${panes[kind]}`)
+  return true
 }
 
 /** Stable hash helper used by diagnostics and telemetry redaction. */

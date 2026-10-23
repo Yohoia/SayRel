@@ -35,7 +35,7 @@ async function shot(name, bodySelector) {
   assert.equal(report.overflow, false, name + ' fits the window')
   assert.equal(report.lang, 'en')
   assert.equal(/\p{Script=Han}/u.test(report.text), false, name + ' uses English')
-  assert.ok(report.bodyFont.startsWith('Inter'), name + ' body uses Inter')
+  assert.ok(report.bodyFont.startsWith(name === 'answer-card' ? '"SF Pro"' : 'Inter'), name + ' uses its intended body font')
   writeFileSync(join(output, name + '.png'), (await win.webContents.capturePage()).toPNG())
   reports.push(report)
   console.log('PASS ' + name)

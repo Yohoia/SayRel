@@ -57,10 +57,14 @@ export function OnboardingApp() {
   const index = STEPS.indexOf(step)
   const next = () => setStep(STEPS[Math.min(index + 1, STEPS.length - 1)])
   const back = () => setStep(STEPS[Math.max(0, index - 1)])
+  const finishSetup = async () => {
+    try { await api.page.completeOnboarding() }
+    catch { toast.error('Could not finish setup. Please try again.') }
+  }
   return <main className="secondary-onboarding">
     <header className="secondary-onboarding-header drag"><div className="secondary-onboarding-brand"><BrandLockup /></div><nav aria-label={t("Setup progress")}>{["Set up", "Try it out"].map((label, i) => <span className={i === (step === 'done' ? 1 : 0) ? 'active' : ''} key={label}>{t(label)}{i < 1 && <ChevronRightRounded />}</span>)}</nav></header>
     <div className="secondary-onboarding-progress" style={{ width: `${(index + 1) * 25}%` }} />
-    {step === 'done' ? <section className="secondary-onboarding-done"><h1><span>{t("Speak,")}</span> {t("don’t type")}</h1><div className="secondary-done-shortcuts"><ShortcutSummary title={t("Dictate")} shortcut={shortcut} /><ShortcutSummary title={t("Ask anything")} shortcut={askShortcut} /></div><button className="secondary-primary-button" onClick={() => void api.page.completeOnboarding()}>{t("Let's go")}</button></section> : <div className="secondary-onboarding-layout">
+    {step === 'done' ? <section className="secondary-onboarding-done"><h1><span>{t("Speak,")}</span> {t("don’t type")}</h1><div className="secondary-done-shortcuts"><ShortcutSummary title={t("Dictate")} shortcut={shortcut} /><ShortcutSummary title={t("Ask anything")} shortcut={askShortcut} /></div><button className="secondary-primary-button" onClick={() => void finishSetup()}>{t("Let's go")}</button></section> : <div className="secondary-onboarding-layout">
       <section className="secondary-onboarding-left"><div className="secondary-onboarding-content">
         <div className="secondary-onboarding-back">{index > 0 && <button className="secondary-text-button" onClick={back}><ArrowBackRounded />{t("Back")}</button>}</div>
         <div className={`secondary-onboarding-copy ${step === 'shortcut' ? 'shortcut-copy' : ''}`}>
@@ -73,6 +77,7 @@ export function OnboardingApp() {
           {step === 'shortcut' && <><p className="secondary-onboarding-description">{t("We recommend the")}<kbd>{shortcut}</kbd> {t("key, at the bottom left of your keyboard.")}</p><p className="secondary-onboarding-question">{t("Does the shortcut light up when you press it?")}</p></>}
         </div>
         <footer className="secondary-onboarding-footer">
+          <button type="button" className="secondary-text-button secondary-onboarding-later" onClick={() => void finishSetup()}>{t('Set up later')}</button>
           {step === 'microphone' && <button className="secondary-outline-button" onClick={() => void api.page.openSettings('microphone')}>{t("No, change microphone")}</button>}
           {step === 'shortcut' && <button className="secondary-outline-button" onClick={() => void api.page.openSettings('shortcuts')}>{t("No, change shortcut")}</button>}
           {(step !== 'permissions' || (mic && accessibility)) && <button className="secondary-primary-button" disabled={step === 'microphone' ? !micReady : step === 'shortcut' ? !tested : false} onClick={next}>{step === 'permissions' ? t("Continue") : t("Yes, continue")}</button>}

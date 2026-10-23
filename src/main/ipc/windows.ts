@@ -91,6 +91,12 @@ export function registerWindowHandlers(handle: (c: string, f: Handler) => void):
     return true
   })
 
+  handle('page:open-onboarding', () => {
+    onboardingWindow.createWindow()
+    onboardingWindow.show()
+    return true
+  })
+
   handle('page:complete-onboarding', () => {
     settings.patch({ onboardingCompleted: true })
     onboardingWindow.closeWindow()

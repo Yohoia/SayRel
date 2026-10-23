@@ -1,6 +1,9 @@
 import { useAppText } from '../shared/i18n/useAppText'
 import { BrandLockup } from '../shared/components/BrandLockup'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { z } from 'zod'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import CloseRounded from '@mui/icons-material/CloseRounded'
 import MicRounded from '@mui/icons-material/MicRounded'
 import CheckRounded from '@mui/icons-material/CheckRounded'
@@ -8,15 +11,11 @@ import { api, bridge } from '../shared/utils/bridge'
 import { toast } from '../shared/components/Toast'
 import '../shared/styles/secondary.css'
 
-type Payload = {
-  id: string
-  mode: string
-  title: string | null
-  userPrompt?: string | null
-  selectedText?: string | null
-  answer: string
-  createdAt: number
-}
+const payloadSchema = z.object({
+  title: z.string().nullish(), userPrompt: z.string().nullish(),
+  selectedText: z.string().nullish(), answer: z.string()
+})
+type Payload = z.infer<typeof payloadSchema>
 
 export function CardApp() {
   const t = useAppText()
@@ -26,14 +25,21 @@ export function CardApp() {
   const [expanded, setExpanded] = useState(false)
   const [collapsible, setCollapsible] = useState(false)
   const promptRef = useRef<HTMLDivElement>(null)
-  const cardRef = useRef<HTMLElement>(null)
+  const measureRef = useRef<HTMLDivElement>(null)
+  const answerRef = useRef<HTMLDivElement>(null)
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    api.page.cardPayload().then((data: Payload | null) => setPayload(data)).catch(() => undefined)
-    const off = window.sayrel.on('interactive-card:update', (data: Payload) => { setPayload(data); setExpanded(false) })
+    let live = true, receivedUpdate = false
+    const update = (value: unknown) => {
+      const parsed = payloadSchema.safeParse(value)
+      if (live && parsed.success) { setPayload(parsed.data); setExpanded(false) }
+    }
+    api.page.cardPayload().then((value: unknown) => { if (!receivedUpdate) update(value) }).catch(() => undefined)
+    const off = window.sayrel.on('interactive-card:update', (value: unknown) => { receivedUpdate = true; update(value) })
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') void api.page.closeCard() }
     window.addEventListener('keydown', onKey)
-    return () => { off?.(); window.removeEventListener('keydown', onKey) }
+    return () => { live = false; off?.(); window.removeEventListener('keydown', onKey) }
   }, [])
 
   useEffect(() => {
@@ -46,50 +52,75 @@ export function CardApp() {
     return () => observer.disconnect()
   }, [payload])
 
-  useEffect(() => {
-    const card = cardRef.current
-    if (!card) return
+  useLayoutEffect(() => {
+    const measure = measureRef.current
+    if (!measure || !payload) return
+    let disposed = false
     let lastHeight = 0
+    const timers = new Set<number>()
+    const reveal = (delay: number) => {
+      const timer = window.setTimeout(() => { timers.delete(timer); if (!disposed) setReady(true) }, delay)
+      timers.add(timer)
+    }
+    setReady(false)
+    reveal(300)
     const resize = () => {
-      const height = Math.ceil(card.getBoundingClientRect().height) + 88
-      if (Math.abs(height - lastHeight) <= 10) return
+      const height = Math.ceil(measure.getBoundingClientRect().height)
+      if (!Number.isFinite(height) || height < 1 || height > 32000 || Math.abs(height - lastHeight) <= 10) return
       lastHeight = height
-      void bridge.invoke('page:update-interactive-card-bounds', { height }).catch(() => undefined)
+      void Promise.resolve(bridge.invoke('page:update-interactive-card-bounds', { height })).catch(() => undefined).finally(() => { if (!disposed) reveal(150) })
     }
     const observer = new ResizeObserver(resize)
-    observer.observe(card)
+    observer.observe(measure)
     resize()
-    return () => observer.disconnect()
+    return () => { disposed = true; observer.disconnect(); timers.forEach(timer => window.clearTimeout(timer)) }
   }, [payload])
 
   const copy = async () => {
     if (!payload) return
     try {
-      await api.clipboard.writeText(payload.answer)
-      setCopied(true); toast.success("Copied")
+      await api.clipboard.writeText(answerRef.current?.innerText ?? payload.answer)
+      setCopied(true)
       setTimeout(() => setCopied(false), 3000)
     } catch { toast.error("Could not copy. Please try again.") }
   }
 
   if (!payload) return null
 
-  return (
-    <main className="secondary-card-shell">
-      <section className="secondary-result-card" ref={cardRef}>
+  const copyPrompt = async () => {
+    try {
+      await api.clipboard.writeText([payload.userPrompt || payload.title, payload.selectedText].filter(Boolean).join('\n'))
+      setPromptCopied(true)
+      setTimeout(() => setPromptCopied(false), 3000)
+    } catch { toast.error('Could not copy. Please try again.') }
+  }
+
+  const card = (measure: boolean) => (
+      <section className="secondary-result-card">
         <header className="secondary-result-brandbar drag">
           <div className="secondary-result-logo"><BrandLockup /></div>
           <button className="secondary-icon-button no-drag" aria-label={t("Close answer")} title={t("Close · Esc")} onClick={() => api.page.closeCard()}><CloseRounded /></button>
         </header>
         <div className="secondary-result-scroll no-drag">
-          {(payload.userPrompt || payload.title) && <section className="secondary-result-prompt"><div ref={promptRef} className={expanded ? 'is-expanded' : ''}><div className="secondary-prompt-row"><MicRounded /><p>{payload.userPrompt || payload.title}</p><button className={`secondary-icon-button ${promptCopied ? 'is-copied' : ''}`} aria-label={t("Copy question")} title={promptCopied ? t("Copied") : t("Copy")} onClick={async () => { try { await api.clipboard.writeText([payload.userPrompt || payload.title, payload.selectedText].filter(Boolean).join('\n')); setPromptCopied(true); setTimeout(() => setPromptCopied(false), 3000); toast.success("Copied") } catch { toast.error("Could not copy. Please try again.") } }}>{promptCopied ? <CheckRounded /> : <CopyIcon />}</button></div>{payload.selectedText && <div className="secondary-selected-text">{payload.selectedText}</div>}</div>{collapsible && <button className="secondary-prompt-toggle" onClick={() => setExpanded(!expanded)}>{expanded ? t("Show less") : t("...more")}</button>}</section>}
+          {(payload.userPrompt || payload.title) && <section className="secondary-result-prompt">
+            <div ref={measure ? undefined : promptRef} className={expanded ? 'is-expanded' : ''}>
+              <div className="secondary-prompt-row"><MicRounded /><p>{payload.userPrompt || payload.title}</p><button className={`secondary-icon-button ${promptCopied ? 'is-copied' : ''}`} aria-label={t('Copy question')} title={promptCopied ? t('Copied') : t('Copy')} onClick={() => void copyPrompt()}>{promptCopied ? <CheckRounded /> : <CopyIcon />}</button></div>
+              {payload.selectedText && <div className="secondary-selected-text"><i className="secondary-selection-rule" aria-hidden="true" /><p>{payload.selectedText}</p><span aria-hidden="true" /></div>}
+              {collapsible && !expanded && <span className="secondary-prompt-more"><i aria-hidden="true" /><button onClick={() => setExpanded(true)}>{t('...more')}</button></span>}
+            </div>
+            {collapsible && expanded && <button className="secondary-prompt-toggle" onClick={() => setExpanded(false)}>{t('Show less')}</button>}
+          </section>}
           <article className="secondary-answer">
             <header><h1><AnswerIcon />{t("Answer")}</h1><button className={`secondary-icon-button ${copied ? 'is-copied' : ''}`} aria-label={copied ? t("Copied") : t("Copy answer")} title={copied ? t("Copied") : t("Copy answer")} onClick={copy}>{copied ? <CheckRounded /> : <CopyIcon />}</button></header>
-            <div className="secondary-answer-content">{payload.answer}</div>
+            <div className="secondary-answer-content" ref={measure ? undefined : answerRef}><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ href, children }) => <a href={href} onClick={event => { event.preventDefault(); if (href) void api.page.openUrl(href) }}>{children}</a> }}>{payload.answer}</ReactMarkdown></div>
           </article>
         </div>
       </section>
-    </main>
   )
+  return <>
+    <main className="secondary-card-shell" style={{ opacity:ready ? 1 : 0, pointerEvents:ready ? 'auto' : 'none' }}>{card(false)}</main>
+    <div className="secondary-card-measure" ref={measureRef} aria-hidden="true">{card(true)}</div>
+  </>
 }
 
 // Original Typeless custom icons from the shipped BYNd6ENk card component.

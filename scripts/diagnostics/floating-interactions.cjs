@@ -33,7 +33,7 @@ function load(file, imports, directory = __dirname) {
 const setupIssue = service => ({ kind: 'provider-setup', service, message: 'Configure a default model.' })
 async function state(phase, patch = {}) {
   await js(`window.__publish({phase:${JSON.stringify(phase)},context:${JSON.stringify({ sessionId: null, mode: 'voice_transcript', handsFree: false, error: null, issue: null, ...patch })}})`)
-  const status = phase === 'starting' ? 'starting-microphone' : phase === 'finishing' ? patch.handsFree ? 'hands-free-dictating' : 'recording-dictating' : phase === 'recording' && patch.handsFree ? 'hands-free' : phase === 'idle' ? 'idle-hidden' : phase
+  const status = phase === 'starting' ? 'starting-microphone' : phase === 'finishing' ? 'recording-dictating' : phase === 'recording' && patch.handsFree ? 'hands-free' : phase === 'idle' ? 'idle-hidden' : phase
   await until(`document.querySelector('[data-testid="floating-bar"]').dataset.status===${JSON.stringify(status)}`)
 }
 async function settled() {
@@ -132,8 +132,8 @@ app.whenReady().then(async () => {
     }
     await state('finishing', { handsFree })
     await shot(handsFree ? 'hands-free-processing' : 'processing')
-    assert.equal(await js("getComputedStyle(document.querySelector('[data-testid=floating-bar]')).width"), handsFree ? '116px' : '82px')
-    if(handsFree) assert.equal(await js("[...document.querySelectorAll('.floating-action')].every(b=>b.disabled)&&document.querySelectorAll('.floating-action').length===2"), true, 'hands-free processing preserves disabled controls')
+    assert.equal(await js("getComputedStyle(document.querySelector('[data-testid=floating-bar]')).width"), '92px')
+    assert.equal(await js("[...document.querySelectorAll('.floating-action')].every(b=>b.disabled&&b.getBoundingClientRect().width===0)"), true, 'processing collapses both recording controls')
   }
   await state('recording', { handsFree: true })
   await js("document.querySelector('.floating-action').click()")

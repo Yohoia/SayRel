@@ -25,8 +25,7 @@ export function ShimmerText({
   waitMs = DEFAULTS.waitMs,
   dim = DEFAULTS.dim,
   high = DEFAULTS.high,
-  lineHeight,
-  blur = 0
+  lineHeight
 }: {
   children: React.ReactNode
   active?: boolean
@@ -90,7 +89,6 @@ export function ShimmerText({
               position: 'absolute',
               inset: 0,
               zIndex: 2,
-              filter: blur ? `blur(${blur}px)` : undefined,
               pointerEvents: 'none',
               backgroundImage: `linear-gradient(${angle}deg,
                 transparent calc(50% - ${shimmerWidth / 2}px),

@@ -71,10 +71,10 @@ Object.assign(mocks['../lib/native'].keyboard, {
   setShortcutCaptureEnabled(value) { captureEnabled = Boolean(value) },
   onKey() { listeners++; return () => { listeners-- } }
 })
-mocks['../services/recordingMachine'] = { recordingMachine: {
+mocks['../services/recordingMachine'] = { recordingMachine: Object.assign(new EventEmitter(), {
   getState: () => ({ phase: 'idle' }), isDisabled: () => disabled,
   setDisabled(value) { disabled = value }
-} }
+}) }
 mocks['../services/insertion'] = {}; mocks['../services/dictionary'] = {}
 const handlers = new Map()
 load('src/main/ipc/misc.ts').registerMiscHandlers((channel, handler) => handlers.set(channel, handler))

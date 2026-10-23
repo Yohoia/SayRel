@@ -158,9 +158,9 @@ export class FloatingBarWindow extends BaseWindow {
       )
       if (inside !== this.lastMouseInside) {
         this.lastMouseInside = inside
-        win.setIgnoreMouseEvents(!inside, { forward: !inside })
+        win.setIgnoreMouseEvents(!inside, { forward: false })
       }
-    }, 40)
+    }, 100)
   }
 
   private stopMouseTracking(): void {

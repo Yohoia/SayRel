@@ -116,7 +116,7 @@ app.whenReady().then(async () => {
   await shot('settings-english')
   win.setSize(840, 560)
   await shot('settings-small-window')
-  for (const state of ['hover', 'starting-microphone', 'hands-free', 'hands-free-dictating', 'error', 'long-pressing']) {
+  for (const state of ['hover', 'starting-microphone', 'hands-free', 'error', 'long-pressing']) {
     win.setSize(750, 500)
     await page('floating-bar.html', { state, mode: 'translation', ...(state === 'hands-free' ? { countdown: '00:25' } : {}) })
     await waitFor(`document.querySelector('[data-testid="floating-bar"]')?.dataset.status === ${JSON.stringify(state)}`)

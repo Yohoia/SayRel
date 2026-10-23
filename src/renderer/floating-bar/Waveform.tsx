@@ -112,5 +112,5 @@ export function Waveform({ analyser, active, width, barWidth = 2, gap = 2 }: {
     }
   }, [analyser, active, count])
 
-  return <WaveformBars values={bars.map(bar => bar.volume)} active={active} width={width} barWidth={barWidth} gap={gap} />
+  return <WaveformBars values={bars.map(bar => bar.volume)} active={active} width={width} barWidth={barWidth} gap={gap} color="var(--accent-ink)" inactiveColor="color-mix(in srgb,var(--accent-ink) 50%,transparent)" borderRadius={9999} />
 }
