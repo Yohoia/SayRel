@@ -8,19 +8,14 @@ import { paths } from '../lib/paths'
 import { util, keyboard } from '../lib/native'
 import { z } from 'zod'
 import type { PermissionKind } from '../../shared/types'
-import { getAppearanceState, setPreference } from '../services/appearance'
-import {
-  getLanguage,
-  normalizeLocale,
-  resetToSystemLanguage,
-  setLanguage
-} from '../services/i18n'
+import { getAppearanceState } from '../services/appearance'
+import { getLanguage } from '../services/i18n'
+import { patchSettings, resetSettings } from '../services/settingsEffects'
 import { parseDictionaryCsv } from '../services/dictionary'
 import { sidecar } from '../lib/sidecar'
 import { captureAudioContext } from '../services/contextCapture'
 import { createLogger } from '../lib/logger'
 import { refreshShortcutRegistrations } from '../services/shortcutRegistration'
-import { broadcast } from '../windows'
 import type { Handler } from './index'
 
 const log = createLogger('ipc:system')
@@ -33,30 +28,33 @@ export function registerSystemHandlers(handle: (c: string, f: Handler) => void):
   // ---- appearance --------------------------------------------------------
   handle('appearance:get-color-mode', () => getAppearanceState().colorMode)
   handle('appearance:get-state', () => getAppearanceState())
-  handle('appearance:set-preference', (_e, mode: any) =>
-    setPreference(mode)
-  )
+  handle('appearance:set-preference', async (_e, mode) => {
+    await patchSettings({ appearancePreference: mode })
+    return getAppearanceState()
+  })
 
   // ---- settings ----------------------------------------------------------
   handle('store:use', (_e, action: string, payload?: any) => {
     if (action === 'get') return settings.get()
     if (action === 'patch') {
-      const next = settings.patch(payload ?? {})
-      applySideEffects(next)
-      return next
+      return patchSettings(payload ?? {})
     }
     if (action === 'reset') {
-      const next = settings.reset()
-      applySideEffects(next)
-      return next
+      return resetSettings()
     }
     throw new Error(`unknown store action: ${action}`)
   })
 
   // ---- i18n --------------------------------------------------------------
   handle('i18n:get-language', () => getLanguage())
-  handle('i18n:set-language', (_e, locale: string) => setLanguage(locale))
-  handle('i18n:reset-to-system-language', () => resetToSystemLanguage())
+  handle('i18n:set-language', async (_e, locale: string) => {
+    await patchSettings({ language: locale })
+    return getLanguage()
+  })
+  handle('i18n:reset-to-system-language', async () => {
+    await patchSettings({ language: null })
+    return getLanguage()
+  })
 
   // ---- device ------------------------------------------------------------
   handle('device:get-info', () => ({
@@ -218,15 +216,6 @@ export function registerSystemHandlers(handle: (c: string, f: Handler) => void):
   handle('rsa:clear', () => sidecar.rsa.clear())
 }
 
-function applySideEffects(next: ReturnType<typeof settings.get>): void {
-  broadcast('store:changed', next)
-  refreshShortcutRegistrations()
-  app.setLoginItemSettings({ openAtLogin: next.launchAtLogin })
-  if (process.platform === 'darwin' && app.dock) {
-    next.showInDock ? app.dock.show() : app.dock.hide()
-  }
-}
-
 function applicationPathFor(bundleId: string): string {
   // Validate bundleId to prevent command injection
   if (!/^[a-zA-Z0-9.-]+$/.test(bundleId)) {
@@ -300,6 +289,3 @@ async function openPermissionSettings(kind: PermissionKind): Promise<boolean> {
 export function hashDeviceId(value: string): string {
   return createHash('sha256').update(value).digest('hex').slice(0, 16)
 }
-
-void normalizeLocale
-void settings

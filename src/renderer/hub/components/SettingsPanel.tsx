@@ -95,7 +95,7 @@ function LanguageSection({ autoOpenTranslation }: { autoOpenTranslation: boolean
   const t = useSettingsText()
   return <>
     <Row label="Interface language" hint="Choose the language used in the user interface.">
-      <HubSelect label={t("Interface language")} value={settings.language ?? 'en'} options={interfaceLanguages} onChange={async value => { await api.i18n.setLanguage(value); await patch({ language: value }) }} />
+      <HubSelect label={t("Interface language")} value={settings.language ?? 'en'} options={interfaceLanguages} onChange={value => { void patch({ language: value }).catch(() => undefined) }} />
     </Row>
     <Row label="Translation targets" hint="Choose up to 3 target languages for your dictation in translation mode."><TranslationTargets autoOpen={autoOpenTranslation} /></Row>
     <Row label="Language variants" hint="Choose your preferred language variants for the best experience."><LanguageVariants /></Row>
@@ -115,8 +115,9 @@ function GeneralSection() {
             { value: 'dark', label: "Dark" }
           ]}
           onChange={(v) => {
-            void patch({ appearancePreference: v as any })
-            void api.appearance.setPreference(v)
+            if (v === 'light' || v === 'dark' || v === 'system') {
+              void patch({ appearancePreference: v }).catch(() => undefined)
+            }
           }}
         />
       </Row>

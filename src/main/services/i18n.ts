@@ -2,8 +2,6 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { app } from 'electron'
 import { settings } from '../lib/settings'
-import { broadcast } from '../windows'
-import { IPC } from '../../shared/ipc'
 import { createLogger } from '../lib/logger'
 
 const log = createLogger('i18n')
@@ -56,18 +54,4 @@ export async function getLanguage(): Promise<string> {
   const configured = settings.get().language
   if (configured) return configured
   return normalizeLocale(await detectSystemLanguage())
-}
-
-export function setLanguage(locale: string): string {
-  const next = normalizeLocale(locale)
-  broadcast('store:changed', settings.patch({ language: next }))
-  broadcast(IPC.I18N_LANGUAGE_CHANGED, next)
-  return next
-}
-
-export async function resetToSystemLanguage(): Promise<string> {
-  const detected = normalizeLocale(await detectSystemLanguage())
-  broadcast('store:changed', settings.patch({ language: null }))
-  broadcast(IPC.I18N_LANGUAGE_CHANGED, detected)
-  return detected
 }

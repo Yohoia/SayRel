@@ -5,6 +5,15 @@ import { MODES, type Mode } from './constants'
 export type ColorMode = 'light' | 'dark' | 'system'
 export type ShortcutStyle = 'hold' | 'toggle'
 
+// IPC preserves error messages, but not custom properties on Error instances.
+export const SETTINGS_EFFECT_ERRORS = {
+  language: 'Settings saved, but language could not be applied. Please try again.',
+  appearance: 'Settings saved, but appearance could not be applied. Please try again.',
+  shortcuts: 'Settings saved, but shortcuts could not be applied. Please try again.',
+  login: 'Settings saved, but launch at startup could not be applied. Please try again.',
+  dock: 'Settings saved, but Dock visibility could not be applied. Please try again.'
+}
+
 export interface ShortcutBinding {
   /** Electron accelerator string, e.g. `Fn`, `RightShift`, `Alt+Space`. */
   accelerator: string

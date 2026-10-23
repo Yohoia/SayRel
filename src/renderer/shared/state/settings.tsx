@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { api, bridge } from '../utils/bridge'
-import { DEFAULT_SETTINGS, type Settings } from '../../../shared/settings'
+import { DEFAULT_SETTINGS, SETTINGS_EFFECT_ERRORS, type Settings } from '../../../shared/settings'
 import { toast } from '../components/Toast'
 
 type Ctx = {
@@ -23,28 +23,48 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [loaded, setLoaded] = useState(false)
   const [systemLanguage, setSystemLanguage] = useState('en')
+  const snapshotVersion = useRef(0)
   const locale = settings.language ?? systemLanguage
 
   const reload = useCallback(async () => {
+    const version = snapshotVersion.current
     try {
       const next = await api.settings.get()
-      if (next) setSettings({ ...DEFAULT_SETTINGS, ...next })
+      if (next && version === snapshotVersion.current) {
+        snapshotVersion.current++
+        setSettings({ ...DEFAULT_SETTINGS, ...next })
+      }
     } finally {
       setLoaded(true)
     }
   }, [])
 
   const patch = useCallback(async (partial: Partial<Settings>) => {
+    const version = snapshotVersion.current
     try {
       const next = await api.settings.patch(partial)
-      if (next) setSettings({ ...DEFAULT_SETTINGS, ...next })
+      if (next && version === snapshotVersion.current) {
+        snapshotVersion.current++
+        setSettings({ ...DEFAULT_SETTINGS, ...next })
+      }
       toast.success("Saved")
-    } catch (error) { toast.error("Could not save. Please try again."); throw error }
+    } catch (error) {
+      const failures = error instanceof Error
+        ? Object.values(SETTINGS_EFFECT_ERRORS).filter(message => error.message.includes(message))
+        : []
+      if (failures.length) failures.forEach(message => toast.error(message))
+      else toast.error("Could not save. Please try again.")
+      throw error
+    }
   }, [])
 
   useEffect(() => {
+    const off = bridge.on('store:changed', (next: Settings) => {
+      snapshotVersion.current++
+      setSettings({ ...DEFAULT_SETTINGS, ...next })
+    })
     void reload()
-    return bridge.on('store:changed', (next: Settings) => setSettings({ ...DEFAULT_SETTINGS, ...next }))
+    return off
   }, [reload])
 
   useEffect(() => {

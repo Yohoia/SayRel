@@ -19,14 +19,6 @@ export function getAppearanceState(): AppearanceState {
   }
 }
 
-export function setPreference(mode: ColorMode): AppearanceState {
-  settings.patch({ appearancePreference: mode })
-  applyTheme(mode)
-  const state = getAppearanceState()
-  broadcast(IPC.APPEARANCE_COLOR_MODE_CHANGED, state)
-  return state
-}
-
 export function applyTheme(mode: ColorMode): void {
   nativeTheme.themeSource = mode
 }

@@ -59,7 +59,13 @@ const bridge = {
       return settings.serviceProviders
     }
     if (channel === 'store:use') {
-      if (args[0] === 'patch') { settings = mergeSettings({ ...settings, ...args[1], provider: { ...settings.provider, ...args[1]?.provider } }); localStorage.setItem('sayrel-ui-settings', JSON.stringify(settings)); emit('store:changed', settings) }
+      if (args[0] === 'patch') {
+        settings = mergeSettings({ ...settings, ...args[1], provider: { ...settings.provider, ...args[1]?.provider } })
+        localStorage.setItem('sayrel-ui-settings', JSON.stringify(settings))
+        if ('language' in args[1]) emit('i18n:language-changed', settings.language ?? 'en')
+        if ('appearancePreference' in args[1]) emit('appearance:color-mode-changed', { colorMode: settings.appearancePreference, resolved: settings.appearancePreference === 'dark' ? 'dark' : 'light' })
+        emit('store:changed', settings)
+      }
       if (args[0] === 'reset') settings = mergeSettings(DEFAULT_SETTINGS)
       return settings
     }

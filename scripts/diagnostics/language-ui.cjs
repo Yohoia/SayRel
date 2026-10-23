@@ -177,4 +177,7 @@ app.whenReady().then(async () => {
   win?.destroy()
   app.exit(process.exitCode || 0)
 })
-app.on('quit', () => rmSync(profile, { recursive:true, force:true, maxRetries:5, retryDelay:50 }))
+app.on('quit', () => {
+  try { rmSync(profile, { recursive:true, force:true, maxRetries:5, retryDelay:50 }) }
+  catch (error) { console.warn('Could not remove temporary language test profile:', error.message) }
+})

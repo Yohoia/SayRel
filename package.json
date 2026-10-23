@@ -23,7 +23,7 @@
     "dist:mac": "electron-vite build && electron-builder --mac",
     "verify:voice": "node scripts/diagnostics/fn-shift-chain.cjs && node scripts/diagnostics/renderer-session.cjs && node scripts/diagnostics/audio-tail.cjs && node scripts/diagnostics/worklet-drain.cjs && python3 scripts/diagnostics/native-hotkeys.py",
     "verify:ui": "node scripts/ui-build.mjs && electron scripts/diagnostics/ui-offline.cjs && electron scripts/diagnostics/history-retention-ui.cjs",
-    "verify:settings": "node scripts/diagnostics/settings-controls.cjs",
+    "verify:settings": "node scripts/diagnostics/settings-controls.cjs && node scripts/diagnostics/settings-effects.cjs",
     "verify:permissions": "node scripts/diagnostics/permissions.cjs && node scripts/ui-build.mjs && electron scripts/diagnostics/permission-settings-ui.cjs",
     "verify:microphone": "node scripts/typeless-reference.mjs && node scripts/diagnostics/microphone-meter.cjs && node scripts/ui-build.mjs && node scripts/diagnostics/microphone-reference-layout.mjs && electron scripts/diagnostics/microphone-ui.cjs",
     "verify:brand": "node scripts/diagnostics/brand-identity.cjs && node scripts/ui-build.mjs && electron scripts/diagnostics/brand-assets.cjs",
@@ -32,7 +32,7 @@
     "verify:home": "node scripts/ui-build.mjs && electron scripts/diagnostics/home-ui.cjs",
     "verify:hero": "node scripts/ui-build.mjs && electron scripts/diagnostics/wispr-hero.cjs && electron scripts/diagnostics/home-fit.cjs",
     "verify:activity": "ELECTRON_RUN_AS_NODE=1 electron scripts/diagnostics/activity.cjs",
-    "verify:language": "node scripts/ui-build.mjs && electron scripts/diagnostics/language-ui.cjs",
+    "verify:language": "node scripts/ui-build.mjs && electron scripts/diagnostics/language-ui.cjs && electron scripts/diagnostics/settings-effects-ui.cjs",
     "verify:floating": "node scripts/ui-build.mjs && electron scripts/diagnostics/floating-interactions.cjs",
     "verify:typeless": "node scripts/typeless-reference.mjs && node scripts/diagnostics/typeless-style-parity.cjs && node scripts/ui-build.mjs && node scripts/diagnostics/typeless-reference-layout.mjs && electron scripts/diagnostics/typeless-floating-ui.cjs"
   },
