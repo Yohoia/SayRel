@@ -77,6 +77,47 @@ async function test(name, fn) { await fn(); console.log('PASS ' + name) }
     assert.equal(f.targetListeners.get('keyup').size, 0)
   })
 
+  await test('browser capture preserves Shift held before capture when another modifier is pressed', async () => {
+    for (const { modifier, code, flag, combination } of [
+      { modifier: 'Alt', code: 'AltLeft', flag: 'altKey', combination: 'Alt+Shift' },
+      { modifier: 'Control', code: 'ControlLeft', flag: 'ctrlKey', combination: 'Control+Shift' },
+      { modifier: 'Meta', code: 'MetaLeft', flag: 'metaKey', combination: 'Command+Shift' },
+      { modifier: 'Fn', code: 'Fn', flag: 'fnKey', combination: 'Shift+Fn' }
+    ]) {
+      const f = fixture(() => Promise.resolve({ native: false, sessionId: 26 })), events = []
+      const session = startShortcutCapture({ bridge: f.bridge, onEvent: event => events.push(event), target: f.target })
+      await session.ready
+      try {
+        f.target.emit('keydown', key(modifier, { code, shiftKey: true, [flag]: true }))
+        f.target.emit('keyup', key(modifier, { code, shiftKey: true }))
+        assert.equal(JSON.stringify(events), JSON.stringify([
+          { type: 'shortcut', combination, pressed: true },
+          { type: 'shortcut', combination, pressed: false }
+        ]), `${modifier} preserves Shift without receiving its keydown`)
+      } finally { await session.stop() }
+    }
+  })
+
+  await test('browser capture retains observed left and right Shift in modifier chords', async () => {
+    for (const [code, shift] of [['ShiftLeft', 'LeftShift'], ['ShiftRight', 'RightShift']]) {
+      const f = fixture(() => Promise.resolve({ native: false, sessionId: 27 })), events = []
+      const session = startShortcutCapture({ bridge: f.bridge, onEvent: event => events.push(event), target: f.target })
+      await session.ready
+      try {
+        f.target.emit('keydown', key('Shift', { code, shiftKey: true }))
+        f.target.emit('keydown', key('Alt', { code: 'AltLeft', altKey: true, shiftKey: true }))
+        f.target.emit('keyup', key('Alt', { code: 'AltLeft', shiftKey: true }))
+        f.target.emit('keyup', key('Shift', { code }))
+        assert.equal(JSON.stringify(events), JSON.stringify([
+          { type: 'shortcut', combination: shift, pressed: true },
+          { type: 'shortcut', combination: `Alt+${shift}`, pressed: true },
+          { type: 'shortcut', combination: `Alt+${shift}`, pressed: false },
+          { type: 'shortcut', combination: shift, pressed: false }
+        ]))
+      } finally { await session.stop() }
+    }
+  })
+
   await test('exit during initialization ends the late session without delivering late events', async () => {
     const pending = deferred(), f = fixture(() => pending.promise), events = []
     const session = startShortcutCapture({ bridge: f.bridge, onEvent: event => events.push(event), target: f.target })

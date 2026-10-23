@@ -77,6 +77,12 @@ app.whenReady().then(async () => {
   console.log('PASS Escape during initialization cancels only capture and releases the late session')
 
   await begin()
+  await chord('Alt', { altKey: true, shiftKey: true, code: 'AltLeft' })
+  await until("!document.querySelector('.is-recording')")
+  assert.equal((await stored()).shortcut.accelerator, 'Alt+Shift', 'Shift held before capture remains in the saved shortcut')
+  console.log('PASS browser capture preserves Shift held before editing when saving Alt+Shift')
+
+  await begin()
   await chord('k', { ctrlKey: true, code: 'KeyK' })
   await until("!document.querySelector('.is-recording')")
   assert.equal((await stored()).shortcut.accelerator, 'Control+K')

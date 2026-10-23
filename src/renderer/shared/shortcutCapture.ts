@@ -53,7 +53,7 @@ function browserCombination(event: KeyboardEvent, heldModifiers: Map<string, str
   if (event.altKey || event.key === 'Alt') parts.push('Alt')
   if (event.shiftKey || event.key === 'Shift') {
     const side = [...heldModifiers].find(([code]) => code === 'ShiftLeft' || code === 'ShiftRight')?.[1]
-    parts.push(side ?? modifierFor(event) ?? 'Shift')
+    parts.push(side ?? (event.key === 'Shift' ? modifierFor(event) : null) ?? 'Shift')
   }
   if (event.getModifierState('Fn') || event.key === 'Fn') parts.push('Fn')
   if (!modifierKeys.has(event.key) && event.key !== 'Unidentified') {
