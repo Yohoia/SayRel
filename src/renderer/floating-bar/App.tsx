@@ -67,6 +67,8 @@ export function FloatingBarApp() {
     return () => { live = false; off?.() }
   }, [])
   const [mode, setMode] = useState('voice_transcript')
+  const [partialText, setPartialText] = useState('')
+  const activeSessionId = useRef<string | null>(null)
   const [recorder, setRecorder] = useState<RecorderHandle | null>(null)
   const pillRef = useRef<HTMLDivElement>(null)
   const hasActivated = useRef(false)
@@ -88,6 +90,8 @@ export function FloatingBarApp() {
       const parsed = recordingStateSchema.safeParse(value)
       if (disposed || !parsed.success) return
       const state = parsed.data
+      if (activeSessionId.current !== state.context.sessionId || !['starting', 'recording'].includes(state.phase)) setPartialText('')
+      activeSessionId.current = state.context.sessionId
       controller.sync(state)
       setIssue(state.context.issue ?? null)
       setActionError(null)
@@ -105,8 +109,12 @@ export function FloatingBarApp() {
       } else setCountdown(null)
     }
     const off = window.sayrel?.on?.('recording-machine:state', (state: unknown) => { receivedState = true; update(state) })
+    const offPartial = window.sayrel?.on?.('recording-machine:partial', (raw: unknown) => {
+      const event = z.object({ sessionId: z.string(), text: z.string() }).safeParse(raw)
+      if (!disposed && event.success && event.data.sessionId === activeSessionId.current) setPartialText(event.data.text.slice(-160))
+    })
     void api.recording.state().then((state: unknown) => { if (!receivedState) update(state) }).catch(() => undefined)
-    return () => { disposed = true; off?.(); void controller.dispose() }
+    return () => { disposed = true; off?.(); offPartial?.(); void controller.dispose() }
   }, [])
 
   // The native transparent window needs screen-space hit regions. Forwarded
@@ -232,6 +240,7 @@ export function FloatingBarApp() {
       <style>{`@keyframes loadingMove { 0% { transform: translateX(-27px); } 100% { transform: translateX(54px); } }`}</style>
       {visibleStatus === 'error' && visibleIssue && <FloatingAlert issue={visibleIssue} busy={actionBusy} actionError={actionError} alertRef={alertRef} onDismiss={dismissAlert} onAction={() => void actOnIssue()} />}
       {visibleStatus === 'long-pressing' && <div role="status" style={errorBubbleStyle}>{t("Tap to start. Tap again to finish recording.")}</div>}
+      {!preview && partialText && ['recording', 'hands-free'].includes(visibleStatus) && <div className="floating-partial" aria-label={t('Live transcript preview')} role="status">{partialText}</div>}
       <div
         ref={pillRef}
         data-testid="floating-bar"
@@ -246,7 +255,7 @@ export function FloatingBarApp() {
         aria-label={t("Recording status")}
         style={{ ...BASE_STYLE, ...style, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto', cursor: ['idle-hidden', 'hover', 'error'].includes(visibleStatus) ? 'pointer' : undefined }}
       >
-        {['voice_command', 'ask_anything', 'translation'].includes(visibleMode) && <div className="floating-mode-glow" aria-hidden="true"><div /></div>}
+        {['voice_command', 'desktop_command', 'ask_anything', 'translation'].includes(visibleMode) && <div className="floating-mode-glow" aria-hidden="true"><div /></div>}
         {showHoverTip && <span className="floating-tooltip" role="tooltip">{t("Click to start dictating")}</span>}
         {((visibleStatus === 'hover' && showHoverTip) || visibleStatus === 'error') && <StatusIcons status={visibleStatus} />}
         {(showWaveform || refining || completing) && <div className="floating-recorder-content">
@@ -258,7 +267,7 @@ export function FloatingBarApp() {
         </div>}
         {visibleStatus === 'starting-microphone' && <div style={shimmerOverlayStyle()} />}
       </div>
-      {modeActive && ['translation', 'ask_anything', 'voice_command'].includes(visibleMode) && <ModeIndicator key={visibleMode} mode={visibleMode} settings={settings} volume={volume} indicatorRef={modeIndicatorRef} menuRef={languageChoicesRef} />}
+      {modeActive && ['translation', 'ask_anything', 'voice_command', 'desktop_command'].includes(visibleMode) && <ModeIndicator key={visibleMode} mode={visibleMode} settings={settings} volume={volume} indicatorRef={modeIndicatorRef} menuRef={languageChoicesRef} />}
       {hotkey.hint && !preview && <div style={hintStyle}>{t(hotkey.hint)}</div>}
     </div>
   )

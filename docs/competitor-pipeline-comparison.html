@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>语音转写与润写链路对比报告 · 核实修订版 · SayRel 与四款竞品</title>
+<style>
+  :root {
+    --accent: #2563eb;
+    --accent-ink: #1e40af;
+    --paper: #ffffff;
+    --paper-2: #f6f7fb;
+    --ink: #1a1d24;
+    --ink-2: #4b5262;
+    --ink-3: #7a8194;
+    --line: #e6e8ef;
+    --good: #0f7a3d;
+    --good-bg: #eefaf1;
+    --warn: #b45309;
+    --warn-bg: #fef6ec;
+    --bad: #b42318;
+    --bad-bg: #fdecea;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    color: var(--ink);
+    background: #eef0f5;
+    line-height: 1.7;
+    font-size: 15px;
+  }
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 0 24px 96px; }
+  header.hero {
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #3b82f6 100%);
+    color: #fff; padding: 56px 24px 48px; margin-bottom: 28px;
+  }
+  header.hero .inner { max-width: 1160px; margin: 0 auto; }
+  header.hero h1 { margin: 0 0 10px; font-size: 30px; line-height: 1.25; letter-spacing: .5px; }
+  header.hero p.sub { margin: 0; color: #dbe5ff; font-size: 16px; max-width: 820px; }
+  header.hero .meta { margin-top: 20px; font-size: 13px; color: #b9c9f5; display: flex; flex-wrap: wrap; gap: 8px 20px; }
+  nav.toc {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(255,255,255,.92); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  nav.toc .inner { max-width: 1160px; margin: 0 auto; padding: 10px 24px; display: flex; flex-wrap: wrap; gap: 6px 4px; }
+  nav.toc a {
+    color: var(--ink-2); text-decoration: none; font-size: 13px;
+    padding: 5px 11px; border-radius: 999px; white-space: nowrap;
+  }
+  nav.toc a:hover { background: var(--paper-2); color: var(--accent); }
+  section { margin: 34px 0; scroll-margin-top: 80px; }
+  h2 {
+    font-size: 23px; margin: 0 0 6px; color: var(--ink);
+    padding-left: 12px; border-left: 4px solid var(--accent);
+  }
+  h3 { font-size: 17px; margin: 26px 0 8px; color: var(--ink); }
+  h4 { font-size: 15px; margin: 20px 0 6px; }
+  .lede { color: var(--ink-2); margin: 6px 0 18px; max-width: 900px; }
+  .card {
+    background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+    padding: 20px 22px; margin: 16px 0;
+  }
+  .callout {
+    border-radius: 10px; padding: 14px 18px; margin: 16px 0; font-size: 14px;
+  }
+  .callout.key { background: var(--good-bg); border: 1px solid #cdeed8; color: #0c5c2e; }
+  .callout.warn { background: var(--warn-bg); border: 1px solid #f3dcb8; color: #7a3c09; }
+  .callout.note { background: #eef4ff; border: 1px solid #d4e2ff; color: #274a86; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; margin: 14px 0; background: #fff; }
+  th, td { border: 1px solid var(--line); padding: 9px 11px; text-align: left; vertical-align: top; }
+  th { background: var(--paper-2); font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+  code { overflow-wrap: anywhere; }
+  td code, th code, p code, li code { font-family: var(--mono); font-size: 12.5px; background: #f0f1f6; padding: 1px 5px; border-radius: 5px; color: #33406a; }
+  tr.hl td { background: #fbfdff; }
+  .tag { display: inline-block; font-size: 11.5px; padding: 1px 8px; border-radius: 999px; font-weight: 600; vertical-align: 1px; }
+  .tag.own { background: #eef4ff; color: var(--accent-ink); }
+  .tag.self { background: #f3e8ff; color: #6b21a8; }
+  .tag.server { background: #fef3c7; color: #92400e; }
+  .tag.native { background: #fce7f3; color: #9d174d; }
+  .tag.agg { background: #e0f2fe; color: #075985; }
+  .flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; margin: 14px 0; }
+  .flow .step {
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 9px;
+    padding: 9px 12px; font-size: 12.5px; max-width: 190px;
+  }
+  .flow .step b { display: block; font-size: 12px; color: var(--accent-ink); margin-bottom: 2px; }
+  .flow .step code { font-size: 11px; }
+  .flow .arrow { display: flex; align-items: center; padding: 0 6px; color: var(--ink-3); font-size: 18px; }
+  .gap {
+    border: 1px solid var(--line); border-left: 4px solid var(--warn);
+    background: #fff; border-radius: 10px; padding: 16px 20px; margin: 14px 0;
+  }
+  .gap.p0 { border-left-color: var(--bad); }
+  .gap.p1 { border-left-color: var(--warn); }
+  .gap.p2 { border-left-color: #94a3b8; }
+  .gap h4 { margin: 0 0 6px; display: flex; align-items: center; gap: 8px; }
+  .pri { font-size: 11px; font-weight: 700; color: #fff; padding: 1px 8px; border-radius: 5px; }
+  .pri.p0 { background: var(--bad); } .pri.p1 { background: var(--warn); } .pri.p2 { background: #94a3b8; }
+  .gap .body { font-size: 14px; }
+  .gap .row { margin: 6px 0; }
+  .gap .row b { color: var(--ink-2); }
+  ul.tight { margin: 6px 0; padding-left: 22px; }
+  ul.tight li { margin: 3px 0; }
+  .muted { color: var(--ink-3); font-size: 12.5px; }
+  .small { font-size: 13px; }
+  .legend { font-size: 12.5px; color: var(--ink-3); margin: 8px 0 20px; }
+  @media (max-width: 820px) {
+    section { scroll-margin-top: 200px; }
+    .flow .arrow { transform: rotate(90deg); }
+    table { font-size: 12px; }
+    th, td { padding: 7px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="inner">
+    <h1>语音转写与润写链路对比报告</h1>
+    <p class="sub">对照 Wispr Flow、Typeless、Voiskey、闪电说的本地发布产物、SpeakMore 开源仓库与 SayRel 当前源码，比较语音采集、转写、润写与上屏。已观察机制、推断、未知和工程建议分别说明。</p>
+    <div class="meta">
+      <span>日期：2026-10-24</span>
+      <span>对象：<code>reference/wisprflow</code>、<code>reference/typeless</code>、<code>reference/voiskey</code>、<code>reference/shandianshuo</code>、<code>reference/speakmore</code></span>
+      <span>方法：既有静态证据 + 当前源码核实（未抓包、未实测线上质量）</span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc"><div class="inner">
+  <a href="#summary">执行摘要</a>
+  <a href="#matrix">横向总表</a>
+  <a href="#family">架构分族</a>
+  <a href="#transcription">转写链路逐产品</a>
+  <a href="#refinement">润写链路逐产品</a>
+  <a href="#sayrel">SayRel 现状精读</a>
+  <a href="#gaps-t">转写差距</a>
+  <a href="#gaps-r">润写差距</a>
+  <a href="#gaps-i">上屏差距</a>
+  <a href="#reuse">迁移前提</a>
+  <a href="#priority">优先级建议</a>
+  <a href="#evidence">证据边界</a>
+</div></nav>
+
+<div class="wrap">
+
+<!-- ================= 执行摘要 ================= -->
+<section id="summary">
+  <h2>执行摘要</h2>
+  <p class="lede">SayRel 已具备录音中 ASR、最终结果元数据和本地编辑学习。真实缺口主要是润写效果验收、卡顿时的兜底、上下文细化与上屏成功确认。竞品机制可作参考，但静态结构不能证明质量，也不能直接决定修改优先级。</p>
+  <div class="callout note"><b>核实修订版 · 2026-10-24</b>：本版修正了三路竞速、协议缺失、函数调用适用范围、词典替换、partial 追加和 IME 防御等判断。详细核实记录见 <a href="research/competitor-pipeline-verification-2026-10-24.md">四款竞品对比文档核实记录</a>。本文建议不等于已确认的故障原因。</div>
+  <div class="card">
+    <h3>架构有不同路径，不是互斥的两类产品</h3>
+    <p class="small">Wispr Flow、Typeless 的客户端主要调用厂商提供的语音服务；Voiskey 把较多编排放在 Go 原生层；闪电说同时存在自带 API Key 与会员后端路径；SpeakMore 是开源批量实现，直出/混合/离线三模式并列、离线完全本机。SayRel 当前以用户选定的 ASR 和 LLM 为主。服务端、原生编排与供应商聚合可以共存。</p>
+    <p class="small">请求域名、协议字段与客户端处理逻辑可核对。是否自训模型、是否联合训练、线上使用哪条路径以及实际质量，不能由这些证据推出。</p>
+  </div>
+  <div class="card">
+    <h3>当前应优先核实什么</h3>
+    <ul class="tight">
+      <li><b>润写效果：</b>“请求成功”不代表“整理达标”。应核对同一次请求的档位、prompt 版本、ASR 原文、模型正文与实际插入文字。结构化输出不能自动解决原样返回。</li>
+      <li><b>转写兜底：</b>live 失败后以同一选定模型重处理完整录音；没有通用的定时竞速或跨供应商容灾。<code>batch-fallback</code> 是逻辑路径名，不保证改用 HTTP。</li>
+      <li><b>上屏确认：</b>native helper 的主路径已使用剪贴板与 Cmd+V，但发送按键后返回 0，尚未证明目标应用实际接收了文字。</li>
+      <li><b>安全扩展：</b>光标数据尚未进入润写上下文；显式替换规则、按应用风格与学习锚点可按需求补充。普通词典不能直接当作纠错替换表。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================= 横向总表 ================= -->
+<section id="matrix">
+  <h2>横向对比总表</h2>
+  <p class="lede">SayRel 一列来自当前源码，其余五列来自本地发布产物或开源仓库的静态分析。“未观察到”不等于不存在；不同协议的机制不同，也不等于效果存在高低之分。</p>
+  <div class="card" style="overflow-x:auto">
+  <table>
+    <tr><th>维度</th><th>Wispr Flow</th><th>Typeless</th><th>Voiskey</th><th>闪电说</th><th>SpeakMore</th><th>SayRel</th></tr>
+    <tr><td>客户端</td><td>Electron + Swift helper</td><td>Electron + koffi 原生库</td><td>Wails/Go + Swift + React</td><td>Rust + JS WebView</td><td>Electron 44 + Node 主进程 + 内置服务</td><td>Electron + TypeScript + native helper</td></tr>
+    <tr><td>ASR 路径</td><td>厂商编排的 gRPC/HTTP 服务</td><td><code>api.typeless.com</code></td><td>Go 原生编排，观察到 <code>api.voiskey.ai</code></td><td>目录含多家 ASR，并有会员路径</td><td>三模式：音频模型直出 / 本机 ONNX + 云端 3 家，均批量</td><td>用户选择供应商，10 种协议</td></tr>
+    <tr><td>润写路径</td><td>服务端结果 + 客户端确定性处理</td><td>后端返回润写成品</td><td>Go 原生编排 LLM，模型细节未完整恢复</td><td>自带 key 与会员路径并存</td><td>纯文字 LLM，一份调好的 prompt（零参数）</td><td>用户选择 LLM，6 种协议，含 <code>/responses</code></td></tr>
+    <tr><td>传输</td><td>gRPC 流；条件性 HTTP 竞速</td><td>WS 实时通道 + 延迟触发 HTTP 兜底</td><td>原生 WS/HTTP；前端流式预览开关关闭</td><td>按供应商适配 WS/HTTP</td><td>纯批量；显式拒绝流式（听写说完出字）</td><td>兼容模型录音中 WS；其他模型录音后处理</td></tr>
+    <tr><td>采集</td><td>16 kHz Worklet，可 Opus</td><td>16 kHz Worklet；有连续与整段编码路径</td><td>原生采集</td><td>观察到原生采集和 16 kHz 配置</td><td>16 kHz 单声道；WebM(Opus) 落盘；手写 sinc 降采样</td><td>16 kHz，Worklet 2048 块，ScriptProcessor 兜底</td></tr>
+    <tr><td>润写上下文</td><td>before/selected/after、AX/OCR、会话等</td><td>光标前后文、输入区周边、采集质量等</td><td>caret prefix/suffix、IME 等</td><td>原生组装细节未完整恢复</td><td>仅词典热词；无光标/输入区上下文</td><td>app、输入框预览、选中文字、可见文本；光标数据目前仅用于本地学习</td></tr>
+    <tr><td>回退</td><td>gRPC/Baseten HTTP 竞速受开关、时长限制；另有重试路径</td><td>默认约 6 s 触发 HTTP，不是 6 s 完成保证</td><td>有音频缓存与重识别入口，覆盖受缓存保留限制</td><td>有重试与供应商选择；未证明自动跨供应商竞速</td><td>本机 GPU→CPU 兜底；夹时间戳整次重试；无跨供应商竞速</td><td>同供应商完整录音重试，不竞速；可仍使用 WS</td></tr>
+    <tr><td>预览状态</td><td>transcriber/formatter 进度</td><td><code>transcription</code> 带 <code>chunk_index</code>；另有润写完成消息</td><td>listening/thinking 等</td><td>recording/processing，分段耗时</td><td>无实时 partial；浮条仅录音中/整理中</td><td>适配器归一到累计 partial 快照，UI 替换显示</td></tr>
+    <tr><td>会话限制</td><td>观察到流 23 分钟限制</td><td>批量请求约 40 s 超时；未确认录音硬上限</td><td>10 分钟与末尾倒计时</td><td>未确认录音硬上限；润写默认 15 s 超时</td><td>无硬上限；长录音按模型 maxSeconds 最静点切分</td><td>录音 5 分钟；live 连接、会话与 final 另有超时</td></tr>
+    <tr><td>润写控制</td><td>应用类别风格与编辑强度</td><td>transcript/ask_anything/translation 等服务模式</td><td>翻译、润色与场景信息</td><td>raw/light/strong 默认 light；会员与自带 key 策略范围需区分</td><td>零参数单一 prompt；无档位/风格</td><td>raw/light/strong + 4 种风格，均为全局设置</td></tr>
+    <tr><td>输出验证</td><td>结构化服务结果，内部语义过程未知</td><td>润写成品字段，服务端校验未知</td><td>ASR 与润写文本分别保留</td><td>存在函数调用相关字符串；强制方式及默认范围未知</td><td>静音哨兵 <code>&lt;无人声&gt;</code>；OpenCC 繁转简；LEAKED_PREFIX；去句末句号</td><td>已有响应 schema、完成/拒绝/空值检查；没有任务级结构化正文契约</td></tr>
+    <tr><td>确定性规则</td><td>词典、替换、片段、大小写等条件性处理</td><td>已见空白/零宽字符处理，未观察到完整规则层</td><td>未观察到完整规则层</td><td>有用户归一化规则和去句末句号配置；顺序未证实</td><td>静音哨兵、繁转简、去句末句号（无用户自定义规则）</td><td>仅空白、换行与尾随空格；无用户替换/片段规则</td></tr>
+    <tr><td>词典学习</td><td>本地历史有 editedText 字段，完整学习策略未恢复</td><td>上传改前改后内容，由服务端返回词典项</td><td>编辑跟踪、锚点收缩、1000 字限制</td><td>词典参与识别与对话；未观察到听写后自动抽词</td><td>词典热词（按模型上限挑、每段带）；无听写后自动抽词</td><td>本地 diff、IME/安全/大幅改写过滤、用户确认与撤销</td></tr>
+    <tr><td>上屏</td><td>helper 粘贴与 PasteOutcome；支持 HTML</td><td>有普通/富文本插入接口及剪贴板标记，原生内部细节有限</td><td>AX/剪贴板相关路径及延迟字符数校验线索</td><td>injection_mode、preserve_clipboard 等配置</td><td>原生 helper 贴 + 剪贴板兜底 + 失败分类</td><td>native 内部先剪贴板 + Cmd+V，未读回确认；显式失败才提示手动粘贴</td></tr>
+    <tr><td>可观测性</td><td>origin、skip reason、字数增删、各段耗时</td><td>采集质量、分段耗时、编辑跟踪日志</td><td>会话/请求 ID、usedDictList 等</td><td>voice_input_latency、历史多层文本、原生日志</td><td>每跳记账 token/cost/latency；超时 unmetered 告警</td><td>会话/请求 ID、ASR 路径、润写档位/风格、changed 与耗时；缺稳定错误分类</td></tr>
+    <tr><td>空结果</td><td>有格式化跳过原因等字段</td><td>已见错误码；未观察到统一空语音类型</td><td>有静音、峰值与断线不同判断线索</td><td>有归一化后判空日志</td><td>静音哨兵 + trim 判空；本地静音段不交模型</td><td><code>final/empty/failed</code> 判别联合已实现</td></tr>
+  </table>
+  </div>
+  <p class="legend">本地版本：Wispr Flow 1.6.1253、Typeless 2.8.3、Voiskey 1.4.7、闪电说 0.8.0、SpeakMore 0.17.0（提交 7bf2124）。供应商数量不等于可用协议数量，也不证明功能默认启用。</p>
+</section>
+
+<!-- ================= 架构分族 ================= -->
+<section id="family">
+  <h2>架构路径与可比范围</h2>
+  <p class="lede">比较时应分别看服务归属、客户端编排位置与后处理方式。不能只按“自有后端 / 聚合供应商”二选一。</p>
+  <div class="card">
+    <h3>厂商服务与原生编排</h3>
+    <ul class="tight">
+      <li>Wispr Flow 的请求和返回协议包含转写、格式化、上下文及风格。它的客户端还执行条件性替换与排版处理，并非只把结果贴回。</li>
+      <li>Typeless 在 renderer 编排实时与 HTTP 通道，主进程负责上下文、隐私、存储和部分网络转发。服务端模型与 prompt 未恢复。</li>
+      <li>Voiskey 的录音、网络和润写较多在 Go 原生层，恢复的前端也包含编辑学习与功能逻辑。“原生负责”不等于“已证明本地模型推理”。</li>
+      <li>SpeakMore 是开源批量实现：直出（音频模型一跳）、混合（转写→整理）、离线（本机 ONNX）三模式并列。它把「识别方式」做成独立维度，与「任务」正交，且显式拒绝流式——与 SayRel 的 live 流式是同一功能的两条相反路线。</li>
+      <li>Baseten 域名是服务承载线索，不是厂商自有域名或自训模型的证明。端点与 pipeline 字段也不能证明联合训练、共享模型状态或质量收益。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>自带 API Key 与会员后端可以并存</h3>
+    <ul class="tight">
+      <li>闪电说有供应商目录、自带 key、会员服务与原生编排。会员日志说明后端按 revision 构建 prompt；不能据此覆盖自带 key 路径。</li>
+      <li>SayRel 分开选择转写与润写模型，并承担鉴权、采样、协议收口、失败处理和插入。模型选择、prompt、上下文与交付可靠性都会影响体验。</li>
+      <li>容灾可以是同模型重试、定时备用通道或显式选择第二供应商。是否竞速应根据失败类型、费用、隐私和实测收益决定。</li>
+    </ul>
+  </div>
+  <div class="callout key">本报告能比较客户端已观察到的机制，不能从架构推导谁的润写更好。SayRel 应先验证实际整理效果，再按故障证据选择机制。</div>
+</section>
+
+<!-- ================= 转写链路逐产品 ================= -->
+<section id="transcription">
+  <h2>转写（语音 → 文本）链路逐产品</h2>
+
+  <h3>Wispr Flow —— 一条 gRPC 双向流 + 四态消息</h3>
+  <div class="card">
+    <div class="flow">
+      <div class="step"><b>触发</b>Fn 快捷键 → Swift helper</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>采集</b>隐藏 renderer AudioWorklet，16kHz/640 样本/40ms，可 Opus</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>建流</b><code>TranscribeStream</code>，发 <code>init</code>（元数据+偏好+上次状态）</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>续传</b><code>payload</code>（音频包）+ <code>context</code>（app/屏幕/输入框/会话）</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>结束</b><code>commit</code>（松键）</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>服务端</b>协议暴露 transcribe/align/format 阶段，回 <code>state</code>/<code>heartbeat</code>/<code>result</code>；内部实现未知</div>
+    </div>
+    <p class="small">要点：</p>
+    <ul class="tight">
+      <li><b>一条流、四种请求消息</b>（<code>init/payload/context/commit</code>），服务端一边收音频一边回实时状态——同一条流暴露转写与格式化进度，但不能据此证明内部模型联合训练或同时推理。</li>
+      <li><b>状态是进度比值不是布尔</b>：<code>formatter</code> 进度追上 <code>transcriber</code> 才算 <code>Formatted</code>，天然表达「识别完了但润写还没完」的中间态。</li>
+      <li><b>回退是竞速不是串行</b>：服务端已接收音频比客户端已发音频落后 &gt;2s 时，可触发 gRPC / Baseten HTTP 竞速。该路径受 <code>GrpcHttpRace</code> 开关和音频时长限制，并等待录音结束；其他重试路径不等于三路同时并发。</li>
+    </ul>
+  </div>
+
+  <h3>Typeless —— 实时流为主，6 秒后 HTTP 兜底竞速</h3>
+  <div class="card">
+    <div class="flow">
+      <div class="step"><b>录音</b>renderer 用 16 kHz <code>AudioContext</code> + Worklet 采集，三项系统 DSP 全关</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>实时上传</b>约每 1 s 切块，走 <code>wss://…/ws/rt_voice_flow</code>；二进制容器未确认</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>部分转写</b>服务端逐块回 <code>transcription{text,chunk_index}</code>，浮条追加显示</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>松键</b><code>end_audio</code>（带 7 段延迟打点）+ 立刻后台并行压缩整段音频</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>竞速</b>WS 的 <code>refine_completed</code> vs 6 s 后自动发出的 <code>POST /ai/voice_flow</code></div>
+      <div class="arrow">→</div>
+      <div class="step"><b>收敛</b>先到者胜，落败方 abort；<code>paywall</code> 中断会话；清本地音频</div>
+    </div>
+    <p class="small">要点：主进程部分可在 <code>reference/typeless/readable/main.index.deobf.js</code> 按行号核对；实时通道在 renderer 的 <code>1uHho0F_.js</code>（<code>class Lf</code>）与 <code>juYOhWy9.mjs</code>（状态机与消息组装），见 <code>reference/typeless/README.md</code> §4。</p>
+    <ul class="tight">
+      <li><b>上一版结论「没有流式」是错的</b>，原因可复现：当时只反混淆了主进程，而主进程<b>确实不认识转写</b>——实时链路整条在 renderer。补上 renderer 后可见完整协议：客户端 7 种消息（<code>start_audio</code>/<code>set_audio_chunk_info</code>/<code>replace_audio_context</code>/<code>set_selected_text</code>/<code>set_mode_config</code>/<code>end_audio</code>/<code>ping</code>），服务端 17 种（含 <code>transcription</code>、<code>refine_completed</code>、<code>process_mode</code>、<code>audio_session_ending</code>）。</li>
+      <li><b>兜底不是「失败后重试」，而是「提前算好 + 定时器竞速」</b>：松键瞬间就启动整段压缩，压缩与 6 s 计时器并行；到点直接发 HTTP。WS 赢了就 <code>abort</code> 掉 HTTP（同一个 <code>abortId</code>），并用 <code>race:winner</code> 打点记录赢家。<b>SayRel 目前是「实时失败了才回退」</b>，中间有一段失败发现延迟。</li>
+      <li><b>弱网是一等公民</b>：一旦判定弱网，后续块<b>不再上传</b>，整条会话直接退化为只等 HTTP；开始录音时最多等 5 s 建连，超时即按弱网起步。</li>
+      <li><b>部分转写按索引片段管理</b>：<code>transcription</code> 带 <code>chunk_index</code>。SayRel 适配器已将多种协议合成累计快照；两种接口语义不同，不应把其 UI 直接改为追加，否则可能重复文字。</li>
+      <li><b>最终原文接口未确认</b>：实时通道可获得转写分片，成品消息给润写文字。当前证据未见独立权威的最终 ASR 原文及仅润写重试接口；不能推导客户端完全没有原文或绝对无法实现对照。</li>
+      <li><b><code>mode</code> 决定服务端 prompt</b>：<code>voice_transcript→transcript</code>、<code>voice_command→ask_anything</code>、<code>voice_translation→translation</code>；<code>parameters</code> 只在 command/translation 下带 <code>selected_text</code> / <code>output_language</code>。</li>
+      <li><b>采集端把「不加工」写死</b>：<code>echoCancellation/noiseSuppression/autoGainControl</code> 全部显式 <code>false</code>；开始提示音按设备动态延迟（同设备 1200 ms、AirPods 300 ms），避免提示音被自己录进去。</li>
+      <li><b>音频编码有降级链</b>：buffer 模式失败（native <code>-5</code>）→ 缓冲区加倍重试 2 次 → 整体退到文件模式（临时 WAV → 转 Ogg）。存在上述编码降级分支，不能保证所有编码故障都不阻断听写。</li>
+    </ul>
+  </div>
+
+  <h3>Voiskey：Go 原生编排与前端状态、学习逻辑</h3>
+  <div class="card">
+    <div class="flow">
+      <div class="step"><b>启动闸门</b>权限→麦克风→弱网→系统可达性，逐项过</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>采集</b>Go 原生，带 500ms 预热 / 250ms 稳定 / 3s 无输入检测</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>ASR</b>Go 原生 WebSocket（api.voiskey.ai），本 build 前端流式预览开关 <code>STREAMING_ASR_ENABLED=false</code>，不等于服务端不实时</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>润色</b>Go 原生 LLM，最多等 45s</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>上屏</b>AX 注入 → 剪贴板兜底 + 字符数校验</div>
+    </div>
+    <p class="small">要点：</p>
+    <ul class="tight">
+      <li><b>音频 LRU 缓存</b>：<code>HasAudioCache/RetrySpeechRecognition/WriteAudioCacheWAV/DeleteAudioCache</code>——存在缓存重识别、导出与 <code>FlushPreGateAudio</code> 入口；可重试范围、保留期与离线续传的完整语义未确认，不能保证任意过去录音随时可用。</li>
+      <li><b>两套网络口径分离</b>：公网弱网探测（5s TCP，&gt;500ms 弱网 / ≤300ms 恢复，带迟滞）与系统可达性（1.5s）互不覆盖，避免状态打架卡死。</li>
+      <li><b>空语音与断线分离</b>：空结果看峰值/静音比例，断线看 <code>failType=ws_heartbeat_timeout</code>，两者走完全不同的重试/文案路径。</li>
+    </ul>
+  </div>
+
+  <h3>闪电说 —— 供应商聚合的协议矩阵</h3>
+  <div class="card">
+    <p class="small">闪电说目录包含多家 ASR，并观察到供应商专用模块与协议线索。可比较的是 <b>协议实现细节</b>（已录入 <code>reference/shandianshuo/realtime-protocols.md</code>）：</p>
+    <table>
+      <tr><th>供应商</th><th>实时协议要点</th></tr>
+      <tr><td>阿里云 Qwen-ASR</td><td>WS + Bearer；<code>session.update</code>→等 <code>session.updated</code>→PCM 16k 单声道 16bit→commit→finish；关服务端 VAD</td></tr>
+      <tr><td>阿里云 Fun-ASR</td><td><code>/api-ws/v1/inference</code>；<code>run-task</code>→等 <code>task-started</code>→发 PCM→<code>finish-task</code>→只收 <code>sentence_end=true</code> 按 sentence_id 排序</td></tr>
+      <tr><td>火山引擎</td><td>4 字节头 + 大端 sequence + 长度 + gzip JSON + PCM；<code>bigmodel_async</code> 不等确认即发音频；末包 flags=3 且 sequence 为负</td></tr>
+      <tr><td>Soniox</td><td><code>stt-rt-v5</code> + pcm_s16le；配置词典 <code>context.terms</code>；空文本帧结束；只拼 <code>is_final</code> token</td></tr>
+      <tr><td>ElevenLabs</td><td><code>xi-api-key</code>；<code>commit_strategy=manual</code>；等 <code>session_started</code>→发 Base64 PCM→空音频 <code>commit=true</code>→收 <code>committed_transcript</code></td></tr>
+      <tr><td>OpenAI Realtime</td><td>Bearer + <code>intent=transcription</code>；<code>session.update</code> 声明 audio/pcm 24k；收 <code>input_audio_transcription.completed</code></td></tr>
+      <tr><td>本地</td><td>SenseVoice Small / Parakeet 本地 ONNX 引擎，独立 check/download/warmup 生命周期</td></tr>
+    </table>
+    <p class="small">闪电说还区分「目录内存在」与「用户可见」（feature gate / intlOnly 过滤），并明确区分「推荐默认」与「配置 hydration 实际默认」（如阿里云推荐 <code>fun-asr-realtime</code> 但默认 <code>qwen3-asr-flash</code>）。这些细节 SayRel 的 <code>provider-catalog</code> 若能对齐，可省去大量试错。</p>
+    <p class="small"><b>0.8.0 原生层补充</b>（<code>src/asr/cloud/*</code>，全部为字符串级观察）：</p>
+    <ul class="tight">
+      <li><b>实时与批量是两份实现</b>，不是一份代码的开关：<code>openai_realtime_asr.rs</code> 与 <code>openai_audio_asr.rs</code> 并存；ElevenLabs 同一模块里既有 <code>wss://…/speech-to-text/realtime</code> 也有 <code>[ElevenLabsASR] Starting batch ASR transcription</code>。SayRel 也已有不同的 HTTP/WS 处理分支，部分能力选择依赖模型名。应明确模型形态与回退兼容性，不能由模块数量直接判断可靠性。</li>
+      <li><b><code>ws_proxy.rs</code></b>：观察到代理模块名与相关日志；实际支持的系统代理类型、默认策略和每条路径尚需原生函数体或请求验证。</li>
+      <li><b><code>net_diag.rs</code></b>：独立的网络诊断模块，把「连不上」当一等公民。</li>
+      <li>观察到 16 kHz 采样相关常量；字符串出现次数和未命中其他数值不能证明所有路径统一使用该采样率。</li>
+      <li><b>重试有专用入口</b>：<code>retry_voice_input</code> / <code>[RetryTranscription]</code>，且<b>归一化之后才判空</b>（<code>[ASR] Text is empty after normalization, skipping injection</code>）——SayRel 是在 ASR 层判空。</li>
+    </ul>
+  </div>
+
+  <h3>SpeakMore —— 三模式并列，纯批量</h3>
+  <div class="card">
+    <div class="flow">
+      <div class="step"><b>触发</b>右 ⌥ 单按开始、再按结束（+空格=语音翻译，+回车=划词翻译）</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>采集</b>悬浮条录 WebM(Opus)，16 kHz 单声道；松键交服务端</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>三模式择一</b>native 直出 / local 混合（转写→整理）/ private 离线</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>成品</b>统一 warmUp/prepare/refine 接口出字</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>上屏</b>原生 helper 贴入光标，失败退剪贴板</div>
+    </div>
+    <p class="small">要点：源码在 <code>reference/speakmore/upstream/</code>（提交 7bf2124），分析见 <code>reference/speakmore/README.md</code>。</p>
+    <ul class="tight">
+      <li><b>纯批量、显式拒绝流式</b>：<code>asr/cloud/vendors.mjs</code> 写明「听写说完就要出字，等不起轮询，也不必为一整段录音开流」。这与 SayRel 的 live 实时流是同一功能的两条相反路线，各有论证。</li>
+      <li><b>三模式平级</b>：native（录音→收音频模型直出成品）/ local（转写→纯文字模型整理）/ private（本机 ONNX 转写、不上传、无 key）。三个实现装成同一接口 <code>warmUp/prepare/refine</code>，服务端只认接口。</li>
+      <li><b>本地 ASR 子进程隔离</b>：模型在 <code>fork</code> 子进程跑（约 2 GB 常驻），崩了只丢一次转写；GPU 起不来自动换 CPU。长录音按模型 <code>maxSeconds</code> 在音量最静点切开、静音段跳过。</li>
+      <li><b>预热与提示词缓存</b>：<code>warmUp</code> 先把「第一次慢 2 倍」从用户第一句话上挪走（3.4–4.1 s → 1.7–1.9 s）；Gemini 有提示词缓存 <code>prepare</code>。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================= 润写链路逐产品 ================= -->
+<section id="refinement">
+  <h2>润写（文本 → 成文）链路逐产品</h2>
+  <div class="card">
+    <h3>Wispr Flow：服务端结果与客户端确定性处理</h3>
+    <ul class="tight">
+      <li>服务协议暴露 <code>FORMAT</code>、<code>StyleConfig</code> 和编辑强度。<code>general_style</code> 按 other/personal/work/email 分类，另有 Slack、签名等配置。服务端实际模型与 prompt 未知。</li>
+      <li>客户端 bundle 第 166817 行附近包含全小写、整段片段触发、词典/替换规则、专名大小写和应用特化。规则确定地处理匹配项，不代表能纠正所有识别错误或保证所有词典词出现。</li>
+      <li>独立 Polish/Transform 路径调用 <code>/llm/polish_text</code>，使用选中文字和指令，通过 <code>ShowDiff</code> 展示结果。它与听写后的自动润写不是同一条流程。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Voiskey：原生润写与编辑后的词典学习</h3>
+    <ul class="tight">
+      <li><code>SpeechResultModel</code> 保留润写后 <code>text</code> 与原始 <code>asrText</code>。Go 润写有约 45 s 等待上限。两层文本可作对照，学习还依赖插入后的用户编辑与上下文跟踪。</li>
+      <li><code>computeAfter</code> 根据 caret prefix/suffix 切出区间，再结合句级 LCP/LCS、头尾锚点与 1000 字限制收缩。恢复代码还处理 placeholder、输入清空和句数差异。</li>
+      <li>学习涉及持久化、撤销、翻译场景过滤与 IME 防御。原生未恢复部分及服务端抽词的实际效果仍未知。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>闪电说：协议路由、会员策略与候选输出契约</h3>
+    <ul class="tight">
+      <li>目录和原生字符串显示多个 LLM 协议及角色配置。SayRel 也已支持 openai-chat、openai-responses、anthropic、gemini、ollama、azure-openai，不缺 <code>/responses</code>。独立助手角色属于产品范围扩展。</li>
+      <li><b>观察：</b>存在 <code>text_correction</code>、<code>corrected_text</code>、tool calls 与函数调用开关。<b>推断：</b>部分配置通过工具参数取正文。没有函数体或真实请求证明默认强制方式、完整 schema 与适用供应商；配置修复日志还显示它与自定义 prompt 有关联。</li>
+      <li>会员路径日志说明后端按 <code>Voice-Input-Revision</code> 构建 system prompt。自带 key 路径有 <code>base_prompt_chars</code>、<code>full_prompt_chars</code> 和发送 prompt 的日志，其基准 prompt 来源仍未知。字符串扫描未命中不证明 prompt 不存在。</li>
+      <li>前端可确认 <code>raw/light/strong</code>，默认 light。日志有 <code>organize_level</code>，不能断言所有模式都只在服务端实现档位。</li>
+      <li>配置与历史 UI 显示归一化规则、去句末句号，以及 <code>original_text</code>、<code>normalized_text</code>、<code>ai_corrected_text</code>。完整执行顺序未取得；既有分析在 AI 前后顺序上存在冲突。字段展示次序不等于执行次序。</li>
+      <li>日志支持关闭/AI 失败时回原文，并有鉴权过期事件线索；前端默认超时为 15 s。没有真实请求统计证明所有失败分支行为。</li>
+    </ul>
+  </div>
+  <div class="callout note">结构化输出约束的是结果形状，不保证模型真正改写、保留全部事实或不拒绝。若引入，必须验证正文并由客户端计算 changed；不能将它作为“深整理无变化”的已证实修复。</div>
+  <div class="card">
+    <h3>Typeless：服务端润写与细粒度上下文</h3>
+    <ul class="tight">
+      <li>恢复的上下文包含 device_environment、active_application、text_insertion_point、context_metadata，涉及 app/窗口、选中文字、光标前后文、输入区周边和采集质量。字段与消费点可核对，服务端使用方式未知。</li>
+      <li>已见可见文本 10,000 字符/500 ms 与周边文本 1,000+1,000 字符/500 ms 等预算，以及 app/URL 黑名单和加密信封。加密保护传输/存储封装，不意味着服务端无法读取上下文。</li>
+      <li>WS 可返回转写分片与润写完成消息；HTTP 返回成品文本。目前未找到独立权威的最终 ASR 原文或仅润写重试接口。不能写成客户端完全拿不到转写文字。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Typeless 编辑学习与 SayRel 的取舍</h3>
+    <ul class="tight">
+      <li>插入后检查目标与已插入文字，进入约 15 秒空闲跟踪窗口；白名单中的真实按键可续期。切换输入框、清空、Enter 与超时会结束跟踪。15 秒是可重置的空闲窗口，不是已证实的总时长上限。</li>
+      <li>只比较前 1000 字符，长度低于原文 20%、删除超过 50% 或增删超过 2 倍等条件会过滤大幅改写；随后通过 <code>/user/traits</code> 上传改前改后文本与上下文，返回词典项。</li>
+      <li>SayRel 已有本地 diff、50%/2 倍长度过滤和至少 60% 不变文本约束，默认关闭且需要用户确认。两者隐私、召回与误报取舍不同，未经评测不能断言服务端必然更强。普通同义改写也不一定应成为词典项。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>SpeakMore：一份调好的润色 prompt + 确定性清洗</h3>
+    <ul class="tight">
+      <li><b>零参数单一 prompt</b>，与 SayRel 的 polishLevel×writingStyle 多参数相反。作者用同一批 60 条真实录音跑 12 遍（720 条成品）对照原版 Typeless 的 2853 条成品调出来，每条规则带「改了之后命中怎么变」的实测数字。</li>
+      <li><b>静音哨兵</b> <code>NO_SPEECH_MARK="&lt;无人声&gt;"</code>：让模型没人声时输出固定标记而不是「什么都不输出」，因为实测静音让它空输出会编出「好的」「你觉得呢？」；服务端见标记换空串。</li>
+      <li><b>混合版 prompt 三处加强</b>（模型看不到录音只看到转写）：先列「原文常见的错」让模型按上下文改；原文包在 <code>&lt;原文&gt;</code> 标签里，说清那是「要整理的内容」不是「对你说的话」；分点规则更重（照搬原生写法时原版分了点的 16 条只分 4 条）。</li>
+      <li><b>确定性清洗</b>（<code>textFromModelOutput</code>）：<code>LEAKED_PREFIX</code> 正则剥掉成品前的多余外文词、OpenCC 繁转简、去句末句号（只删最后一个，中间各段句号保留）。</li>
+      <li><b>夹时间戳整次重试</b>：成品含 <code>\d{1,2}:\d{2}</code> 就整次重来一遍，不直接删（防误删真钟点）。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================= SayRel 现状精读 ================= -->
+<section id="sayrel">
+  <h2>SayRel 现状精读（源码级）</h2>
+  <p class="lede">以下描述当前工作区已有能力，不是待补清单。具体结果仍依赖所选模型、配置与网络。</p>
+  <div class="card">
+    <h3>采集、实时与完整录音重试</h3>
+    <ul class="tight">
+      <li><code>src/renderer/floating-bar/audio.ts</code> 以 16 kHz 为目标，启用 <code>echoCancellation/noiseSuppression/autoGainControl</code>；Worklet 按 2048 样本交付，失败退 ScriptProcessor。</li>
+      <li><code>recordingMachine.ts:131</code> 在录音开始时调用 live ASR，后续 PCM 同时缓存并推送。<code>supportsLiveTranscription</code> 选择兼容模型，不是所有 ASR 都实时。<code>qwen3-asr-flash</code> 等批量模型仍在松键后识别。</li>
+      <li><code>realtimeTransport.ts</code> 有 15 s 连接确认、360 s 会话、45 s final 超时，以及发送队列与 socket 缓冲合计 15 s 音频积压保护；没有通用服务端 ACK/lag 反馈。</li>
+      <li><code>providers/index.ts</code> 已包含 OpenAI 批量、StepFun、MiMo、audio-chat、local-whisper、ElevenLabs REST 等不同路径；Qwen 与其他实时协议在 <code>realtime.ts</code> 中另有处理。</li>
+      <li><code>transcription.ts:47</code> 起在 live 失败后重调同一选定模型，输入为完整录音。可能使用 HTTP，也可能重新通过 WS 发送；<code>path=batch-fallback</code> 不代表独立批量 API。</li>
+      <li><code>AsrOutcome</code> 已区分 final/empty/failed，记录会话、请求、供应商/模型、路径及时间信息。当前不伪造词典命中、分段置信度或时间戳。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>润写与上下文</h3>
+    <ul class="tight">
+      <li>ASR 完成后独立调用选定的 writing 模型。<code>recordingMachine.ts:539</code> 起将档位、风格、标点、词典与上下文传入请求，失败落回原文并允许只重试润写。未选择 writing 模型则跳过；历史记录已区分未配置、失败回退、成功未改动与已改动，并可查看原文及按当前设置重新整理。</li>
+      <li><code>refinementPrompt.ts</code> 有 preservation、raw/light/strong、style 等策略，strong 额外加入 dictationPolicy。保留事实与引用，不等于必须保留口头绕述；档位是否产生预期差异须靠输出案例验证。</li>
+      <li><code>chat.ts</code> 支持 6 种协议，包含 <code>/responses</code>；按协议检查完成状态、拒绝、工具调用及空结果。OpenAI chat/Azure 分支使用 temperature 0.2，并非所有协议都发送同一温度。DeepSeek auto 的听写请求使用低 reasoning effort。</li>
+      <li><code>contextCapture.ts</code> 与 <code>prompts.ts</code> 提供 app、选中文字、输入框预览和可见文本等，并屏蔽安全字段。光标位置、区间和 IME 数据已用于本地学习，尚未进入润写上下文；缺输入区类型、周边内容和采集质量。</li>
+      <li>词典同时用于 ASR 提示与润写 preferred_spellings，不是强制替换表。<code>postprocess.ts</code> 仅做换行、空白和尾随空格处理，不删除解释性前缀。响应合法但附带解释的正文仍可能被接受。</li>
+      <li><code>RefinementOutcome</code> 已记录 completed/skipped/fallback，completed 有 changed、模型、prompt 版本和耗时。错误 message 有区别，但缺稳定分类；日志与新元数据已记录实际请求档位、风格和标点设置，便于复现。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>上屏、编辑学习与历史</h3>
+    <ul class="tight">
+      <li><code>insertion.ts</code> 默认首次尝试加两次重试，间隔 120 ms。<code>swift/InputHelper.swift:37</code> 内部已经保存剪贴板、写文本、模拟 Cmd+V 并延迟恢复，返回 0 前未读回确认。显式失败才走手动粘贴提示。</li>
+      <li><code>insertRichText</code> 接口存在但主链路未用；富文本是特定编辑器的格式能力，不是纯文本失败的通用兜底。</li>
+      <li><code>dictionaryLearning.ts</code> 在上屏前取快照，250 ms 首次检查，随后每秒采样，固定总窗口 15 s；编辑稳定约 1.5 s 或 Enter 后生成候选。目标变化、secure 或 IME 会停止跟踪。</li>
+      <li><code>editLearning.ts</code> 校验前后缀、目标一致、UTF-16 光标、1000 字上限、改写幅度和词形；候选上限 50、10 分钟过期。用户确认才入词典，5 s 内可撤销，仍保持本地学习。</li>
+      <li>历史保留 transcript/refinedText/finalEditedText 等层；finalEditedText 是有界编辑快照，不保证等于最终发送内容。历史重识别依赖可用音频，处理阶段才写占位；仅加占位记录无法恢复崩溃丢失的内存 PCM。</li>
+    </ul>
+  </div>
+  <div class="callout key">“深整理没有变化”应先区分未配置、请求失败回退、成功但未改动，以及插入了错误层文本。已有接口与本地测试通过，不构成真实润写质量验收。</div>
+</section>
+
+<!-- ================= 转写差距 ================= -->
+<section id="gaps-t">
+  <h2>差距分析 · 转写</h2>
+  <p class="lede">P0 表示已证实的正确性风险或当前阻塞验收项；P1 是可靠性与边界完善；P2 是按需求评估。未进行竞品线上性能测试，阈值不能直接照搬。</p>
+  <div class="gap p1">
+    <h4><span class="pri p1">P1</span>缺少有界的定时兜底，而非缺少实时能力</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>录音中 live 已实现。当前仅在 live 明确失败后重处理完整录音，不竞速。</div>
+      <div class="row"><b>证据与边界：</b>Typeless 有默认约 6 s 触发 HTTP 的路径；Wispr 有受开关与时长限制的 gRPC/Baseten HTTP 竞速。触发备用请求不等于该秒数内完成。</div>
+      <div class="row"><b>建议：</b>先确认所选模型是否支持录音中处理，再评估松键后提前准备完整音频并在等待超预算时启动兼容备用路径。必须处理空结果、错误、会话取消和失败分支，不能只取第一个 settled Promise。记录赢家、耗时及可能重复费用。</div>
+    </div>
+  </div>
+  <div class="gap p2">
+    <h4><span class="pri p2">P2</span>跨供应商容灾与服务端滞后反馈需单独设计</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>没有备选供应商选择；已有发送积压保护，但没有统一的服务端接收进度。</div>
+      <div class="row"><b>证据与边界：</b>Wispr 的 lag 是已发送音频时长减服务端确认时长，不是“上一次 partial 距今”。静音、停顿与仅返回 final 的模型可能长期无 partial。</div>
+      <div class="row"><b>建议：</b>先用协议 ACK、socket 状态、发送积压与 final 等待预算观测问题。跨供应商上传必须用户明确配置和授权，区分计费/隐私成本；不将无 partial 自动判为宕机。</div>
+    </div>
+  </div>
+  <div class="gap p1">
+    <h4><span class="pri p1">P1</span>润写缺光标前后文，但 native 已有部分采集能力</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>当前 reference_context 只有输入框预览和选中等字段。光标与 IME 已在本地学习快照中使用。</div>
+      <div class="row"><b>证据与边界：</b>Wispr/Voiskey/Typeless 的恢复材料有不同粒度的光标与周边上下文；不能据此证明上传更多就一定更好。</div>
+      <div class="row"><b>建议：</b>复用已有采集，区分本地学习许可与上传上下文许可。加入有界 before/after、输入区类型与采集质量，secure/IME/目标变化时安全降级；不要默认上传完整输入框。</div>
+    </div>
+  </div>
+  <div class="gap p1">
+    <h4><span class="pri p1">P1</span>统一代理策略和诊断不足，具体故障仍需复现</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>undici WebSocket 未显式接入统一代理/连通性诊断；具体代理环境行为未验证。</div>
+      <div class="row"><b>证据与边界：</b>闪电说有 ws_proxy.rs/net_diag.rs 字符串线索，不能只凭模块名确认所有系统代理类型均支持。Electron session 代理不自动等于 Node 网络栈代理。</div>
+      <div class="row"><b>建议：</b>以实际 WS 握手、TLS、鉴权和网络错误分类为依据，分别验证 HTTP/WS 的代理行为。普通 HEAD 成功不证明 WS 可用，失败也不能直接判 ASR 不可用；探测不应阻塞录音。</div>
+    </div>
+  </div>
+  <div class="gap p1">
+    <h4><span class="pri p1">P1</span>模型能力元数据需比文件拆分更明确</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>实时和批量已有不同的 HTTP/WS 实现，但部分路由依赖模型名和协议条件。部分完整录音重试仍复用 WS。</div>
+      <div class="row"><b>证据与边界：</b>OpenAI 的实时/批量在模型中已区分，ElevenLabs REST 与 WS 也已分支。闪电说文件名体现模块划分，不证明“必须每种形态一个类”。</div>
+      <div class="row"><b>建议：</b>显式描述模型是否支持 live、完整录音和可兼容回退，并验证模型/端点组合。按协议边界拆分代码，而不是为文件数量或类数量重构。</div>
+    </div>
+  </div>
+  <div class="gap p2">
+    <h4><span class="pri p2">P2</span>编码开销需测量后决定是否改为增量编码</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>部分路径在松键后编码；live 成功且不存音频可跳过。是否造成明显等待尚未按录音长度测量。</div>
+      <div class="row"><b>证据与边界：</b>Typeless 恢复了连续编码和整段转码路径。接口存在及 worker 配置不代表所有通道都使用同一编码方式，实时二进制容器仍有未知。</div>
+      <div class="row"><b>建议：</b>先测 encodingMs、持久化及模型耗时，再选择 worker 或 native 增量编码。若用 WebCodecs，要验证 Electron 版本、执行上下文、编码器与容器支持，不假定 AudioWorklet 直接可用。</div>
+    </div>
+  </div>
+  <div class="gap p1">
+    <h4><span class="pri p1">P1</span>跨会话恢复依赖保存的音频</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>内存帧与当前 retryInput 不构成持久缓存；已有历史重试，但依赖可用 audioLocalPath。</div>
+      <div class="row"><b>证据与边界：</b>Voiskey 有缓存、重识别及导出入口，覆盖范围受缓存保留影响；单有 DB 占位不等于可恢复音频。</div>
+      <div class="row"><b>建议：</b>若确需崩溃/离线恢复，将临时缓存与长期归档分别设计，明确用户许可、容量、保留期、清理与恢复原子性。不能在“关闭保存音频”后静默持久化。</div>
+    </div>
+  </div>
+  <div class="gap p1">
+    <h4><span class="pri p1">P1</span>展示真实阶段，不伪造转写/润写进度比值</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>已有 phase、partial 和分段耗时；历史已显示未配置、失败回退和成功未改动，真实模型未改动的语义原因仍需文本对照。</div>
+      <div class="row"><b>证据与边界：</b>Wispr 有服务端 transcriber/formatter 进度；SayRel 的普通 LLM 请求没有可验证的中间百分比。</div>
+      <div class="row"><b>建议：</b>区分连接、识别、润写、插入，并保留已识别文本预览。历史状态与重新整理入口已补齐；后续评估浮条阶段提示，不把累计 partial 再追加。</div>
+    </div>
+  </div>
+  <div class="gap p2">
+    <h4><span class="pri p2">P2</span>会话上限与供应商元数据是能力选择</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>录音上限 5 分钟；已有 final/empty/failed 元数据，缺统一分段时间戳、置信度和词典归因。</div>
+      <div class="row"><b>证据与边界：</b>Voiskey usedDictList 与 Wispr 增删统计不是同一种数据。请求里的 context.terms、hotwords 或 vocabulary 只证明传入提示，不证明返回命中归因。</div>
+      <div class="row"><b>建议：</b>时长按模型能力和实测成本配置。仅在响应实际提供字段时映射；本地匹配只能称“输出包含词典词”，不能伪装成供应商确认命中。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 润写差距 ================= -->
+<section id="gaps-r">
+  <h2>差距分析 · 润写</h2>
+  <div class="gap p0">
+    <h4><span class="pri p0">P0</span>先建立真实润写效果验收</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>档位、风格和 prompt 已接通；本地契约测试不能判断真实模型是否把口语整理成预期成文。用户反馈“深整理无变化”仍需同次请求对照定位。</div>
+      <div class="row"><b>证据与边界：</b>completed/changed 只能证明完成和文本差异。长度变短也不证明保留了事实、否定、引用及意图。结构化输出可以合法返回原文。</div>
+      <div class="row"><b>建议：</b>记录脱敏的请求档位、模型、prompt 版本、结果状态与耗时。用用户同意保留的失败例及合成用例覆盖填充词、改口、重复、多任务、混合语言、数字与否定；比较原文/模型正文/插入文本，明确三档各自允许的编辑幅度。</div>
+    </div>
+  </div>
+  <div class="gap p1">
+    <h4><span class="pri p1">P1</span>缺任务级正文契约，但已有协议完整性检查</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>已有响应 schema、完成状态、拒绝和空值检查；没有工具/结构化正文模式，也没有删除解释性前缀的清洗规则。</div>
+      <div class="row"><b>证据与边界：</b>闪电说存在函数调用路径线索，适用范围与强制方式尚未知。服务端返回成品字段也不证明内部杜绝格式错误。</div>
+      <div class="row"><b>建议：</b>按模型能力验证工具或结构化输出模式，校验正文和失败类型，保留纯文本路径。changed 由客户端计算，避免为 notes 增加无用输出；以真实错误率证明收益，不宣称必然解决润写力度。</div>
+    </div>
+  </div>
+  <div class="gap p1">
+    <h4><span class="pri p1">P1</span>缺显式替换与片段规则，不是把词典再替换一遍</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>词典已用于 ASR 与润写提示，但仅保存正确词，缺错误写法/触发词到输出的明确映射。</div>
+      <div class="row"><b>证据与边界：</b>Wispr 有条件性确定性处理；闪电说有规则配置和三层文本字段，执行顺序未证实。精确词边界不解决词义歧义或中文分词问题。</div>
+      <div class="row"><b>建议：</b>分开建模词典、显式替换、片段与排版。规则需用户确认，可预览、禁用与撤销。决定各规则在润写前还是后执行，并记录实际文本层；若允许正则，限制规则数量/输入长度并防止灾难性回溯，不盲目推导纠错映射。</div>
+    </div>
+  </div>
+  <div class="gap p1">
+    <h4><span class="pri p1">P1</span>全局风格可扩展为按应用覆盖</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>polishLevel 与 writingStyle 是全局设置。</div>
+      <div class="row"><b>证据与边界：</b>Wispr 有应用类别风格；Voiskey 有场景与应用映射。场景数量不等于效果更好。</div>
+      <div class="row"><b>建议：</b>按 bundleId 给可选覆盖，仍服从用户编辑预算与隐私设置。先验证邮件、聊天、笔记与代码场景，再扩展目录。</div>
+    </div>
+  </div>
+  <div class="gap p1">
+    <h4><span class="pri p1">P1</span>词典学习可提高边界召回，但不能删掉已有防御</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>已有目标、secure、IME、前后缀、1000 字、长度比例和至少 60% 不变文本过滤；尚无进一步锚点收缩，窗口是固定 15 s。</div>
+      <div class="row"><b>证据与边界：</b>Voiskey 采用多步锚点，Typeless 有按键续期。两者更复杂不等于对本地词典学习必然更准。</div>
+      <div class="row"><b>建议：</b>以具体漏学/误学例验证锚点，边界不唯一时放弃。可评估空闲续期加总时长上限；保留确认、撤销与本地计算，不把同义改写默认当词典项。</div>
+    </div>
+  </div>
+  <div class="gap p2">
+    <h4><span class="pri p2">P2</span>独立选中文字润写与 diff 属于范围扩展</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>已有语音编辑和桌面白名单指令，但无完整的选中、润写、diff、确认替换流程。</div>
+      <div class="row"><b>证据与边界：</b>Wispr 有独立 Polish/Transform 和 ShowDiff。它不等于日常听写润写。</div>
+      <div class="row"><b>建议：</b>需求明确时复用 interactiveCard，先展示 before/after，再确认目标与替换范围；无需为解决自动润写问题先扩展此功能。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 上屏差距 ================= -->
+<section id="gaps-i">
+  <h2>差距分析 · 上屏</h2>
+  <div class="gap p0">
+    <h4><span class="pri p0">P0</span>返回成功不等于目标应用已写入</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>native helper 主路径是剪贴板 + Cmd+V，发出事件后返回 0。JS 默认首次加两次重试，但未读回确认，因此目标未接收时可能被当成成功。</div>
+      <div class="row"><b>证据与边界：</b>见 swift/InputHelper.swift:37 与 insertion.ts。Voiskey 有延迟校验线索；Wispr 有 PasteOutcome。它们不能证明仅比字符数就足够可靠。</div>
+      <div class="row"><b>建议：</b>确认目标身份与插入区间，尽可能对比有界文本；无法验证时返回 unknown，而非假成功。仅比较字符数会漏掉等长错误。结果不明时避免自动重复粘贴，保留用户可控的手动恢复。</div>
+    </div>
+  </div>
+  <div class="gap p1">
+    <h4><span class="pri p1">P1</span>剪贴板保存与恢复需要可观测结果</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>helper 已保存并延迟恢复剪贴板，JS 侧没有恢复结果。</div>
+      <div class="row"><b>证据与边界：</b>现有代码可直接核对，不仅是注释宣称。异步恢复还需考虑用户或其他进程在这期间修改剪贴板。</div>
+      <div class="row"><b>建议：</b>记录实际方法、写入/恢复结果与耗时；恢复前校验归属或 changeCount，避免覆盖用户新复制的内容。保留多类型、多项目数据的语义。</div>
+    </div>
+  </div>
+  <div class="gap p2">
+    <h4><span class="pri p2">P2</span>富文本是场景能力，不是通用失败回退</h4>
+    <div class="body">
+      <div class="row"><b>现状：</b>insertRichText 已存在，但主链路只使用普通文本。</div>
+      <div class="row"><b>证据与边界：</b>Wispr/Typeless 有 HTML 相关接口。支持富文本不代表编辑器会接受，也不证明它能修复纯文本插入失败。</div>
+      <div class="row"><b>建议：</b>仅在用户需要且目标支持时生成并交付安全 HTML，同时保留纯文本；与上屏成功确认分开实施。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 可复用清单 ================= -->
+<section id="reuse">
+  <h2>可借鉴机制与迁移前提</h2>
+  <p class="lede">以下是候选机制，不是逐项照搬清单。“已有”指当前代码存在，不代表所有真实供应商均已验收。</p>
+  <div class="card" style="overflow-x:auto">
+  <table>
+    <tr><th>机制</th><th>来源证据</th><th>SayRel 当前状态与前提</th></tr>
+    <tr><td>录音中 ASR 与完整录音重试</td><td>Wispr/Typeless/闪电说</td><td>已有 live 与完整录音重试；先验证所选模型能力。StepFun/MiMo 与 /responses 已实现。</td></tr>
+    <tr><td>定时备用通道</td><td>Typeless；Wispr 条件性 gRPC/HTTP 竞速</td><td>P1。先确认备用路径可独立工作、取消和记录赢家，处理费用与超时。</td></tr>
+    <tr><td>服务端进度/ACK</td><td>Wispr audio_received_seconds</td><td>已有发送积压保护。供应商真实提供 ACK 才映射，不用无 partial 代替 ACK。</td></tr>
+    <tr><td>跨供应商容灾</td><td>供应商目录提供切换能力，非默认竞速证明</td><td>P2。需第二供应商、凭据和上传授权，以及收益测量。</td></tr>
+    <tr><td>正文契约</td><td>闪电说函数调用相关字符串</td><td>P1 候选。按模型能力验证；不能据此保证改写力度。</td></tr>
+    <tr><td>显式替换与片段</td><td>Wispr 客户端；闪电说规则配置</td><td>P1。正确词典不等于纠错表；明确映射、执行顺序、预览和撤销。</td></tr>
+    <tr><td>文本处理层留存</td><td>闪电说多层历史字段</td><td>已有 transcript/refined/finalEdited。引入规则后按真实顺序补层，不为字段数量迁移。</td></tr>
+    <tr><td>光标上下文与质量</td><td>Wispr/Voiskey/Typeless</td><td>P1。复用已用于本地学习的 caret/IME 数据，另行尊重上传许可和预算。</td></tr>
+    <tr><td>代理与网络诊断</td><td>闪电说模块和日志；Typeless 网络路径</td><td>P1。分别验证 Node WS 与 HTTP；探测不得阻塞采集。</td></tr>
+    <tr><td>模型形态元数据</td><td>各供应商协议差异</td><td>P1。用能力表代替部分命名推断，不要求机械拆成同样的类。</td></tr>
+    <tr><td>partial 语义归一</td><td>Typeless 索引分片与 SayRel 累计快照</td><td>保留累计快照接口。不要直接把 UI 改成追加。</td></tr>
+    <tr><td>开始录音即写占位</td><td>Typeless 存储编排</td><td>若需恢复，还要持久化音频及元数据；占位本身不保证崩溃可恢复。</td></tr>
+    <tr><td>临时音频缓存</td><td>Voiskey 缓存/重试入口</td><td>P1 需求项。与归档分开，明确保留期、容量和用户许可。</td></tr>
+    <tr><td>连续编码与降级</td><td>Typeless worker/native 接口</td><td>P2。先测编码瓶颈；验证编码器、执行环境与格式，不假定实时通道容器。</td></tr>
+    <tr><td>有界上下文采集</td><td>Typeless 预算/占位/质量字段</td><td>P1。限制时长和长度，失败安全降级，不复制全部上下文。</td></tr>
+    <tr><td>学习续期与锚点</td><td>Typeless/Voiskey</td><td>P1。已有大幅修改和 IME 防御；基于漏学/误学案例调整，并保留总时长上限。</td></tr>
+    <tr><td>应用风格</td><td>Wispr/Voiskey</td><td>P1。可选覆盖全局设置，实际评测场景效果。</td></tr>
+    <tr><td>空结果与失败分离</td><td>Voiskey 与 SayRel</td><td>已有 final/empty/failed。供应商未回传的数据不补造。</td></tr>
+    <tr><td>上屏成功确认</td><td>Voiskey 校验线索；Wispr PasteOutcome</td><td>P0。校验目标与文本，保留 unknown，防止重复写入；富文本单独列 P2。</td></tr>
+    <tr><td>选中后润写 diff</td><td>Wispr 独立 Polish 路径</td><td>P2 产品范围项。复用卡片并明确确认后才替换。</td></tr>
+    <tr><td>润写可观测性</td><td>Wispr skip reason；SayRel refinement outcome</td><td>档位、跳过原因、历史原文对照和按当前设置重新整理已补齐；真实润写质量仍是 P0 验收项。</td></tr>
+    <tr><td>离线模式（本地 ONNX）</td><td>SpeakMore private 模式 + sherpa-onnx/transcribe-cpp</td><td>P2 产品范围项。本机转写、不上传、无 key；可作「隐私档」蓝图，含子进程隔离与 GPU→CPU 兜底。</td></tr>
+    <tr><td>音频一跳直出</td><td>SpeakMore native 模式（Gemini/GPT-Audio/Qwen-Omni）</td><td>可选路线。整段音频一次出成品，省转写→润色两跳延迟；需按供应商能力验证。</td></tr>
+    <tr><td>静音哨兵</td><td>SpeakMore <code>&lt;无人声&gt;</code> 固定标记</td><td>可抄。避免「空输出」被模型编出内容；服务端见标记换空串。</td></tr>
+    <tr><td>预热与提示词缓存</td><td>SpeakMore warmUp + Gemini 提示词缓存</td><td>可抄。把第一次慢 2 倍从用户第一句话挪走，并暴露坏 key/坏模型名。</td></tr>
+    <tr><td>长录音最静点分段</td><td>SpeakMore segment.mjs（音量切点，不用 VAD）</td><td>batch-fallback 与长录音可用。静音段跳过，与模型/运行库无关。</td></tr>
+    <tr><td>每跳记账</td><td>SpeakMore meter.mjs</td><td>对照。时间花在哪跳、钱花在谁身上拆开记；超时/断开单记 unmetered 告警。</td></tr>
+  </table>
+  </div>
+</section>
+
+<!-- ================= 优先级建议 ================= -->
+<section id="priority">
+  <h2>优先级建议</h2>
+  <p class="lede">本表是针对当前项目和用户反馈的工程判断，不是竞品功能的客观排名。P0 的验收缺口不等于根因已查明。</p>
+  <div class="card" style="overflow-x:auto">
+  <table>
+    <tr><th>优先级</th><th>事项</th><th>验收要求</th></tr>
+    <tr><td><span class="pri p0">P0</span></td><td>定位深整理效果，建立语义验收</td><td>同次请求对照档位、prompt、原文、模型结果、插入文本；区分跳过/回退/未改动，检查事实保留与口语整理。</td></tr>
+    <tr><td><span class="pri p0">P0</span></td><td>上屏结果可信</td><td>目标不接收、部分写入和等长错误不能报 verified 成功；不可验证需 unknown，不盲目重贴。</td></tr>
+    <tr><td><span class="pri p1">P1</span></td><td>定时完整录音兜底与模型能力声明</td><td>对支持组合测试卡住、早失败、空结果、取消及备用失败；计时触发不冒充总耗时上界。</td></tr>
+    <tr><td><span class="pri p1">P1</span></td><td>按能力试验结构化正文输出</td><td>兼容模型确实减少格式错误，拒绝/截断仍被识别，质量不回退；保留纯文本路径。</td></tr>
+    <tr><td><span class="pri p1">P1</span></td><td>显式替换规则与文本层</td><td>只应用用户授权映射，预览/关闭/撤销可用，规则有资源限制，原始文本可对照。</td></tr>
+    <tr><td><span class="pri p1">P1</span></td><td>光标上下文、代理诊断、剪贴板恢复</td><td>各自验证隐私开关、预算、网络栈和剪贴板所有权；不得为新增功能扩大静默上传或覆盖用户内容。</td></tr>
+    <tr><td><span class="pri p1">P1</span></td><td>学习召回、应用风格与临时缓存</td><td>分别以真实漏学、场景需求和恢复需求决定；保留安全过滤、用户确认和清理策略。</td></tr>
+    <tr><td><span class="pri p2">P2</span></td><td>跨供应商竞速、连续编码、富文本、独立 diff</td><td>有明确需求与实测收益后实施，验证计费/隐私、格式兼容及目标写入安全。</td></tr>
+  </table>
+  </div>
+  <div class="callout key">推荐顺序：先定位“深整理无变化”并补上屏确认，再验证实时卡住时的有界兜底。输出契约、替换规则和上下文增强各自解决不同问题，不能代替真实润写效果验收，也不应先按竞品功能数量重构。</div>
+</section>
+
+<!-- ================= 证据边界 ================= -->
+<section id="evidence">
+  <h2>证据边界与核实记录</h2>
+  <div class="callout note">
+    <ul class="tight">
+      <li><b>本次修订：</b>核对已有发布产物、恢复代码、协议和 SayRel 当前源码，没有新抓包、真实供应商调用或线上竞品质量测试。本文不包含账号、密钥、真实转写内容或令牌。</li>
+      <li><b>观察：</b>文件字节、已恢复函数/消费点、消息字段、符号、配置项与日志字符串。字符串只证明存在相关文字，不等于函数体、调用顺序、默认启用或真实执行。</li>
+      <li><b>推断：</b>闪电说 text_correction 的具体输出路径、自定义 prompt 的关联分支，以及尚未恢复的服务端使用方式。<b>未知：</b>服务端模型/prompt、联合训练、真实质量/延迟、功能开关的线上取值、未恢复的原生控制流。</li>
+      <li><b>Wispr Flow 1.6.1253：</b><code>reference/wisprflow/readable/main.index.pretty.js:142954</code> 的 gRPC/Baseten HTTP 竞速受功能开关、录音完成和时长限制；第 166817 行附近为条件性客户端处理。另见 README、analysis 与重建 proto。三路同时竞速的旧结论已撤回。</li>
+      <li><b>Typeless 2.8.3：</b>主 bundle 的反混淆结果与 renderer 的 1uHho0F_.js/juYOhWy9.mjs 分别证明不同层。实时通道、延迟触发兜底、分片消息和上下文消费点可回查；二进制块真实容器、完整服务端流程、最终原文/单独润写接口仍有未知。不能仅凭 Opus 配置断言线上实际容器。</li>
+      <li><b>Voiskey 1.4.7：</b>frontend 恢复自 source map，原生层仅部分符号与伪代码。STREAMING_ASR_ENABLED 关闭证明前端预览分支关闭，不单独证明服务器不实时处理。缓存入口不保证任意过去录音永久可重试。</li>
+      <li><b>闪电说 0.8.0：</b>没有取得 Rust 函数伪代码；模块、函数调用配置、corrected_text 与归一化相关结论来自原生字符串和前端。会员 prompt 日志不能推广到自带 key 路径。归一化完整顺序未证实；既有 pipeline-deep-analysis 的 3.1/3.6 顺序冲突不作为实施依据。</li>
+      <li><b>SpeakMore 0.17.0：</b>开源仓库（MIT，提交 7bf2124）直接读码，非二进制反汇编。三模式（native/local/private）、批量拒绝流式、静音哨兵、润色 prompt、本地 ONNX ASR 与分段均为源码级观察；耗时、费用、评测命中数是作者自建评测的声称，未复测。未抓包、未读用户数据。</li>
+      <li><b>既有 REA 记录：</b>部分目录分析曾超时/内存不足，裁剪后分析与 AST findings 保存在既有 .build 产物或 reference/evidence。AST、字符串和语义图不是服务端源码，也不证明运行时效果；本次修订没有重新运行这些大目录分析。</li>
+      <li><b>本地验证：</b>核实轮重新执行 live-asr.ts 的 30 个本地场景、edit-learning.cjs 的 11 个场景与 writing-controls.ts，均通过。它们验证传输、边界、隐私和请求契约，不证明真实润写质量或企业代理可用性。</li>
+      <li><b>对应材料：</b><code>reference/wisprflow/{README,analysis}.md</code>、<code>reference/voiskey/{README,analysis}.md</code>、<code>reference/shandianshuo/{README,provider-catalog,realtime-protocols,frontend-provider-analysis,pipeline-deep-analysis}.md</code>、<code>reference/typeless/{README.md,readable/,evidence/drizzle/}</code>、<code>reference/speakmore/{README.md,upstream/}</code>。<a href="research/competitor-pipeline-verification-2026-10-24.md">核实记录</a>中的旧 HTML 行号指修订前版本，本页修改后以章节和符号定位。</li>
+    </ul>
+  </div>
+</section>
+
+</div>
+</body>
+</html>

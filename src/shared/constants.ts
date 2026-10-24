@@ -40,6 +40,7 @@ export const HUB_ROUTES = {
 export const MODES = {
   VOICE_TRANSCRIPT: 'voice_transcript',
   VOICE_COMMAND: 'voice_command',
+  DESKTOP_COMMAND: 'desktop_command',
   ASK_ANYTHING: 'ask_anything',
   TRANSLATION: 'translation'
 } as const

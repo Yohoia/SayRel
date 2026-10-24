@@ -6,6 +6,8 @@ export const transcriptionProtocols = ['openai-transcription', 'audio-chat', 'qw
 export const refinementProtocols = ['openai-chat', 'openai-responses', 'anthropic', 'gemini', 'ollama', 'azure-openai'] as const
 export const providerProtocolSchema = z.enum([...transcriptionProtocols, ...refinementProtocols])
 export type ProviderProtocol = z.infer<typeof providerProtocolSchema>
+export const thinkingModeSchema = z.enum(['auto', 'enabled', 'disabled'])
+export type ThinkingMode = z.infer<typeof thinkingModeSchema>
 const common = {
   id: z.string().min(1).max(120),
   presetId: z.string().max(120),
@@ -22,7 +24,7 @@ const common = {
 }
 export const providerProfileSchema = z.discriminatedUnion('service', [
   z.object({ ...common, service: z.literal('transcription'), protocol: z.enum(transcriptionProtocols) }),
-  z.object({ ...common, service: z.literal('refinement'), protocol: z.enum(refinementProtocols) })
+  z.object({ ...common, service: z.literal('refinement'), protocol: z.enum(refinementProtocols), thinkingMode: thinkingModeSchema.default('auto') })
 ]).superRefine((profile, ctx) => {
   if (profile.preferredModel && !profile.models.includes(profile.preferredModel)) ctx.addIssue({ code: 'custom', path: ['preferredModel'], message: "Select a model for this provider" })
   if (profile.protocol === 'local-whisper') return
@@ -34,6 +36,14 @@ export const providerProfileSchema = z.discriminatedUnion('service', [
   if (new Set(profile.models).size !== profile.models.length) ctx.addIssue({ code: 'custom', path: ['models'], message: "Model IDs must be unique" })
 })
 export type ProviderProfile = z.infer<typeof providerProfileSchema>
+
+export function supportsDeepSeekThinking(profile: Pick<ProviderProfile, 'service' | 'protocol' | 'endpoint'>, model: string): boolean {
+  if (profile.service !== 'refinement' || profile.protocol !== 'openai-chat' || !['deepseek-flash', 'deepseek-v4-pro'].includes(model)) return false
+  try {
+    const url = new URL(profile.endpoint)
+    return url.protocol === 'https:' && url.hostname === 'api.deepseek.com' && !url.port && !url.username && !url.password && !url.hash
+  } catch { return false }
+}
 export const providerSelectionSchema = z.object({ providerId: z.string(), model: z.string() })
 export type ProviderSelection = z.infer<typeof providerSelectionSchema>
 export const serviceProvidersSchema = z.object({

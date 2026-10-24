@@ -72,6 +72,10 @@
 .history-view-answer { border:1px solid var(--line-strong); border-radius:var(--radius-control); padding:7px 10px; color:var(--accent); font-size:14px; line-height:18px; white-space:nowrap; }
 .history-item-failed { color:var(--error); }
 .history-refinement-warning { display:block; color:var(--error); font-size:13px; line-height:21px; margin-top:6px; }
+.history-refinement-status { display:block; color:var(--ink-tertiary); font-size:13px; line-height:21px; margin-top:6px; }
+.history-text-comparison { display:grid; gap:18px; }
+.history-text-comparison h3 { margin:0 0 8px; font-size:14px; color:var(--ink-soft); }
+.history-text-comparison .detail-transcript { max-height:24vh; overflow-wrap:anywhere; }
 .history-empty { flex:1; justify-content:center; padding:0 16px; }
 .history-load-more { display:flex; justify-content:center; padding:20px 0; color:var(--ink-tertiary); }
 .detail-transcript { font-size:16px; line-height:28px; white-space:pre-wrap; user-select:text; overflow:auto; max-height:50vh; }

@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { refinementOutcomeSchema } from './refinement'
 
 export const practiceTargetSchema = z.discriminatedUnion('kind', [
-  z.object({ id: z.string().min(1), kind: z.literal('dictation'), mode: z.literal('voice_transcript') }),
+  z.object({ id: z.string().min(1), kind: z.literal('dictation'), mode: z.literal('voice_transcript'), destination: z.enum(['chat', 'email', 'notes', 'tasks']).optional() }),
   z.object({ id: z.string().min(1), kind: z.literal('translation'), mode: z.literal('translation') }),
   z.object({ id: z.string().min(1), kind: z.literal('rewrite'), mode: z.literal('ask_anything'), selectedText: z.string().max(20000) }),
   z.object({ id: z.string().min(1), kind: z.literal('question'), mode: z.literal('ask_anything'), selectedText: z.string().max(20000) })

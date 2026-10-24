@@ -146,7 +146,13 @@ function DictationSection() {
     <Row label="Dictate" hint="Press to start and stop dictation."><ShortcutEditor settingKey="shortcut" /></Row>
     <Row label="Translate" hint="Press to start and stop translation."><ShortcutEditor settingKey="translationShortcut" /></Row>
     <Row label="Ask anything" hint="Press to start and stop asking anything."><ShortcutEditor settingKey="askAnythingShortcut" /></Row>
+    <DesktopShortcutRow />
   </>
+}
+
+function DesktopShortcutRow() {
+  const { settings } = useAppSettings()
+  return settings.desktopCommandsEnabled ? <Row label="Desktop commands" hint="Use this shortcut while the target app is focused."><ShortcutEditor settingKey="desktopCommandShortcut" /></Row> : null
 }
 
 function AudioSection({ autoOpen }: { autoOpen: boolean }) {
@@ -160,7 +166,26 @@ function AudioSection({ autoOpen }: { autoOpen: boolean }) {
 
 function PersonalizationSection() {
   const t = useSettingsText()
-  return <><div className="settings-personal-card"><div className="settings-personal-heading"><span>{t("Overall personalization:")}</span><strong>--</strong><button className="settings-pill" disabled title="Personalization is not available yet">{t("Enable personalization")}</button></div><div className="settings-personal-empty"><div className="settings-personal-chart" /><span>{t("Not Enough Data")}</span></div></div></>
+  const { settings, patch } = useAppSettings()
+  return <>
+    <Row label="Cleanup level" hint="Choose how much Sayrel changes your dictated wording.">
+      <HubSelect label={t('Cleanup level')} value={settings.polishLevel} options={[
+        { value: 'raw', label: t('Original wording') }, { value: 'light', label: t('Light cleanup') }, { value: 'strong', label: t('Deep cleanup') }
+      ]} onChange={value => { if (value === 'raw' || value === 'light' || value === 'strong') void patch({ polishLevel: value }).catch(() => undefined) }} />
+    </Row>
+    <Row label="Writing style" hint="Style stays within the selected cleanup level.">
+      <HubSelect label={t('Writing style')} value={settings.writingStyle} options={['neutral', 'formal', 'casual', 'concise'].map(value => ({ value, label: t(value) }))}
+        onChange={value => { if (value === 'neutral' || value === 'formal' || value === 'casual' || value === 'concise') void patch({ writingStyle: value }).catch(() => undefined) }} />
+    </Row>
+    <Row label="Automatic punctuation" hint="Allow the writing model to add punctuation. Existing ASR punctuation is kept."><Toggle value={settings.autoPunctuation} onChange={value => { void patch({ autoPunctuation: value }).catch(() => undefined) }} /></Row>
+    <Row label="Automatic language detection" hint="Let the transcription model detect your spoken language."><Toggle value={settings.autoDetectLanguage} onChange={value => { void patch({ autoDetectLanguage: value }).catch(() => undefined) }} /></Row>
+    {!settings.autoDetectLanguage && <Row label="Recognition language" hint="Used when automatic language detection is off."><HubSelect label={t('Recognition language')} value={settings.transcriptionLanguage ?? settings.preferredLanguages[0] ?? 'en'} options={[
+      { value: 'en', label: 'English' }, { value: 'zh', label: '中文' }, { value: 'ja', label: '日本語' }, { value: 'ko', label: '한국어' }, { value: 'es', label: 'Español' }, { value: 'fr', label: 'Français' }, { value: 'de', label: 'Deutsch' }
+    ]} onChange={value => { void patch({ transcriptionLanguage: value }).catch(() => undefined) }} /></Row>}
+    <Row label="Learn words from edits" hint="Read edits to your last dictation locally and suggest words for you to confirm. No input-box text is sent for learning."><Toggle value={settings.dictionaryLearning} onChange={value => { void patch({ dictionaryLearning: value }).catch(() => undefined) }} /></Row>
+    <Row label="Desktop commands" hint="Enable a separate voice mode for opening supported apps and reading selected text. Each action needs confirmation."><Toggle value={settings.desktopCommandsEnabled} onChange={value => { void patch({ desktopCommandsEnabled: value }).catch(() => undefined) }} /></Row>
+    {settings.desktopCommandsEnabled && <Row label="Desktop command shortcut" hint="Say Open Safari, Open Notes, or Read selected text. Use the shortcut while the target app is focused."><ShortcutEditor settingKey="desktopCommandShortcut" /></Row>}
+  </>
 }
 
 function ExternalRow({ label, url }: { label: string; url: string }) {

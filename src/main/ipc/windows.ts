@@ -56,7 +56,8 @@ export function registerWindowHandlers(handle: (c: string, f: Handler) => void):
     return true
   })
 
-  handle('page:close-interactive-card', () => {
+  handle('page:close-interactive-card', async () => {
+    (await import('../services/desktopCommands')).cancelDesktopPlan()
     interactiveCardWindow.closeWindow()
     return true
   })

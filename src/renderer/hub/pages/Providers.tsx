@@ -6,7 +6,7 @@ import { PROVIDER_PRESETS, createProviderProfile } from '../../../shared/provide
 import { azureChatUrl, geminiUrl } from '../../../shared/providerEndpoints'
 import {
   EMPTY_SERVICE_PROVIDERS, providerProfileSchema, providerConfigurationIssue, protocolLabels, refinementProtocols,
-  transcriptionProtocols, type ProviderProfile, type ProviderService, type ServiceProviders
+  supportsDeepSeekThinking, transcriptionProtocols, type ProviderProfile, type ProviderService, type ServiceProviders, type ThinkingMode
 } from '../../../shared/providers'
 import { api, bridge } from '../../shared/utils/bridge'
 import { providerApi } from '../../shared/utils/providerApi'
@@ -20,7 +20,7 @@ import '../../shared/styles/providers.css'
 
 const services: ProviderService[] = ['transcription', 'refinement']
 const serviceLabels = { transcription: "Transcription", refinement: "Text refinement" }
-type Draft = Omit<ProviderProfile, 'protocol'> & { protocol: string }
+type Draft = Omit<ProviderProfile, 'protocol'> & { protocol: string; thinkingMode?: ThinkingMode }
 const messageOf = (error: unknown) => error instanceof Error ? error.message : String(error)
 const presetFor = (profile: Pick<ProviderProfile, 'presetId'>) => PROVIDER_PRESETS.find(preset => preset.id === profile.presetId)
 const canDiscover = (protocol: string) => ['openai-chat', 'openai-responses', 'anthropic', 'gemini', 'ollama'].includes(protocol)
@@ -28,7 +28,7 @@ const canDiscover = (protocol: string) => ['openai-chat', 'openai-responses', 'a
 function blankProfile(service: ProviderService): Draft {
   return { id: `custom-${crypto.randomUUID()}`, presetId: 'custom', name: "Custom provider", service,
     protocol: service === 'transcription' ? 'openai-transcription' : 'openai-chat', enabled: false,
-    endpoint: '', apiKey: '', models: [], appId: '', accessToken: '', resourceId: 'volc.bigasr.sauc.duration', apiVersion: '2024-10-21' }
+    endpoint: '', apiKey: '', models: [], appId: '', accessToken: '', resourceId: 'volc.bigasr.sauc.duration', apiVersion: '2024-10-21', ...(service === 'refinement' ? { thinkingMode: 'auto' } : {}) }
 }
 
 function requestPreview(draft: Draft, model = draft.models[0] || '{model}'): string {
@@ -260,6 +260,7 @@ function ProviderEditor({ initial, saved, selection, onClose, onUpdated }: {
   const readyDraft = providerProfileSchema.safeParse(effectiveDraft)
   const issue = readyDraft.success ? providerConfigurationIssue(readyDraft.data) : "Enter a valid API base URL and model first"
   const selectedModel = draft.preferredModel ?? (selection?.providerId === draft.id && draft.models.includes(selection.model) ? selection.model : draft.models[0])
+  const thinkingSupported = readyDraft.success && supportsDeepSeekThinking(readyDraft.data, selectedModel)
   const preview = requestPreview(draft, selectedModel)
   const secretField = (label: string, field: 'apiKey' | 'accessToken') => <div className="provider-field">
     <div className="provider-field-heading"><label htmlFor={`provider-${draft.id}-${field}`}>{t(label)}</label>{preset?.helpUrl && <button type="button" className="provider-inline-link" onClick={() => void api.page.openUrl(preset.helpUrl)}>{t("Get API key ↗")}</button>}</div>
@@ -278,6 +279,13 @@ function ProviderEditor({ initial, saved, selection, onClose, onUpdated }: {
         </>}
         <label className="provider-field"><span>{local ? t("whisper-cli executable") : t("API base URL")}</span><input className="text-input" name="endpoint" value={draft.endpoint} placeholder={local ? '/usr/local/bin/whisper-cli' : 'https://api.example.com/v1'} autoComplete="off" spellCheck={false} onChange={event => edit({ endpoint: event.target.value })} /></label>
         {draft.protocol === 'azure-openai' && <label className="provider-field"><span>{t("API version")}</span><input className="text-input" name="apiVersion" value={draft.apiVersion} onChange={event => edit({ apiVersion: event.target.value })} /></label>}
+        {thinkingSupported && <div className="provider-field provider-thinking-field">
+          <span id={`provider-${draft.id}-thinking-label`}>{t("Thinking mode")}</span>
+          <div className="provider-thinking-options" role="group" aria-labelledby={`provider-${draft.id}-thinking-label`} aria-describedby={`provider-${draft.id}-thinking-help`}>
+            {([{ value: 'auto', label: "Auto" }, { value: 'enabled', label: "On" }, { value: 'disabled', label: "Off" }] satisfies { value: ThinkingMode; label: string }[]).map(option => <button type="button" key={option.value} aria-pressed={(draft.thinkingMode ?? 'auto') === option.value} disabled={!!busy || !!testing} onClick={() => edit({ thinkingMode: option.value })}>{t(option.label)}</button>)}
+          </div>
+          <p className="provider-help" id={`provider-${draft.id}-thinking-help`}>{t((draft.thinkingMode ?? 'auto') === 'enabled' ? "Thinking is on for this provider. Uses the model’s standard reasoning effort and may take longer or use more tokens." : draft.thinkingMode === 'disabled' ? "Thinking is off for this provider. Usually faster; complex corrections may be less reliable." : "Auto uses low reasoning effort for dictation refinement and the model default for other writing tasks.")}</p>
+        </div>}
         <section className="provider-model-section" aria-label={t("Model list")}><div className="provider-model-heading"><h3>{local ? t("Local model file path") : draft.protocol === 'azure-openai' ? t("Model deployment name") : t("Models")}</h3><div className="provider-model-heading-actions">{canDiscover(draft.protocol) && <button type="button" className="text-button" disabled={!!busy || !!testing} onClick={() => void discover()}>{busy === 'models' ? t("Fetching…") : t("Fetch models")}</button>}{preset?.docsUrl && <button type="button" className="provider-inline-link" onClick={() => void api.page.openUrl(preset.docsUrl)}>{t("Model docs ↗")}</button>}</div></div>
           <div className="provider-model-list" role="radiogroup" aria-label={t("Current model")}>{draft.models.map(model => {
             const current = selectedModel === model
@@ -295,6 +303,7 @@ function ProviderEditor({ initial, saved, selection, onClose, onUpdated }: {
           })}{!draft.models.length && <p className="provider-model-empty">{t("Add a model ID, then select it to use it.")}</p>}</div>
           <div className="provider-add-model"><input className="text-input" name="model" aria-label={local ? t("Model file path") : t("Model ID")} value={modelInput} placeholder={local ? '/path/to/ggml-model.bin' : t("Enter model ID")} onChange={event => { ++version.current; setTesting(null); setModelInput(event.target.value); setDiscard(false) }} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); addModel() } }} /><button type="button" className="secondary-button" onClick={addModel}>{t("Add model")}</button></div>
         </section>
+
       </fieldset>
       <footer className="provider-editor-footer"><div className="provider-footer-leading">{!local && <button type="button" className="secondary-button provider-test-connection" title={issue ? t(issue) : undefined} disabled={!!testing || !!busy} onClick={() => void test(selectedModel)}>{testing ? t("Testing…") : t("Test connection")}</button>}{saved && <button type="button" className="text-button provider-danger" disabled={!!busy} onClick={() => { setDiscard(false); setRemoveConfirm(true) }}>{draft.id === draft.presetId ? t("Remove configuration") : t("Delete provider")}</button>}</div><div className="provider-footer-actions"><button type="button" className="secondary-button" disabled={locked} onClick={close}>{t("Cancel")}</button><button type="submit" className="primary-button" disabled={!!busy}>{busy === 'save' ? t("Saving…") : t("Save configuration")}</button></div></footer>
     </form>

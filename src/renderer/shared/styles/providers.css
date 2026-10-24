@@ -39,6 +39,11 @@
 .provider-field { display:flex!important; flex-direction:column; gap:8px; min-width:0; margin:0!important; font-size:13px!important; line-height:20px; }
 .provider-field>span { font-weight:500; }
 .provider-field .hub-select { width:100%; }
+.provider-thinking-options { display:flex; align-self:flex-start; gap:4px; padding:4px; border:1px solid var(--line-strong); border-radius:var(--radius-control); background:var(--fill-tough); }
+.provider-thinking-options button { min-width:70px; min-height:32px; padding:6px 12px; border-radius:var(--radius-control); font-size:13px; line-height:20px; color:var(--ink-tertiary); }
+.provider-thinking-options button:hover { background:var(--fill-hover); color:var(--ink); }
+.provider-thinking-options button[aria-pressed=true] { background:var(--paper-elevated); color:var(--accent); box-shadow:0 1px 3px #0001; font-weight:550; }
+.provider-thinking-field .provider-help { margin:0; }
 .provider-field-pair { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 .provider-field .text-input,.provider-add-model .text-input { height:40px; font-size:13px; border-radius:var(--radius-control); }
 .provider-secret { position:relative; }

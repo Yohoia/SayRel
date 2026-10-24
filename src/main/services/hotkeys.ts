@@ -72,9 +72,9 @@ export function handleFallbackShortcut(combination: string): void {
 
 export function shortcutBindings(): { binding: ShortcutBinding; mode: Mode }[] {
   const config = settings.get()
-  const modes = { shortcut: 'voice_transcript', translationShortcut: 'translation', askAnythingShortcut: 'ask_anything' } as const
+  const modes = { shortcut: 'voice_transcript', translationShortcut: 'translation', askAnythingShortcut: 'ask_anything', desktopCommandShortcut: 'desktop_command' } as const
   return [
-    ...SHORTCUT_KEYS.flatMap(key => bindingsFor(config, key).map(binding => ({ binding, mode: modes[key] }))),
+    ...SHORTCUT_KEYS.filter(key => key !== 'desktopCommandShortcut' || config.desktopCommandsEnabled).flatMap(key => bindingsFor(config, key).map(binding => ({ binding, mode: modes[key] }))),
     { binding: config.commandShortcut, mode: 'voice_command' }
   ]
 }

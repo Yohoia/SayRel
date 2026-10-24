@@ -42,11 +42,12 @@ export async function captureAudioContext(): Promise<AudioContextSnapshot> {
   try {
     const raw = await context.getFocusedElementInfo()
     if (raw) {
+      const secure = Boolean(raw.isSecure || raw.secureInput || raw.subrole === 'AXSecureTextField')
       snapshot.focusedInput = {
         role: raw.role ?? null,
-        valuePreview: raw.isSecure ? null : raw.valuePreview ?? null,
-        selectedText: raw.isSecure ? null : raw.selectedText ?? null,
-        isSecure: Boolean(raw.isSecure),
+        valuePreview: secure ? null : raw.valuePreview ?? null,
+        selectedText: secure ? null : raw.selectedText ?? null,
+        isSecure: secure,
         bounds: raw.bounds ?? null
       } satisfies FocusedInputInfo
     }

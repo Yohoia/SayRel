@@ -23,7 +23,11 @@ export function referenceContext(context?: AudioContextSnapshot | null): Record<
   const secure = context.focusedInput?.isSecure === true
   const fields = {
     app: context.focusedApp?.appName,
+    bundle_id: context.focusedApp?.bundleId,
     window: context.focusedApp?.windowTitle,
+    web_title: context.focusedApp?.webTitle,
+    web_domain: context.focusedApp?.webDomain,
+    input_role: context.focusedInput?.role,
     selected_text: secure ? null : context.focusedInput?.selectedText,
     input_preview: secure ? null : context.focusedInput?.valuePreview,
     visible_text: secure ? null : context.visibleText,

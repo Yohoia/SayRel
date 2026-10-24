@@ -1,6 +1,15 @@
 import { EMPTY_SERVICE_PROVIDERS, providerConfigurationIssue, serviceProvidersSchema, type ServiceProviders, type ProviderProfile } from './providers'
 import { normalizeShortcut, normalizeTranslationTargets } from './settingsControls'
 import { MODES, type Mode } from './constants'
+import { z } from 'zod'
+
+export const writingPreferencesSchema = z.object({
+  polishLevel: z.enum(['raw', 'light', 'strong']).optional(),
+  writingStyle: z.enum(['neutral', 'formal', 'casual', 'concise']).optional(),
+  dictionaryLearning: z.boolean().optional(), desktopCommandsEnabled: z.boolean().optional(),
+  autoPunctuation: z.boolean().optional(), autoDetectLanguage: z.boolean().optional(),
+  transcriptionLanguage: z.string().trim().regex(/^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/).nullable().optional()
+})
 
 export type ColorMode = 'light' | 'dark' | 'system'
 export type ShortcutStyle = 'hold' | 'toggle'
@@ -37,9 +46,10 @@ export interface Settings {
   pushToTalk: boolean
   shortcut: ShortcutBinding
   commandShortcut: ShortcutBinding
+  desktopCommandShortcut: ShortcutBinding
   askAnythingShortcut: ShortcutBinding
   translationShortcut: ShortcutBinding
-  additionalShortcuts: Partial<Record<'shortcut' | 'translationShortcut' | 'askAnythingShortcut', ShortcutBinding[]>>
+  additionalShortcuts: Partial<Record<'shortcut' | 'translationShortcut' | 'askAnythingShortcut' | 'desktopCommandShortcut', ShortcutBinding[]>>
   translationTargetLanguages: string[]
   translationTargetLanguage: string
   muteWhileDictating: boolean
@@ -56,6 +66,9 @@ export interface Settings {
 
   // Writing style
   writingStyle: 'neutral' | 'formal' | 'casual' | 'concise'
+  polishLevel: 'raw' | 'light' | 'strong'
+  dictionaryLearning: boolean
+  desktopCommandsEnabled: boolean
   customInstructions: string
 
   // Privacy
@@ -99,6 +112,7 @@ export const DEFAULT_SETTINGS: Settings = {
   pushToTalk: true,
   shortcut: { accelerator: 'Fn', style: 'toggle', enabled: true },
   commandShortcut: { accelerator: '', style: 'toggle', enabled: false },
+  desktopCommandShortcut: { accelerator: '', style: 'toggle', enabled: false },
   askAnythingShortcut: { accelerator: 'Fn+Space', style: 'toggle', enabled: true },
   translationShortcut: { accelerator: 'Fn+Shift', style: 'toggle', enabled: true },
   additionalShortcuts: {},
@@ -116,6 +130,9 @@ export const DEFAULT_SETTINGS: Settings = {
   preferredLanguages: [],
 
   writingStyle: 'neutral',
+  polishLevel: 'light',
+  dictionaryLearning: false,
+  desktopCommandsEnabled: false,
   customInstructions: '',
 
   historyEnabled: true,
@@ -176,6 +193,10 @@ export function mergeSettings(persisted: Partial<Settings> | undefined): Setting
   return {
     ...DEFAULT_SETTINGS,
     ...Object.fromEntries(Object.entries(persisted ?? {}).filter(([key]) => key in DEFAULT_SETTINGS)),
+    polishLevel: z.enum(['raw', 'light', 'strong']).catch('light').parse(persisted?.polishLevel),
+    writingStyle: z.enum(['neutral', 'formal', 'casual', 'concise']).catch('neutral').parse(persisted?.writingStyle),
+    dictionaryLearning: persisted?.dictionaryLearning === true,
+    desktopCommandsEnabled: persisted?.desktopCommandsEnabled === true,
     ...normalizeTranslationTargets(
       persisted?.translationTargetLanguages ?? [persisted?.translationTargetLanguage ?? 'en'],
       persisted?.translationTargetLanguage ?? 'en'
@@ -183,6 +204,7 @@ export function mergeSettings(persisted: Partial<Settings> | undefined): Setting
     additionalShortcuts: Object.fromEntries(Object.entries(persisted?.additionalShortcuts ?? {}).map(([key, bindings]) => [key, bindings.map(binding => mergeBinding(binding, undefined))])),
     shortcut: mergeBinding(DEFAULT_SETTINGS.shortcut, persisted?.shortcut),
     commandShortcut: mergeBinding(DEFAULT_SETTINGS.commandShortcut, persisted?.commandShortcut),
+    desktopCommandShortcut: mergeBinding(DEFAULT_SETTINGS.desktopCommandShortcut, persisted?.desktopCommandShortcut),
     askAnythingShortcut: mergeBinding(DEFAULT_SETTINGS.askAnythingShortcut, persisted?.askAnythingShortcut),
     translationShortcut: mergeBinding(DEFAULT_SETTINGS.translationShortcut, persisted?.translationShortcut),
     provider: { ...provider, apiKey: null, transcription: migrateCloudName(provider.transcription), refinement: migrateCloudName(provider.refinement) },
@@ -207,7 +229,7 @@ function migrateProviderSettings(legacy: Settings['provider'] | undefined): Serv
   }
   if (legacy.refinement !== 'mock') {
     const model = legacy.refinementModel || legacy.model || 'gpt-4o-mini'
-    const profile: ProviderProfile = { ...fields, id: 'migrated-refinement', presetId: 'llm-openai_compatible', name: "Text refinement", service: 'refinement', protocol: 'openai-chat', endpoint, apiKey, models: [model] }
+    const profile: ProviderProfile = { ...fields, id: 'migrated-refinement', presetId: 'llm-openai_compatible', name: "Text refinement", service: 'refinement', protocol: 'openai-chat', endpoint, apiKey, models: [model], thinkingMode: 'auto' }
     state.profiles.push(profile)
     // Empty old keys should lead to an unconfigured role, even for compatible endpoints.
     if (apiKey || /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::|\/|$)/.test(endpoint)) state.refinement = { providerId: profile.id, model }

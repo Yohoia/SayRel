@@ -49,6 +49,10 @@ export const api = {
       bridge.invoke('db:history-upsert-client-metadata', id, meta)
   },
   dictionary: {
+    suggestions: () => bridge.invoke('dictionary:suggestions'),
+    acceptSuggestion: (id: string) => bridge.invoke('dictionary:accept-suggestion', id),
+    dismissSuggestion: (id: string) => bridge.invoke('dictionary:dismiss-suggestion', id),
+    undoLearnedWord: (id: string) => bridge.invoke('dictionary:undo-learned-word', id),
     list: () => bridge.invoke('dictionary:list'),
     add: (word: string, opts?: unknown) => bridge.invoke('dictionary:add', word, opts),
     update: (id: string, word: string) => bridge.invoke('dictionary:update', id, word),

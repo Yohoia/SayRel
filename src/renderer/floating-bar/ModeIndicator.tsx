@@ -48,7 +48,7 @@ export function ModeIndicator({ mode, settings, volume, indicatorRef, menuRef }:
   }
 
   if (mode !== 'translation') return <div ref={indicatorRef} className="floating-mode-indicator floating-ask-indicator" role="status">
-    <span>{t('Ask anything')}</span><VolumeGlow volume={volume} />
+    <span>{t(mode === 'desktop_command' ? 'Desktop commands' : 'Ask anything')}</span><VolumeGlow volume={volume} />
   </div>
 
   const targets = [selected, ...settings.translationTargetLanguages.filter(code => code !== selected)].reverse()

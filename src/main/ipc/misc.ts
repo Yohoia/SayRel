@@ -1,4 +1,4 @@
-import { onboardingWindow, openHub } from '../windows'
+import { onboardingWindow, openHub, interactiveCardWindow } from '../windows'
 import { BrowserWindow, globalShortcut, shell, webContents, type WebContents } from 'electron'
 import { practiceTargetSchema, type PracticeResult } from '../../shared/featureTour'
 import { join } from 'node:path'
@@ -11,6 +11,7 @@ import { refreshShortcutRegistrations } from '../services/shortcutRegistration'
 import { listDictionary, addWord, updateWord, removeWord } from '../services/dictionary'
 import { createLogger } from '../lib/logger'
 import type { Handler } from './index'
+import { z } from 'zod'
 
 const log = createLogger('ipc:misc')
 
@@ -59,6 +60,20 @@ export function registerMiscHandlers(handle: (c: string, f: Handler) => void): v
   )
   handle('dictionary:update', (_e, id: string, word: string) => updateWord(id, word))
   handle('dictionary:remove', (_e, id: string) => removeWord(id))
+  handle('dictionary:suggestions', async () => (await import('../services/dictionaryLearning')).listWordSuggestions())
+  handle('dictionary:accept-suggestion', async (_e, id: unknown) => (await import('../services/dictionaryLearning')).acceptWordSuggestion(id))
+  handle('dictionary:dismiss-suggestion', async (_e, id: unknown) => (await import('../services/dictionaryLearning')).dismissWordSuggestion(id))
+  handle('dictionary:undo-learned-word', async (_e, id: unknown) => (await import('../services/dictionaryLearning')).undoLearnedWord(id))
+  handle('desktop-command:approve', async (event, id: unknown) => {
+    if (interactiveCardWindow.getWindow()?.webContents.id !== event.sender.id) throw new Error('Approve this command from its confirmation card')
+    const payload = z.object({ desktopPlan: z.object({ id: z.string().uuid() }) }).passthrough().parse(interactiveCardWindow.getPayload())
+    if (payload.desktopPlan.id !== id) throw new Error('This confirmation card is no longer current')
+    const answer = await (await import('../services/desktopCommands')).approveDesktopPlan(id)
+    const current = z.object({ desktopPlan: z.object({ id: z.string() }) }).passthrough().safeParse(interactiveCardWindow.getPayload())
+    if (current.success && current.data.desktopPlan.id === id) interactiveCardWindow.setPayload({ ...payload, desktopPlan: undefined, answer })
+    return answer
+  })
+  handle('desktop-command:cancel', async () => { (await import('../services/desktopCommands')).cancelDesktopPlan(); return true })
 
   // ---- keyboard ----------------------------------------------------------
   let capture: { ownerId: number; sessionId: number; stop: () => void } | null = null

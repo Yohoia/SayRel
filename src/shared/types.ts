@@ -1,5 +1,7 @@
 import type { Delivery, HistoryStatus, Mode } from './constants'
 import type { RefinementOutcome } from './refinement'
+import type { AsrOutcome } from './asr'
+import type { DesktopPlanView } from './desktopCommands'
 
 export interface FocusedAppInfo {
   appName: string | null
@@ -77,6 +79,7 @@ export interface HistoryRecord {
 
 export interface HistoryListItem {
   id: string
+  transcript?: string
   refinedText: string | null
   status: string | null
   mode: string
@@ -132,6 +135,7 @@ export interface DictionaryEntry {
 }
 
 export interface TranscriptionRequest {
+  allowEmpty?: boolean
   pcm?: Float32Array
   sampleRate?: number
   signal?: AbortSignal
@@ -162,6 +166,9 @@ export interface RefineRequest {
   dictionary?: string[]
   context?: AudioContextSnapshot | null
   instructions?: string | null
+  polishLevel?: 'raw' | 'light' | 'strong'
+  writingStyle?: 'neutral' | 'formal' | 'casual' | 'concise'
+  autoPunctuation?: boolean
 }
 
 export interface RefineResult {
@@ -180,6 +187,8 @@ export interface VoiceFlowResult {
   detectedLanguage: string | null
   error?: string | null
   refinement?: RefinementOutcome
+  asr?: AsrOutcome
+  desktopPlan?: DesktopPlanView
 }
 
 export type PermissionKind = 'microphone' | 'accessibility' | 'screenRecording'

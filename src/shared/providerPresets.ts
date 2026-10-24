@@ -491,5 +491,5 @@ export function createProviderProfile(preset: ProviderPreset, id: string = prese
   }
   const protocol = preset.protocol
   if (protocol !== 'openai-chat' && protocol !== 'openai-responses' && protocol !== 'anthropic' && protocol !== 'gemini' && protocol !== 'ollama' && protocol !== 'azure-openai') throw new Error('Invalid refinement preset')
-  return { ...common, service: 'refinement', protocol }
+  return { ...common, service: 'refinement', protocol, thinkingMode: 'auto' }
 }

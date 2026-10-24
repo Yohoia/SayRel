@@ -12,7 +12,12 @@ import { IPC } from '../../shared/ipc'
 import * as history from './history'
 import { listDictionary } from './dictionary'
 import { insertText } from './insertion'
-import { transcribe } from './transcription'
+import { transcribe, recognitionLanguage } from './transcription'
+import { startLiveTranscription, supportsLiveTranscription } from './providers/realtime'
+import type { LiveTranscriptionSession } from './providers/realtimeTransport'
+import type { AsrOutcome } from '../../shared/asr'
+import { REFINEMENT_PROMPT_VERSION } from './providers/refinementPrompt'
+import { cancelDesktopPlan, prepareDesktopPlan } from './desktopCommands'
 import { createProviders } from './providers'
 import { runVoiceAction } from './voiceActions'
 import { settings } from '../lib/settings'
@@ -48,15 +53,24 @@ type Session = {
   stopped: boolean; stoppedAt?: number; resolveStop?: () => void; stopTimer?: NodeJS.Timeout
   historyRetry?: boolean
   refinementRetry?: boolean
+  historyRefinement?: boolean
   completion?: Promise<void>; historyWritten: boolean
   practice: OwnedPracticeTarget | null
+  live?: LiveTranscriptionSession
+  liveFailure?: string
+  firstPartialAt?: number
+  connectionReadyAt?: number
+  asrFinalAt?: number
+  asr?: AsrOutcome
+  asrRequestId: string
+  dictionary: string[]
 }
 type ShortcutGesture =
   | { kind: 'pending' | 'ignored' | 'long_pressing'; id: symbol }
   | { kind: 'recording'; id: symbol; sessionId: string }
 type ProcessingContext = { mode: Mode; durationMs: number; context: AudioContextSnapshot | null }
 type AudioInput = ProcessingContext & { kind: 'audio'; pcm: Float32Array; audioPath?: string }
-type TranscriptInput = ProcessingContext & { kind: 'transcript'; result: TranscriptionResult }
+type TranscriptInput = ProcessingContext & { kind: 'transcript'; result: TranscriptionResult; asr?: AsrOutcome }
 type ProcessingInput = AudioInput | TranscriptInput
 
 /** Main owns session identity; renderer owns the microphone and acknowledges its drain. */
@@ -68,6 +82,7 @@ export class RecordingMachine extends EventEmitter {
   private session: Session | null = null
   private shortcut: ShortcutGesture | null = null
   private disabled = false
+  private stopLearningTracking: (() => void) | null = null
   private practiceScope: { kind: 'closed' } | { kind: 'blocked'; ownerId: number } | ({ kind: 'ready' } & OwnedPracticeTarget) = { kind: 'closed' }
 
   blockPractice(ownerId: number): void {
@@ -117,6 +132,7 @@ export class RecordingMachine extends EventEmitter {
   markStreaming(sessionId: string): void {
     if (sessionId !== this.session?.id || this.state.phase !== 'starting') return
     this.session.startedAt = Date.now()
+    this.beginAsr(this.session)
     this.transition('recording', { recorderState: { isStartingMicrophone: false } })
   }
   pushPcm(chunk: Float32Array, sessionId: string): void {
@@ -124,11 +140,35 @@ export class RecordingMachine extends EventEmitter {
     if (!session || sessionId !== session.id || session.stopped) return
     if (!['starting', 'recording', 'finishing'].includes(this.state.phase)) return
     session.frames.push(chunk)
+    session.live?.pushPcm(chunk)
+  }
+  private beginAsr(session: Session): void {
+    const selected = selectedProvider(session.config.serviceProviders, 'transcription')
+    if (!selected || !supportsLiveTranscription(selected.profile, selected.model)) return
+    try {
+      session.live = startLiveTranscription(selected.profile, selected.model, {
+        sampleRate: AUDIO.SAMPLE_RATE, durationMs: 0, mode: session.mode,
+        language: recognitionLanguage(session.config), languages: session.config.preferredLanguages,
+        dictionary: session.dictionary, signal: session.controller.signal
+      }, text => {
+        if (!this.active(session) || session.stopped) return
+        if (text.trim()) session.firstPartialAt ??= Date.now()
+        broadcast('recording-machine:partial', { sessionId: session.id, requestId: session.asrRequestId, text })
+      }, () => { if (this.active(session)) session.connectionReadyAt ??= Date.now() })
+      for (const chunk of session.frames) session.live.pushPcm(chunk)
+      void session.live.result.catch(() => {
+        if (this.active(session)) log.warn('live ASR unavailable; retaining audio for batch fallback', { sessionId: session.id })
+      })
+      void session.live.result.then(() => { session.asrFinalAt = Date.now() }, () => {})
+    } catch {
+      session.liveFailure = 'Live connection could not be started'
+    }
   }
   markStopped(sessionId: string): void {
     if (!this.session || sessionId !== this.session.id) return
     this.session.stopped = true
     this.session.stoppedAt = Date.now()
+    void this.session.live?.finish()
     this.session.resolveStop?.()
   }
   reportError(sessionId: string, message: string): void {
@@ -229,7 +269,7 @@ export class RecordingMachine extends EventEmitter {
     }
   }
   private newSession(mode: Mode): Session {
-    return { id: randomUUID(), startedAt: Date.now(), mode, frames: [],
+    return { id: randomUUID(), asrRequestId: randomUUID(), dictionary: listDictionary().map(entry => entry.word), startedAt: Date.now(), mode, frames: [],
       context: Promise.resolve(null), config: structuredClone(settings.get()),
       controller: new AbortController(), stopped: false, historyWritten: false, practice: this.practiceScope.kind === 'ready' ? { ownerId: this.practiceScope.ownerId, target: structuredClone(this.practiceScope.target) } : null }
   }
@@ -243,10 +283,16 @@ export class RecordingMachine extends EventEmitter {
   async start(mode?: Mode, { handsFree = false }: { handsFree?: boolean } = {}): Promise<void> {
     if (this.disabled || this.session || this.state.phase === 'long_pressing') return
     const requestedMode = mode ?? settings.get().dictationMode
+    if (requestedMode === 'desktop_command' && !settings.get().desktopCommandsEnabled) {
+      this.showSetupIssue(requestedMode, { kind: 'processing', message: 'Enable Desktop commands in Personalization first.', canRetry: false })
+      return
+    }
+    cancelDesktopPlan()
     if (this.practiceScope.kind === 'blocked' || this.practiceScope.kind === 'ready' && requestedMode !== this.practiceScope.target.mode) return
     const requireRefinement = this.practiceScope.kind === 'ready' && this.practiceScope.target.kind === 'dictation'
     const issue = recordingSetupIssue(settings.get(), requestedMode, { requireRefinement })
     if (issue) { this.showSetupIssue(requestedMode, issue); return }
+    this.stopLearningTracking?.()
     this.shortcut = null
     const session = this.newSession(requestedMode)
     this.session = session
@@ -257,8 +303,13 @@ export class RecordingMachine extends EventEmitter {
       session.config.historyEnabled = false
       session.config.saveAudio = false
       const target = session.practice.target
-      session.context = Promise.resolve({ focusedApp: null, visibleText: null,
-        focusedInput: { role: target.kind === 'rewrite' ? 'AXTextArea' : 'AXStaticText', valuePreview: 'selectedText' in target ? target.selectedText : '', selectedText: 'selectedText' in target ? target.selectedText : '', isSecure: false, bounds: null } })
+      const destination = target.kind === 'dictation' ? target.destination : undefined
+      const destinationNames = { chat: 'Chat', email: 'Email', notes: 'Notes', tasks: 'Tasks' }
+      session.context = Promise.resolve({
+        focusedApp: destination ? { appName: destinationNames[destination], bundleId: null, windowTitle: null, webTitle: null, webDomain: null, webUrl: null, capturedAt: Date.now() } : null,
+        visibleText: null,
+        focusedInput: { role: target.kind === 'rewrite' || target.kind === 'dictation' ? 'AXTextArea' : 'AXStaticText', valuePreview: 'selectedText' in target ? target.selectedText : null, selectedText: 'selectedText' in target ? target.selectedText : null, isSecure: false, bounds: null }
+      })
     } else {
       session.context = captureAudioContext().catch(err => { log.warn('context capture failed', err); return null })
     }
@@ -309,7 +360,7 @@ export class RecordingMachine extends EventEmitter {
     const fallback = result.refinement?.kind === 'fallback'
     this.refinementRetry = fallback ? { id: session.id, config: structuredClone(session.config), input: {
       kind: 'transcript', mode: input.mode, durationMs: input.durationMs, context: input.context,
-      result: { text: result.transcript, detectedLanguage: result.detectedLanguage, provider: 'saved-transcript' }
+      result: { text: result.transcript, detectedLanguage: result.detectedLanguage, provider: 'saved-transcript' }, asr: result.asr
     } } : null
     this.transition('idle', { sessionId: null, recorderState: { isStartingMicrophone: false }, handsFree: false, recorderTimeoutState: null,
       error: null, issue: fallback ? { kind: 'refinement', message: 'Text refinement failed. Your original transcript is available. Retry refinement to open the revised text in a card.', canRetry: true } : null })
@@ -322,7 +373,8 @@ export class RecordingMachine extends EventEmitter {
       interactiveCardWindow.setPayload({ id: result.id, mode: result.mode, title: result.transcript,
         userPrompt: result.transcript,
         question: result.transcript, selectedText: input.context?.focusedInput?.selectedText ?? null,
-        answer: result.refined, createdAt: Date.now() })
+        answer: result.refined, refinement: result.mode === 'voice_transcript' || result.mode === 'voice_command' ? result.refinement : undefined,
+        desktopPlan: result.desktopPlan, createdAt: Date.now() })
       interactiveCardWindow.createWindow()
       interactiveCardWindow.show()
     }
@@ -335,6 +387,7 @@ export class RecordingMachine extends EventEmitter {
     this.stopCountdown()
     if (session) {
       session.controller.abort()
+      session.live?.abort()
       clearTimeout(session.stopTimer)
       session.resolveStop?.()
       session.frames = []
@@ -342,6 +395,8 @@ export class RecordingMachine extends EventEmitter {
     return session
   }
   cancel(): void {
+    cancelDesktopPlan()
+    this.stopLearningTracking?.()
     this.shortcut = null
     const session = this.releaseSession()
     this.retryInput = null
@@ -356,8 +411,17 @@ export class RecordingMachine extends EventEmitter {
     const issue: RecordingIssue = this.state.phase === 'starting' || this.state.phase === 'recording'
       ? { kind: 'microphone', message }
       : { kind: 'processing', message, canRetry: this.retryInput !== null || this.refinementRetry !== null }
+    if (!session.asr) {
+      const selected = selectedProvider(session.config.serviceProviders, 'transcription')
+      session.asr = { kind: 'failed', sessionId: session.id, requestId: session.asrRequestId,
+        providerId: selected?.profile.id ?? 'unconfigured', model: selected?.model ?? '',
+        path: session.liveFailure ? 'batch-fallback' : session.live ? 'live' : 'batch',
+        startedAt: session.startedAt, completedAt: Date.now(), stoppedAt: session.stoppedAt,
+        reason: /timed?\s*out|timeout/i.test(message) ? 'timeout' : /connection|network|connect/i.test(message) ? 'network' : 'provider', message }
+    }
     this.releaseSession()
-    if (session.historyWritten) history.upsertHistory({ id: session.id, status: HISTORY_STATUS.FAILED, debugInfo: message })
+    if (session.historyWritten) history.upsertHistory({ id: session.id, status: HISTORY_STATUS.FAILED, debugInfo: message,
+      ...(session.asr.kind === 'failed' ? { modeMeta: JSON.stringify({ transcript: '', asr: session.asr }) } : {}) })
     this.transition('error', { sessionId: null, error: message, issue, recorderState: { isStartingMicrophone: false }, handsFree: false, recorderTimeoutState: null })
     broadcast(IPC.PAGE_FLOATING_BAR_CLICK, 'error', message)
     broadcast('history:changed')
@@ -370,6 +434,8 @@ export class RecordingMachine extends EventEmitter {
       const current = settings.get()
       session.id = retained.id
       session.config = { ...structuredClone(retained.config), provider: structuredClone(current.provider), serviceProviders: structuredClone(current.serviceProviders),
+        polishLevel: current.polishLevel, writingStyle: current.writingStyle, autoPunctuation: current.autoPunctuation,
+        customInstructions: current.customInstructions, preferredLanguages: structuredClone(current.preferredLanguages),
         sendFocusedAppContext: current.sendFocusedAppContext, sendScreenContext: current.sendScreenContext }
       session.refinementRetry = true
       this.session = session
@@ -391,17 +457,24 @@ export class RecordingMachine extends EventEmitter {
     try { await this.complete(session, { ...retained, context: retryContext(retained.context, current) }) }
     catch (err) { if (this.active(session)) this.fail(session, err) }
   }
-  async retryHistory(id: string): Promise<void> {
+  async retryHistory(id: string, action: 'retry' | 'refine' = 'retry'): Promise<void> {
     if (this.practiceScope.kind !== 'closed') throw new Error('Exit the practice before retrying history')
     if (this.session || this.disabled) throw new Error("Wait for the current recording to finish processing")
     const row = history.getHistory(id)
     if (!row) throw new Error('This recording is no longer available')
     const metadata = readVoiceMetadata(row.modeMeta?.toString() ?? null)
-    const refinementOnly = metadata?.refinement?.kind === 'fallback' && !!metadata.transcript
+    if (action === 'refine') {
+      if (row.mode !== 'voice_transcript') throw new Error('Only saved dictations can be refined again')
+      if (!metadata?.transcript.trim()) throw new Error('No original transcript is available for this dictation')
+      const selected = selectedProvider(settings.get().serviceProviders, 'refinement')
+      if (!selected || providerConfigurationIssue(selected.profile)) throw new Error('Choose a default writing model in Providers before retrying refinement.')
+    }
+    const refinementOnly = (action === 'refine' || metadata?.refinement?.kind === 'fallback') && !!metadata?.transcript
     if (!refinementOnly && !row.audioLocalPath) throw new Error("No audio was saved for this recording, so it cannot be retried")
     const session = this.newSession(row.mode as Mode)
     session.id = id
     session.historyRetry = true
+    session.historyRefinement = action === 'refine'
     this.retryInput = null
     this.refinementRetry = null
     this.session = session
@@ -411,7 +484,7 @@ export class RecordingMachine extends EventEmitter {
     context = retryContext(context, session.config)
     const input: ProcessingInput = refinementOnly ? {
       kind: 'transcript', mode: session.mode, durationMs: row.duration ?? 0, context,
-      result: { text: metadata.transcript, detectedLanguage: metadata.detectedLanguage ?? null, provider: 'saved-transcript' }
+      result: { text: metadata.transcript, detectedLanguage: metadata.detectedLanguage ?? null, provider: 'saved-transcript' }, asr: metadata.asr
     } : { kind: 'audio', pcm: new Float32Array(), mode: session.mode, durationMs: row.duration ?? 0, context, audioPath: row.audioLocalPath ?? undefined }
     try { await this.complete(session, input) }
     catch (err) {
@@ -421,17 +494,19 @@ export class RecordingMachine extends EventEmitter {
   }
   private async process(session: Session, input: ProcessingInput): Promise<VoiceFlowResult> {
     const config = session.config
-    const dictionary = listDictionary().map(entry => entry.word)
+    const dictionary = session.dictionary
     this.requireActive(session)
-    if (config.historyEnabled || session.historyRetry) {
+    if ((config.historyEnabled || session.historyRetry) && !session.historyRefinement) {
       history.upsertHistory({ id: session.id, status: HISTORY_STATUS.PROCESSING, mode: input.mode,
         duration: input.durationMs, audioContext: input.context ? JSON.stringify(input.context) : null,
         micDevice: config.micDevice, appVersion: process.env.npm_package_version ?? '1.0.0' })
       session.historyWritten = true
     }
     const result = input.kind === 'transcript' ? input.result : (await transcribe({ pcm: input.pcm, audioPath: input.audioPath,
-      durationMs: input.durationMs, language: config.transcriptionLanguage, dictionary,
+      durationMs: input.durationMs, language: recognitionLanguage(config), dictionary,
       context: input.context, mode: input.mode, config, signal: session.controller.signal,
+      liveResult: session.live?.result,
+      onLiveFallback: () => { session.liveFailure = 'Live transcription failed; retried with the complete recording' },
       onAudioEncoded: async ogg => {
         if (!config.historyEnabled || !config.saveAudio || session.historyRetry) return
         this.requireActive(session)
@@ -444,8 +519,28 @@ export class RecordingMachine extends EventEmitter {
         history.upsertHistory({ id: session.id, audioLocalPath: file })
       } })).result
     this.requireActive(session)
+    const selectedAsr = selectedProvider(config.serviceProviders, 'transcription')
+    const identity = { sessionId: session.id, requestId: session.asrRequestId,
+      providerId: selectedAsr?.profile.id ?? result.provider, model: selectedAsr?.model ?? 'saved-transcript',
+      path: input.kind === 'transcript' ? 'saved' as const : session.liveFailure ? 'batch-fallback' as const : session.live ? 'live' as const : 'batch' as const,
+      startedAt: session.startedAt, completedAt: session.live && !session.liveFailure ? session.asrFinalAt ?? Date.now() : Date.now(), stoppedAt: session.stoppedAt,
+      connectionReadyAt: session.connectionReadyAt, firstPartialAt: session.firstPartialAt, streamFailure: session.liveFailure }
+    session.asr = input.kind === 'transcript' && input.asr ? input.asr : result.text.trim() ? { ...identity, kind: 'final', asrText: result.text,
+      detectedLanguage: result.detectedLanguage, confidence: result.confidence } : { ...identity, kind: 'empty', asrText: '' }
     if (session.historyWritten && input.kind === 'audio') history.upsertHistory({ id: session.id, refinedText: result.text,
-      modeMeta: JSON.stringify({ transcript: result.text, detectedLanguage: result.detectedLanguage }) })
+      modeMeta: JSON.stringify({ transcript: result.text, detectedLanguage: result.detectedLanguage, asr: session.asr }) })
+    if (session.asr.kind === 'empty') throw new Error('No speech was detected. Check the microphone and try again.')
+    if (input.mode === 'desktop_command') {
+      if (session.asr.kind !== 'final' || session.historyRetry || session.refinementRetry) throw new Error('Record a new complete desktop command before executing an action')
+      const command = prepareDesktopPlan(session.asr, input.context, config.historyEnabled ? session.id : null)
+      if (session.historyWritten) history.upsertHistory({ id: session.id, status: HISTORY_STATUS.COMPLETED, refinedText: command.answer,
+        modeMeta: JSON.stringify({ transcript: result.text, asr: session.asr, desktopCommand: {
+          status: command.plan ? 'awaiting_confirmation' : 'unsupported', plan: command.plan,
+          events: [{ status: command.plan ? 'awaiting_confirmation' : 'unsupported', at: Date.now() }]
+        } }) })
+      return { id: session.id, transcript: result.text, refined: command.answer, delivery: 'card', mode: input.mode,
+        durationMs: input.durationMs, detectedLanguage: result.detectedLanguage, asr: session.asr, desktopPlan: command.plan }
+    }
     let refined = result.text
     let refinement: RefinementOutcome = { kind: 'skipped' }
     if (result.text && (input.mode === 'ask_anything' || input.mode === 'translation')) {
@@ -456,32 +551,56 @@ export class RecordingMachine extends EventEmitter {
       if (input.kind === 'transcript' && (!selection || providerConfigurationIssue(selection.profile))) throw new Error('Choose a default writing model in Providers before retrying refinement.')
       if (selection) {
         const startedAt = Date.now()
-        const details = { sessionId: session.id, mode: input.mode, providerId: selection.profile.id, model: selection.model }
+        const writing = { providerId: selection.profile.id, model: selection.model, promptVersion: REFINEMENT_PROMPT_VERSION,
+          polishLevel: config.polishLevel, writingStyle: config.writingStyle, autoPunctuation: config.autoPunctuation }
+        const details = { sessionId: session.id, mode: input.mode, ...writing }
         log.info('refinement started', { ...details, transcriptLength: result.text.length })
         try {
           refined = (await createProviders(config.provider, config.serviceProviders).refinement.refine({ transcript: result.text, mode: input.mode,
-            language: result.detectedLanguage, languages: config.preferredLanguages, dictionary, context: input.context, instructions: config.customInstructions || undefined, signal: session.controller.signal })).text
-          refinement = { kind: 'completed' }
+            language: result.detectedLanguage, languages: config.preferredLanguages, dictionary, context: input.context, instructions: config.customInstructions || undefined,
+            polishLevel: config.polishLevel, writingStyle: config.writingStyle, autoPunctuation: config.autoPunctuation, signal: session.controller.signal })).text
+          refinement = { kind: 'completed', ...writing, changed: refined !== result.text, durationMs: Date.now() - startedAt }
           log.info('refinement completed', { ...details, durationMs: Date.now() - startedAt, changed: refined !== result.text, outputLength: refined.length })
         } catch (err) {
           this.requireActive(session)
-          refinement = { kind: 'fallback', message: err instanceof Error ? err.message : 'Text refinement failed. Please try again.' }
+          if (session.historyRefinement) throw err
+          refinement = { kind: 'fallback', ...writing, message: err instanceof Error ? err.message : 'Text refinement failed. Please try again.' }
           log.warn('refinement failed, using raw transcript', { ...details, durationMs: Date.now() - startedAt, message: refinement.message })
         }
       } else {
+        refinement = { kind: 'skipped', reason: 'no-default-provider' }
         log.info('refinement skipped', { sessionId: session.id, mode: input.mode, reason: 'no-default-provider', credentialsUnavailable: config.providerCredentialsUnavailable })
       }
     }
     this.requireActive(session)
     let delivery: VoiceFlowResult['delivery'] = 'card'
+    let insertionMs = 0
     if (!session.practice && input.mode !== 'ask_anything' && !session.historyRetry && !session.refinementRetry) {
+      const learning = config.dictionaryLearning && input.mode === 'voice_transcript' && session.asr.kind === 'final'
+        ? await import('./dictionaryLearning') : null
+      this.requireActive(session)
+      const before = learning?.captureLearningSnapshot()
+      if (learning) this.stopLearningTracking = learning.stopDictionaryTracking
+      const insertionStartedAt = Date.now()
       const outcome = await insertText(refined, { addTrailingSpace: config.addTrailingSpace, isCancelled: () => !this.active(session) })
+      insertionMs = Date.now() - insertionStartedAt
       delivery = outcome.ok ? 'insert' : 'clipboard'
+      if (outcome.ok && before && learning && this.active(session)) learning.trackInsertedDictation({
+        requestId: session.asrRequestId, historyId: config.historyEnabled ? session.id : null, before,
+        inserted: refined, asrText: result.text
+      })
     }
     this.requireActive(session)
+    if (session.historyRefinement && !history.getHistory(session.id)) throw new Error('This recording is no longer available')
     if (config.historyEnabled || session.historyRetry) history.upsertHistory({ id: session.id, status: HISTORY_STATUS.COMPLETED, refinedText: refined,
-      modeMeta: JSON.stringify({ transcript: result.text, detectedLanguage: result.detectedLanguage, refinement, aiResult: { text: refined, delivery } }) })
-    return { id: session.id, transcript: result.text, refined, delivery, mode: input.mode, durationMs: input.durationMs, detectedLanguage: result.detectedLanguage, refinement }
+      modeMeta: JSON.stringify({ transcript: result.text, detectedLanguage: result.detectedLanguage, asr: session.asr, refinement,
+        deliveryTiming: { insertionMs, completedAt: Date.now() }, aiResult: { text: refined, delivery } }) })
+    log.info('voice flow completed', { sessionId: session.id, requestId: session.asrRequestId, path: session.asr.path,
+      firstPartialMs: session.firstPartialAt ? session.firstPartialAt - session.startedAt : null,
+      connectionMs: session.connectionReadyAt ? session.connectionReadyAt - session.startedAt : null, insertionMs,
+      stopToFinalMs: session.stoppedAt ? session.asr.completedAt - session.stoppedAt : null,
+      stopToDeliveryMs: session.stoppedAt ? Date.now() - session.stoppedAt : null })
+    return { id: session.id, transcript: result.text, refined, delivery, mode: input.mode, durationMs: input.durationMs, detectedLanguage: result.detectedLanguage, refinement, asr: session.asr }
   }
   private stopCountdown(): void { if (this.countdown) clearInterval(this.countdown); this.countdown = null }
 }

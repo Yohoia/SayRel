@@ -5,6 +5,7 @@ import { providerActionSchema, updateProviderState } from '../src/shared/provide
 import { buildDictationUsage } from '../src/shared/usage'
 
 const params = new URLSearchParams(location.search)
+let wordSuggestions = params.has('dictation-features') ? [{ id: '11111111-1111-4111-8111-111111111111', requestId: 'fixture-request', word: 'Sayrel Team', createdAt: Date.now() }] : []
 const empty = params.get('state') === 'empty'
 const listeners = new Map<string, Set<(...args: any[]) => void>>()
 const emit = (channel: string, ...args: any[]) => listeners.get(channel)?.forEach((cb) => cb(...args))
@@ -20,6 +21,13 @@ let history = empty ? [] : [
   { id: 'history-2', refinedText: 'Thanks for sending this over. I have reviewed the proposal and would love to discuss the next steps tomorrow.', mode: 'voice_transcript', focusedAppName: 'Gmail', status: 'completed', createdAt: '2026-10-19T08:30:00Z', duration: 34000 },
   { id: 'history-3', refinedText: 'Break the work into three steps: explore the reference, implement the interface, and review the result.', mode: 'ask_anything', focusedAppName: 'ChatGPT', status: 'completed', createdAt: '2026-10-18T08:10:00Z', duration: 22000 }
 ]
+if (params.has('refinement-review')) {
+  history = history.map((item, index) => ({ ...item, hasAudio: false,
+    transcript: index === 0 ? 'Um, tomorrow at five. No, make that six.' : 'Already clear writing.',
+    refinement: index === 0 ? { kind: 'completed', changed: false, polishLevel: 'light', model: 'fixture-model', promptVersion: 'fixture-v1' }
+      : { kind: 'skipped', reason: 'no-default-provider' }
+  }))
+}
 // Synthetic microphone for UI review only. No OS permission or physical input.
 const fixtureMedia = new EventTarget()
 const fixtureDevices = [
@@ -76,7 +84,17 @@ const bridge = {
     if (channel === 'db:history-list' || channel === 'db:history-latest') {
       const query = args[0] ?? {}; const items = history.filter((item) => (!query.mode || (query.mode === 'dictations' ? item.mode !== 'ask_anything' : item.mode === query.mode)) && (!query.search || item.refinedText.toLowerCase().includes(query.search.toLowerCase())))
       const offset = query.offset ?? 0
-      return { items: items.slice(offset, offset + (query.limit ?? 50)), total: items.length, nextCursor: null }
+      return { items: structuredClone(items.slice(offset, offset + (query.limit ?? 50))), total: items.length, nextCursor: null }
+    }
+    if (channel === 'db:history-refine' && params.has('refinement-review')) {
+      if (params.get('fail') === 'refinement') throw new Error('New writing request failed. Previous result kept.')
+      const item = history.find(entry => entry.id === args[0])
+      if (!item) throw new Error('This recording is no longer available')
+      history = history.map(entry => entry.id !== item.id ? entry : { ...entry, refinedText: 'Tomorrow at six.',
+        refinement: { kind: 'completed', changed: true, polishLevel: settings.polishLevel, writingStyle: settings.writingStyle,
+          model: 'fixture-writing-model', promptVersion: 'fixture-v2' } })
+      emit('history:changed')
+      return structuredClone(history.find(entry => entry.id === item.id))
     }
     if (channel === 'db:history-usage') {
       return buildDictationUsage(history.filter(item => item.status === 'completed' && item.mode !== 'ask_anything' && new Date(item.createdAt).getTime() <= Date.now()))
@@ -108,7 +126,17 @@ const bridge = {
       return before - history.length
     }
     if (channel === 'db:history-clear') { history = []; return true }
-    if (channel === 'dictionary:list') return words
+    if (channel === 'dictionary:list') return structuredClone(words)
+    if (channel === 'dictionary:suggestions') return settings.dictionaryLearning ? wordSuggestions : []
+    if (channel === 'dictionary:accept-suggestion') {
+      const suggestion = wordSuggestions.find(item => item.id === args[0])
+      if (!suggestion) throw new Error('This word suggestion has expired')
+      const entry = { id: crypto.randomUUID(), word: suggestion.word, source: 'auto', language: null, createdAt: new Date().toISOString() }
+      words.push(entry); wordSuggestions = wordSuggestions.filter(item => item.id !== args[0]); emit('dictionary:suggestions-changed')
+      return { entry, canUndo: true }
+    }
+    if (channel === 'dictionary:dismiss-suggestion') { wordSuggestions = wordSuggestions.filter(item => item.id !== args[0]); emit('dictionary:suggestions-changed'); return true }
+    if (channel === 'dictionary:undo-learned-word') { words = words.filter((item: any) => item.id !== args[0]); emit('dictionary:suggestions-changed'); return true }
     if (channel === 'dictionary:add') { if (params.get('fail') === 'save') throw new Error('UI fixture save failure'); words.push({ id: crypto.randomUUID(), word: args[0], source: 'manual', createdAt: new Date().toISOString() }); localStorage.setItem('sayrel-ui-words', JSON.stringify(words)); return words.at(-1) }
     if (channel === 'dictionary:remove') { await new Promise(resolve => setTimeout(resolve, 180)); if (params.get('fail') === 'delete') throw new Error("Could not delete"); words = words.filter((item: any) => item.id !== args[0]); localStorage.setItem('sayrel-ui-words', JSON.stringify(words)); return true }
     if (channel === 'dictionary:update') {
@@ -131,7 +159,10 @@ const bridge = {
     if (channel === 'keyboard:begin-shortcut-capture') return { native: false, sessionId: ++shortcutCaptureSessionId }
     if (channel === 'audio:get-devices-async') return [{ deviceId: 'default', label: 'MacBook Pro Microphone', isDefault: true }]
     if (channel === 'troubleshooting:get-system-info') return { appVersion: '1.0.0', platform: 'darwin', arch: 'arm64' }
-    if (channel === 'page:get-interactive-card-payload') return { title:'Help me organize this idea', answer:'Clear writing starts with one simple sentence.\n\nSpeak naturally and let the words take shape as you think.', createdAt:Date.now() }
+    if (channel === 'page:get-interactive-card-payload') return params.has('desktop-command')
+      ? { title: 'Open Safari', answer: 'Open Safari', desktopPlan: { id: '22222222-2222-4222-8222-222222222222', summary: 'Open Safari', expiresAt: Date.now() + 120000 } }
+      : { title:'Help me organize this idea', answer:'Clear writing starts with one simple sentence.\n\nSpeak naturally and let the words take shape as you think.', createdAt:Date.now() }
+    if (channel === 'desktop-command:approve') return 'Opened Safari (offline fixture)'
     if (channel === 'page:is-onboarding-window-visible') return location.pathname.endsWith('/onboarding.html')
     if (channel === 'updater:check-for-update') { await new Promise(resolve => setTimeout(resolve, 700)); return { skipped: 'dev-build' } }
     if (channel === 'clipboard:write-text' && params.get('fail') === 'clipboard') throw new Error('Could not copy')

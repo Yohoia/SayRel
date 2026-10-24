@@ -48,6 +48,7 @@ function readString(ptr: unknown): string | null {
 }
 
 const freeString = fn(libs.util ?? libs.input, 'freeString', 'void', ['void *'])
+const inputStateString = fn(libs.input, 'getCurrentInputState', 'void *', ['int'])
 
 // ---------------------------------------------------------------- input
 
@@ -59,9 +60,12 @@ export const input = {
     | null,
   deleteBackward: fn(libs.input, 'deleteBackward', 'int', ['int']) as ((n: number) => number) | null,
   getSelectedText: fn(libs.input, 'getSelectedText', 'str', ['int']) as ((t: number) => string) | null,
-  getCurrentInputState: fn(libs.input, 'getCurrentInputState', 'str', ['int']) as
-    | ((t: number) => string)
-    | null,
+  getCurrentInputState: inputStateString ? (timeout: number): string => {
+    const pointer = inputStateString(timeout)
+    if (!pointer) return ''
+    try { return readString(pointer) ?? '' }
+    finally { freeString?.(pointer) }
+  } : null,
   checkAccessibilityPermission: fn(libs.input, 'checkAccessibilityPermission', 'int', ['int']) as
     | ((prompt: number) => number)
     | null

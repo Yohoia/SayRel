@@ -135,6 +135,7 @@ function toListItem(row: any): HistoryListItem {
   return {
     id: row.id,
     refinedText: row.refinedText,
+    ...(metadata ? { transcript: metadata.transcript } : {}),
     status: row.status,
     mode: row.mode ?? 'voice_transcript',
     duration: row.duration,

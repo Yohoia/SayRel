@@ -1,9 +1,9 @@
 import type { Settings, ShortcutBinding } from './settings'
 
-export const SHORTCUT_KEYS = ['shortcut', 'translationShortcut', 'askAnythingShortcut'] as const
+export const SHORTCUT_KEYS = ['shortcut', 'translationShortcut', 'askAnythingShortcut', 'desktopCommandShortcut'] as const
 export type ShortcutKey = typeof SHORTCUT_KEYS[number]
 export function bindingsFor(settings: Settings, key: ShortcutKey): ShortcutBinding[] {
-  return [settings[key], ...(settings.additionalShortcuts?.[key] ?? [])].filter(binding => binding.enabled && binding.accelerator)
+  return [settings[key], ...(settings.additionalShortcuts?.[key] ?? [])].filter(binding => binding?.enabled && binding.accelerator)
 }
 export function normalizeShortcut(accelerator: string): string {
   return [...new Set(accelerator.split('+').map(key => /^(?:KeyCode(?:179|63)|Globe)$/i.test(key) ? 'Fn' : key))].join('+')

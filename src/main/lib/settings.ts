@@ -167,6 +167,7 @@ export const settings = {
       ...current, ...partial, providerCredentialsUnavailable: current.providerCredentialsUnavailable,
       shortcut: mergeNested(current.shortcut, partial.shortcut),
       commandShortcut: mergeNested(current.commandShortcut, partial.commandShortcut),
+      desktopCommandShortcut: mergeNested(current.desktopCommandShortcut, partial.desktopCommandShortcut),
       askAnythingShortcut: mergeNested(current.askAnythingShortcut, partial.askAnythingShortcut),
       translationShortcut: mergeNested(current.translationShortcut, partial.translationShortcut),
       provider: mergeNested(current.provider, partial.provider),

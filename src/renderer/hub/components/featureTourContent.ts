@@ -37,7 +37,10 @@ export function tourExample(feature: TourFeature, index: number, chinese: boolea
 }
 
 export function practiceTarget(feature: TourFeature, index: number, id: string, selectedText: string): PracticeTarget {
-  if (feature === 'dictate') return { id, kind: 'dictation', mode: 'voice_transcript' }
+  if (feature === 'dictate') {
+    const destinations = ['chat', 'email', 'notes', 'tasks'] satisfies NonNullable<Extract<PracticeTarget, { kind: 'dictation' }>['destination']>[]
+    return { id, kind: 'dictation', mode: 'voice_transcript', destination: destinations[index] ?? 'chat' }
+  }
   if (feature === 'translate') return { id, kind: 'translation', mode: 'translation' }
   return { id, kind: index === 0 ? 'rewrite' : 'question', mode: 'ask_anything', selectedText }
 }

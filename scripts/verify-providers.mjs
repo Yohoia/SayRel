@@ -13,14 +13,14 @@ function run(command, args, label, env = process.env) {
   const passes = (result.stdout ?? '').split('\n').filter(line => /PASS|passed/.test(line))
   console.log(passes.length ? passes.join('\n') : `PASS ${label}`)
 }
-for (const name of ['providers-config', 'provider-runtime', 'realtime-providers', 'refinement-integrity', 'transcription-integrity']) run(process.execPath, ['--import', 'tsx', `scripts/diagnostics/${name}.ts`], name)
+for (const [group, name] of [['providers', 'providers-config'], ['providers', 'provider-runtime'], ['providers', 'realtime-providers'], ['refinement', 'refinement-integrity'], ['refinement', 'transcription-integrity'], ['refinement', 'refinement-quality']]) run(process.execPath, ['--import', 'tsx', `scripts/diagnostics/${group}/${name}.ts`], name)
 for (const [entry, name] of [['src/main/lib/settings.ts', 'settings'], ['src/main/ipc/providers.ts', 'ipc']]) {
   await build({ entryPoints: [resolve(root, entry)], outfile: resolve(root, `.build/provider-settings/${name}.mjs`), platform: 'node', format: 'esm', bundle: true, packages: 'external' })
 }
-run(process.execPath, ['scripts/diagnostics/settings-recovery.cjs'], 'settings-recovery')
+run(process.execPath, ['scripts/diagnostics/settings/settings-recovery.cjs'], 'settings-recovery')
 const electron = resolve(root, 'node_modules/.bin/electron')
-run(electron, ['scripts/diagnostics/voice-recovery.cjs'], 'voice-recovery', { ...process.env, ELECTRON_RUN_AS_NODE: '1' })
-for (const name of ['provider-settings', 'providers-ipc']) run(electron, [`scripts/diagnostics/${name}.cjs`], name)
+run(electron, ['scripts/diagnostics/audio/voice-recovery.cjs'], 'voice-recovery', { ...process.env, ELECTRON_RUN_AS_NODE: '1' })
+for (const name of ['provider-settings', 'providers-ipc']) run(electron, [`scripts/diagnostics/providers/${name}.cjs`], name)
 run(process.execPath, ['scripts/ui-build.mjs'], 'offline UI build')
-run(electron, ['scripts/diagnostics/providers-ui.cjs'], 'provider UI')
-run(electron, ['scripts/diagnostics/recovery-ui.cjs'], 'recovery UI')
+run(electron, ['scripts/diagnostics/providers/providers-ui.cjs'], 'provider UI')
+run(electron, ['scripts/diagnostics/settings/recovery-ui.cjs'], 'recovery UI')

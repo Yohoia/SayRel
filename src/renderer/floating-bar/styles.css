@@ -50,3 +50,18 @@ html[data-sayrel-surface='floating-bar'],html[data-sayrel-surface='floating-bar'
 .floating-language-choices button:hover { background:color-mix(in srgb,var(--accent-ink) 20%,transparent); }
 .floating-language-choices button[aria-checked=true] { border-color:color-mix(in srgb,var(--accent-ink) 25%,transparent); background:color-mix(in srgb,var(--accent-ink) 26%,var(--accent)); }
 .floating-language-divider { height:1px; background:color-mix(in srgb,var(--accent-ink) 25%,transparent); }
+.floating-partial {
+  max-width: 340px;
+  max-height: 54px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}

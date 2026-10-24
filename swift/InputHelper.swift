@@ -108,10 +108,26 @@ public func getSelectedText(_ timeoutMs: Int32) -> UnsafeMutablePointer<CChar>? 
 
 /// Snapshot of the caret surroundings, used to decide whether a trailing space
 /// or capitalisation is needed.
+private var trackedInputElement: AXUIElement?
+private var trackedInputGeneration: UInt64 = 0
+
 @_cdecl("getCurrentInputState")
 public func getCurrentInputState(_ timeoutMs: Int32) -> UnsafeMutablePointer<CChar>? {
-    var payload: [String: Any] = [:]
+    let secureInput = IsSecureEventInputEnabled()
+    var payload: [String: Any] = ["secureInput": secureInput]
+    if secureInput { return cString("{\"secureInput\":true,\"hasFocus\":false}") }
     if let element = focusedElement() {
+        AXUIElementSetMessagingTimeout(element, Float(max(50, timeoutMs)) / 1000)
+        var subrole: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subrole)
+        if subrole as? String == "AXSecureTextField" { return cString("{\"secureInput\":true,\"hasFocus\":false}") }
+        if trackedInputElement == nil || !CFEqual(trackedInputElement, element) {
+            trackedInputGeneration &+= 1
+            trackedInputElement = element
+        }
+        var pid: pid_t = 0
+        AXUIElementGetPid(element, &pid)
+        payload["targetId"] = "\(pid):\(trackedInputGeneration)"
         var range: CFTypeRef?
         if AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &range) == .success,
            let cfRange = range, CFGetTypeID(cfRange) == AXValueGetTypeID() {
@@ -125,11 +141,26 @@ public func getCurrentInputState(_ timeoutMs: Int32) -> UnsafeMutablePointer<CCh
         if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &role) == .success {
             payload["role"] = role as? String
         }
+        if ["AXTextArea", "AXTextField", "AXComboBox"].contains(role as? String ?? "") {
+            var value: CFTypeRef?
+            if AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &value) == .success,
+               let text = value as? String, text.utf16.count <= 12000 {
+                payload["value"] = text
+            }
+            var marked: CFTypeRef?
+            var markedRange = CFRange()
+            var hasMarkedText = false
+            if AXUIElementCopyAttributeValue(element, "AXMarkedTextRange" as CFString, &marked) == .success,
+               let marked, CFGetTypeID(marked) == AXValueGetTypeID(),
+               AXValueGetValue(marked as! AXValue, .cfRange, &markedRange) {
+                hasMarkedText = markedRange.length > 0
+            }
+            payload["hasMarkedText"] = hasMarkedText
+        }
         payload["hasFocus"] = true
     } else {
         payload["hasFocus"] = false
     }
-    payload["secureInput"] = IsSecureEventInputEnabled()
     guard let data = try? JSONSerialization.data(withJSONObject: payload),
           let json = String(data: data, encoding: .utf8) else {
         return cString("{}")

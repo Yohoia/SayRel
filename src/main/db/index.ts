@@ -17,13 +17,12 @@ let db: Db | null = null
 function migrationsDir(): string {
   const here = dirname(fileURLToPath(import.meta.url))
   const candidates = [
-    // dev: out/main/db -> src/main/db/sql
-    join(here, '..', '..', '..', 'src', 'main', 'db', 'sql'),
-    // dev, when bundled flat: out/main -> src/main/db/sql
-    join(here, '..', '..', 'src', 'main', 'db', 'sql'),
-    // packaged: resources/db
-    join(process.resourcesPath ?? here, 'db'),
-    join(here, '..', '..', 'db')
+    // dev: out/main/db -> resources/db
+    join(here, '..', '..', '..', 'resources', 'db'),
+    // dev, when the main bundle is flat: out/main -> resources/db
+    join(here, '..', '..', 'resources', 'db'),
+    // packaged: Resources/db
+    join(process.resourcesPath ?? here, 'db')
   ]
   for (const candidate of candidates) {
     try {

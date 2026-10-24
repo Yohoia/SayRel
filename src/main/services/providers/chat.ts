@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { ProviderProfile } from '../../../shared/providers'
+import { supportsDeepSeekThinking, type ProviderProfile } from '../../../shared/providers'
 import { azureChatUrl, geminiUrl } from '../../../shared/providerEndpoints'
 import { bearer, endpointUrl, outputText, parsed, ProviderError, responseJson, withProviderRequest } from './transport'
 
@@ -88,8 +88,12 @@ export async function completeChat(profile: ProviderProfile, model: string, mess
       case 'openai-chat': {
         url = endpointUrl(profile.endpoint, '/chat/completions')
         Object.assign(headers, bearer(profile.apiKey))
-        const fastDictation = purpose === 'dictation' && url.protocol === 'https:' && url.hostname === 'api.deepseek.com' && ['deepseek-flash', 'deepseek-v4-pro'].includes(model)
-        body = { model, messages, temperature: 0.2, stream: false, ...(fastDictation ? { thinking: { type: 'enabled' }, reasoning_effort: 'low' } : {}) }
+        const thinking = supportsDeepSeekThinking(profile, model)
+          ? profile.thinkingMode === 'enabled' ? { thinking: { type: 'enabled' } }
+            : profile.thinkingMode === 'disabled' ? { thinking: { type: 'disabled' } }
+              : purpose === 'dictation' ? { thinking: { type: 'enabled' }, reasoning_effort: 'low' } : {}
+          : {}
+        body = { model, messages, temperature: 0.2, stream: false, ...thinking }
         break
       }
       default: { const exhaustive: never = protocol; throw new Error(`Unknown protocol ${exhaustive}`) }

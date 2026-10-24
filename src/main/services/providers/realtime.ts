@@ -8,19 +8,14 @@ import type { TranscriptionRequest, TranscriptionResult } from '../../../shared/
 import { decodeHistoryAudio, pcm16, wavAudio } from './audio'
 import { bearer, parsed, ProviderError, responseJson, withProviderRequest } from './transport'
 import { transcriptionPrompt } from './prompts'
+import { openRealtimeTransport, type LiveTranscriptionSession, type RealtimeProtocol } from './realtimeTransport'
 
 type Send = (message: string | Buffer) => void
-type Update = { ready?: boolean; done?: boolean }
-type RealtimeSession = {
-  begin: (send: Send) => void
-  receive: (message: string | Buffer) => Update
-  audio: (chunk: Buffer, last: boolean, send: Send) => void
-  finish: (send: Send) => void
-  result: () => Pick<TranscriptionResult, 'text' | 'detectedLanguage'>
-}
+type RealtimeSession = RealtimeProtocol
 const malformed = (): ProviderError => new ProviderError("The realtime transcription provider returned an invalid protocol message")
 const eventSchema = z.object({
   type: z.string(), item_id: z.string().optional(), transcript: z.string().optional(),
+  delta: z.string().optional(), text: z.string().optional(),
   language: z.string().optional(), languages: z.array(z.object({ code: z.string() })).optional(),
   error: z.object({ code: z.union([z.string(), z.number()]).optional() }).optional()
 })
@@ -68,12 +63,13 @@ function audioSamples(req: TranscriptionRequest, targetRate: number): Buffer {
 
 function qwenSession(model: string, req: TranscriptionRequest, openai: boolean): RealtimeSession {
   const transcripts = new Map<string, string>()
+  const partials = new Map<string, string>()
   let language: string | null = null
   return {
     begin(send) {
       const prompt = transcriptionPrompt(req)
       const transcription = openai
-        ? { model, ...(prompt && model !== 'gpt-realtime-whisper' ? { prompt } : {}), ...(req.language ? (['gpt-live-transcribe', 'gpt-transcribe'].includes(model) ? { languages: req.languages?.length ? req.languages : [req.language] } : { language: req.language }) : {}) }
+        ? { model, ...(prompt && model !== 'gpt-realtime-whisper' ? { prompt } : {}), ...(req.language ? (['gpt-live-transcribe', 'gpt-transcribe'].includes(model) ? { languages: [req.language] } : { language: req.language }) : {}) }
         : { ...(req.language ? { language: req.language } : {}) }
       const session = openai
         ? { type: 'transcription', audio: { input: { format: { type: 'audio/pcm', rate: 24000 }, transcription, turn_detection: null } } }
@@ -84,11 +80,17 @@ function qwenSession(model: string, req: TranscriptionRequest, openai: boolean):
       const event = parsed(eventSchema, jsonMessage(message))
       if (event.type === 'error' || event.type.endsWith('.failed')) serviceFailure(event.error?.code)
       if (event.type === 'session.updated' || event.type === 'transcription_session.updated') return { ready: true }
+      if (event.type === 'conversation.item.input_audio_transcription.delta' || event.type === 'conversation.item.input_audio_transcription.text') {
+        const id = event.item_id ?? 'recording'
+        partials.set(id, event.text ?? (partials.get(id) ?? '') + (event.delta ?? ''))
+        return { partial: [...transcripts.values(), ...partials.values()].join('') }
+      }
       if (event.type === 'conversation.item.input_audio_transcription.completed') {
         if (event.transcript === undefined) throw malformed()
         transcripts.set(event.item_id ?? 'recording', event.transcript)
+        partials.delete(event.item_id ?? 'recording')
         language = event.language ?? event.languages?.[0]?.code ?? language
-        return { done: openai }
+        return { done: openai, partial: [...transcripts.values()].join('') }
       }
       return { done: !openai && event.type === 'session.finished' }
     },
@@ -119,7 +121,10 @@ function funSession(model: string, req: TranscriptionRequest, rate: number): Rea
       if (event.header.event === 'task-failed' || event.header.error_code) serviceFailure(event.header.error_code)
       const sentence = event.payload?.output?.sentence
       if (sentence?.sentence_end) sentences.set(sentence.sentence_id, sentence.text)
-      return { ready: event.header.event === 'task-started', done: event.header.event === 'task-finished' }
+      const snapshot = new Map(sentences)
+      if (sentence) snapshot.set(sentence.sentence_id, sentence.text)
+      return { ready: event.header.event === 'task-started', done: event.header.event === 'task-finished',
+        ...(sentence ? { partial: [...snapshot.entries()].sort(([a], [b]) => a - b).map(([, value]) => value).join('') } : {}) }
     },
     audio(chunk, _last, send) { send(chunk) },
     finish(send) { send(JSON.stringify({ header: { action: 'finish-task', task_id: taskId, streaming: 'duplex' }, payload: { input: {} } })) },
@@ -136,7 +141,7 @@ function sonioxSession(model: string, req: TranscriptionRequest, apiKey: string)
   return {
     begin(send) {
       send(JSON.stringify({ ...(apiKey ? { api_key: apiKey } : {}), model, audio_format: 'pcm_s16le', sample_rate: 16000, num_channels: 1,
-        ...(req.language || req.languages?.length ? { language_hints: req.languages?.length ? req.languages : [req.language] } : {}),
+        ...(req.language || req.languages?.length ? { language_hints: req.language ? [req.language] : req.languages } : {}),
         ...(req.dictionary?.length ? { context: { terms: req.dictionary } } : {}) }))
     },
     receive(message) {
@@ -149,7 +154,8 @@ function sonioxSession(model: string, req: TranscriptionRequest, apiKey: string)
           language = token.language ?? language
         }
       }
-      return { done: event.finished === true }
+      const partial = (event.tokens ?? []).filter(token => !token.is_final && token.translation_status !== 'translation' && !['<end>', '<fin>'].includes(token.text)).map(token => token.text).join('')
+      return { done: event.finished === true, ...(event.tokens ? { partial: text + partial } : {}) }
     },
     audio(chunk, _last, send) { send(chunk) }, finish(send) { send('') },
     result: () => ({ text, detectedLanguage: language })
@@ -164,6 +170,7 @@ function elevenSession(): RealtimeSession {
     receive(message) {
       const event = parsed(elevenSchema, jsonMessage(message))
       if (event.message_type === 'session_started') return { ready: true }
+      if (event.message_type === 'partial_transcript') return { partial: event.text ?? '' }
       if (event.message_type === 'committed_transcript') {
         if (event.text === undefined) throw malformed()
         text = event.text
@@ -222,9 +229,10 @@ function volcSession(req: TranscriptionRequest): RealtimeSession {
       const result = event.response.result
       if (Array.isArray(result)) text = result.map(item => item.text ?? '').join('')
       else if (result?.text !== undefined) text = result.text
-      return { ready: true, done: event.final }
+      return { ready: true, done: event.final, partial: text }
     },
     audio(chunk, last, send) { send(volcPacket(2, sequence++, last, chunk)) }, finish() {},
+    finishLive(send) { send(volcPacket(2, sequence++, true, Buffer.alloc(0))) },
     result: () => ({ text, detectedLanguage: null })
   }
 }
@@ -341,13 +349,7 @@ async function funFlash(profile: ProviderProfile, model: string, req: Transcript
   })
 }
 
-export async function transcribeRealtime(profile: ProviderProfile, model: string, req: TranscriptionRequest): Promise<TranscriptionResult> {
-  if (profile.protocol === 'qwen-asr' && model === 'qwen3-asr-flash') {
-    const audio = audioSamples(req, 16000)
-    // Recorded clips use the selected batch model; oversized Base64 retains the streaming transport.
-    if (4 * Math.ceil((audio.length + 44) / 3) <= 10 * 1024 * 1024) return qwenBatch(profile, model, req, audio)
-  }
-  if (profile.protocol === 'qwen-asr' && /^(?:fun-asr-flash|qwen-audio-[\d.]+-asr-flash)/.test(model) && !model.includes('realtime')) return funFlash(profile, model, req)
+function realtimeConfiguration(profile: ProviderProfile, model: string, req: TranscriptionRequest) {
   let url: URL, session: RealtimeSession, sampleRate = 16000, readyOnOpen = false
   const headers: Record<string, string> = {}
   switch (profile.protocol) {
@@ -395,6 +397,31 @@ export async function transcribeRealtime(profile: ProviderProfile, model: string
     }
     default: throw new ProviderError("This protocol does not support realtime transcription")
   }
-  const result = await runSession({ url, headers, session, audio: audioSamples(req, sampleRate), sampleRate, readyOnOpen, signal: req.signal })
+  return { url, headers, session, sampleRate, readyOnOpen }
+}
+
+export function supportsLiveTranscription(profile: ProviderProfile, model: string): boolean {
+  return profile.protocol === 'openai-realtime' || profile.protocol === 'soniox'
+    || profile.protocol === 'qwen-asr' && model.includes('realtime')
+    || profile.protocol === 'elevenlabs' && model.includes('realtime')
+    || profile.protocol === 'volcengine-asr' && ['bigmodel', 'bigmodel_nostream', 'bigmodel_async'].includes(model)
+}
+
+export function startLiveTranscription(profile: ProviderProfile, model: string, req: TranscriptionRequest, onPartial: (text: string) => void, onReady?: () => void): LiveTranscriptionSession {
+  if (!supportsLiveTranscription(profile, model)) throw new ProviderError('This model requires batch transcription')
+  req.signal?.throwIfAborted()
+  return openRealtimeTransport({ ...realtimeConfiguration(profile, model, req), inputRate: req.sampleRate ?? 16000,
+    provider: profile.id, signal: req.signal, onPartial, onReady })
+}
+
+export async function transcribeRealtime(profile: ProviderProfile, model: string, req: TranscriptionRequest): Promise<TranscriptionResult> {
+  if (profile.protocol === 'qwen-asr' && model === 'qwen3-asr-flash') {
+    const audio = audioSamples(req, 16000)
+    // Recorded clips use the selected batch model; oversized Base64 retains the streaming transport.
+    if (4 * Math.ceil((audio.length + 44) / 3) <= 10 * 1024 * 1024) return qwenBatch(profile, model, req, audio)
+  }
+  if (profile.protocol === 'qwen-asr' && /^(?:fun-asr-flash|qwen-audio-[\d.]+-asr-flash)/.test(model) && !model.includes('realtime')) return funFlash(profile, model, req)
+  const config = realtimeConfiguration(profile, model, req)
+  const result = await runSession({ ...config, audio: audioSamples(req, config.sampleRate), signal: req.signal })
   return { ...result, provider: profile.id }
 }

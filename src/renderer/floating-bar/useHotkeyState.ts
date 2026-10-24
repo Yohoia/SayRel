@@ -18,6 +18,7 @@ export function useHotkeyState(mode = 'voice_transcript') {
       if (cancelled) return
       const binding = mode === 'translation' ? config?.translationShortcut
         : mode === 'ask_anything' ? config?.askAnythingShortcut
+        : mode === 'desktop_command' ? config?.desktopCommandShortcut
         : mode === 'voice_command' ? config?.commandShortcut : config?.shortcut
       setShortcutLabel(binding?.enabled ? binding.accelerator : '')
       setHint(config?.onboardingCompleted && config?.shortcut?.enabled === false ? "No shortcut set. Click here to start" : null)

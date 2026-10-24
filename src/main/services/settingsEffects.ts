@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { z } from 'zod'
 import { settings, type DeepPartial } from '../lib/settings'
-import { SETTINGS_EFFECT_ERRORS, type Settings } from '../../shared/settings'
+import { SETTINGS_EFFECT_ERRORS, writingPreferencesSchema, type Settings } from '../../shared/settings'
 import { IPC } from '../../shared/ipc'
 import { broadcast } from '../windows'
 import { applyTheme, getAppearanceState } from './appearance'
@@ -11,7 +11,7 @@ import { createLogger } from '../lib/logger'
 
 const log = createLogger('settings-effects')
 
-const preferences = z.object({
+const preferences = writingPreferencesSchema.extend({
   language: z.string().nullable().optional(),
   appearancePreference: z.enum(['light', 'dark', 'system']).optional(),
   launchAtLogin: z.boolean().optional(),
@@ -60,7 +60,7 @@ async function applyEffects({ next, fields }: { next: Settings; fields: string[]
       broadcast(IPC.APPEARANCE_COLOR_MODE_CHANGED, getAppearanceState())
     } })
   }
-  if (['shortcut', 'commandShortcut', 'translationShortcut', 'askAnythingShortcut', 'additionalShortcuts'].some(field => fields.includes(field))) {
+  if (['shortcut', 'commandShortcut', 'desktopCommandShortcut', 'desktopCommandsEnabled', 'translationShortcut', 'askAnythingShortcut', 'additionalShortcuts'].some(field => fields.includes(field))) {
     await apply({ effect: 'shortcuts', run: () => {
       if (!refreshShortcutRegistrations()) throw new Error('Shortcut registration did not complete')
     } })
@@ -78,6 +78,14 @@ async function applyEffects({ next, fields }: { next: Settings; fields: string[]
         else app.dock.hide()
       }
     } })
+  }
+  if (fields.includes('dictionaryLearning') && !next.dictionaryLearning) {
+    const { clearDictionaryLearning } = await import('./dictionaryLearning')
+    clearDictionaryLearning()
+  }
+  if (fields.includes('desktopCommandsEnabled') && !next.desktopCommandsEnabled) {
+    const { cancelDesktopPlan } = await import('./desktopCommands')
+    cancelDesktopPlan()
   }
   broadcast('store:changed', settings.get())
   if (failures.length) throw new Error(failures.join('\n'))
