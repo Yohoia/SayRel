@@ -22,10 +22,12 @@ const raw = new Database(':memory:')
 for (const file of fs.readdirSync(path.join(root, 'src/main/db/sql')).filter(file => file.endsWith('.sql')).sort()) raw.exec(fs.readFileSync(path.join(root, 'src/main/db/sql', file), 'utf8'))
 const db = drizzle(raw, { schema })
 const history = load('src/main/services/history.ts', {
+  '../../shared/refinement': load('src/shared/refinement.ts'),
   '../db': { getDb: () => db, getRawDb: () => raw, schema },
   '../lib/logger': { createLogger: () => logger },
   '../lib/paths': { paths: { recordings: temporary } },
-  '../../shared/constants': load('src/shared/constants.ts')
+  '../../shared/constants': load('src/shared/constants.ts'),
+  '../../shared/usage': load('src/shared/usage.ts')
 })
 let config = { historyRetentionDays: 0, audioRetentionDays: 0 }
 const jobs = new Map()
@@ -63,6 +65,7 @@ async function main() {
 
   const handlers = new Map()
   load('src/main/ipc/history.ts', {
+    '../../shared/refinement': load('src/shared/refinement.ts'),
     electron: {}, '../services/recordingMachine': {}, '../services/history': history,
     '../lib/settings': { settings: { get: () => config } }, '../lib/paths': { paths: {} }
   }).registerHistoryHandlers((name, handler) => handlers.set(name, handler))

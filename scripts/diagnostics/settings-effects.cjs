@@ -14,6 +14,7 @@ function fixture({ platform = 'darwin' } = {}) {
     constructor({ defaults }) { disk = structuredClone(defaults) }
     get(key) { return disk[key] }
     set(key, value) { disk[key] = value }
+    get store() { return structuredClone(disk) }
     set store(value) {
       if (saveFails) throw new Error('disk unavailable')
       disk = structuredClone(value); writes++

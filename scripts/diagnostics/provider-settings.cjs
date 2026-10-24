@@ -32,7 +32,9 @@ app.whenReady().then(async () => {
   assert.equal(readDisk().includes(apiKey), false, 'unrelated settings writes never leak secrets')
   settings.invalidateCache()
   assert.equal(settings.get().serviceProviders.profiles[0].apiKey, apiKey + updated.profiles[0].id, 'reload decrypts independent credentials')
-  assert.equal(settings.get().provider.apiKey, apiKey)
+  assert.equal(settings.get().provider.apiKey, null, 'migrated credentials live only on provider profiles')
+  assert.equal(JSON.parse(readDisk()).encryptedApiKey, undefined, 'migration removes the legacy encrypted key')
+  assert.equal(JSON.parse(readDisk()).encryptedProviderSecrets, undefined, 'migration never keeps a duplicate __legacy credential')
   settings.patch({ language: 'zh-CN' })
   settings.invalidateCache()
   assert.equal(settings.get().language, 'zh-CN', 'later language choices survive reloads and unrelated writes')
@@ -49,6 +51,7 @@ app.whenReady().then(async () => {
   assert.equal(settings.get().provider.apiKey, null)
   const disk = JSON.parse(readDisk())
   assert.equal(disk.encryptedProviderSecrets, undefined)
+  assert.equal(disk.encryptedProviderCredentials, undefined)
   assert.equal(disk.encryptedApiKey, undefined)
   console.log('PASS provider settings: encrypted migration, immediate use, save/reload, unrelated writes, validation and reset')
 }).catch(error => { console.error(error); process.exitCode = 1 }).finally(() => {

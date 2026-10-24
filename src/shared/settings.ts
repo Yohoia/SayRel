@@ -78,6 +78,8 @@ export interface Settings {
   }
 
   serviceProviders: ServiceProviders
+  /** Runtime-only profile IDs whose encrypted credentials need recovery. */
+  providerCredentialsUnavailable: string[]
 
   // Onboarding
   onboardingCompleted: boolean
@@ -136,6 +138,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
 
   serviceProviders: EMPTY_SERVICE_PROVIDERS,
+  providerCredentialsUnavailable: [],
 
   onboardingCompleted: false,
   onboardingStep: null,
@@ -182,7 +185,7 @@ export function mergeSettings(persisted: Partial<Settings> | undefined): Setting
     commandShortcut: mergeBinding(DEFAULT_SETTINGS.commandShortcut, persisted?.commandShortcut),
     askAnythingShortcut: mergeBinding(DEFAULT_SETTINGS.askAnythingShortcut, persisted?.askAnythingShortcut),
     translationShortcut: mergeBinding(DEFAULT_SETTINGS.translationShortcut, persisted?.translationShortcut),
-    provider: { ...provider, transcription: migrateCloudName(provider.transcription), refinement: migrateCloudName(provider.refinement) },
+    provider: { ...provider, apiKey: null, transcription: migrateCloudName(provider.transcription), refinement: migrateCloudName(provider.refinement) },
     serviceProviders: persisted?.serviceProviders
       ? serviceProvidersSchema.parse(persisted.serviceProviders)
       : migrateProviderSettings(persisted?.provider)

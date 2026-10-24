@@ -30,7 +30,7 @@ export function tourExample(feature: TourFeature, index: number, chinese: boolea
   const features = feature === 'dictate' ? [
     ['removed the filler words', 'heard you change your mind: 9 → 9:30', 'kept only your final version'],
     ['formatted the email: greeting, body, sign-off', 'formatted the phone number for you', 'went back and fixed the name at the top'],
-    ['turned your ramble into a numbered list', 'your vague clue → the exact book title', 'used its own knowledge to complete your thought'],
+    ['turned your ramble into a numbered list', 'kept the book descriptions you provided', 'did not guess missing details'],
     ['moved parking to #1: you said it mattered most', 'kept your latest call: big suitcase → carry-on', 'kept your reasons: short notes in brackets']
   ][index] ?? [] : []
   return { prompt: message[chinese ? 1 : 0] ?? message[0], selectedText, features }

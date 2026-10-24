@@ -18,6 +18,9 @@ const shared = load('src/shared/constants.ts')
 mocks['./constants'] = shared
 mocks['./providers'] = load('src/shared/providers.ts')
 const sharedProviders = mocks['./providers']
+mocks['../../shared/providers'] = sharedProviders
+mocks['../../shared/refinement'] = load('src/shared/refinement.ts')
+mocks['./refinement'] = mocks['../../shared/refinement']
 mocks['../../shared/recordingFeedback'] = load('src/shared/recordingFeedback.ts', { './constants': shared, './providers': sharedProviders })
 mocks['./settingsControls'] = load('src/shared/settingsControls.ts')
 mocks['../../shared/settingsControls'] = mocks['./settingsControls']
@@ -31,6 +34,10 @@ const readyProviders = {
   transcription: { providerId: 'transcription', model: 'fixture-model' }, refinement: { providerId: 'refinement', model: 'fixture-model' }
 }
 let transcribe = async () => ({ result: { text: 'hello' }, ogg: Buffer.alloc(0) })
+let providersFactory = () => ({
+  transcription: { transcribe: async (...args) => (await transcribe(...args)).result },
+  refinement: { refine: async ({ transcript }) => ({ text: transcript }) }
+})
 Object.assign(mocks, {
   'node:fs/promises': { readFile: async () => Buffer.from('fixture-audio') },
   '../lib/paths': { paths: {} }, '../../shared/constants': shared,
@@ -39,7 +46,7 @@ Object.assign(mocks, {
   './dictionary': { listDictionary: () => [] }, './voiceActions': { runVoiceAction: async () => 'answer' },
   './insertion': { insertText: async text => { inserted.push(text); return { ok: true } } },
   './transcription': { transcribe: (...args) => transcribe(...args) },
-  './providers': { createProviders: (_legacy, state) => { refinementStates.push(state); return { transcription: { transcribe: async (...args) => (await transcribe(...args)).result }, refinement: { refine: async ({ transcript }) => ({ text: transcript }) } } } },
+  './providers': { createProviders: (legacy, state) => { refinementStates.push(state); return providersFactory(legacy, state) } },
   '../lib/settings': { settings: { get: () => config } }, './contextCapture': { captureAudioContext: async () => null }
 })
 const { RecordingMachine } = load('src/main/services/recordingMachine.ts')
@@ -239,7 +246,38 @@ async function recorderChain(machine) {
     assert.equal(results[0].ownerId,7)
     assert.equal(results[0].targetId,'practice-1')
     assert.equal(results[0].text,'hello')
+    assert.equal(results[0].refinement.kind,'completed')
     m.setPracticeTarget(7,null)
+  })
+  await test('dictation practice requires a writing model before it opens the microphone', async () => {
+    const m = new RecordingMachine()
+    config.serviceProviders.refinement = null
+    m.setPracticeTarget(7, { id: 'polishing-practice', kind: 'dictation', mode: 'voice_transcript' })
+    await m.startPractice(7)
+    assert.equal(m.getState().phase, 'error')
+    assert.equal(m.getState().context.issue.kind, 'provider-setup')
+    assert.equal(m.getState().context.issue.service, 'refinement')
+    assert.equal(m.getState().context.sessionId, null)
+    m.setPracticeTarget(7, null)
+    await m.start()
+    assert.equal(m.getState().phase, 'starting', 'ordinary transcription remains available without optional polishing')
+    m.cancel()
+  })
+  await test('failed practice polishing reports fallback instead of a successful refined result', async () => {
+    const m = new RecordingMachine(), results = [], beforeInserted = inserted.length, beforeRows = rows.length
+    const previousFactory = providersFactory
+    providersFactory = () => ({ refinement: { refine: async () => { throw new Error('offline writing model failure') } } })
+    try {
+      m.on('practice-result', result => results.push(result))
+      m.setPracticeTarget(7, { id: 'failed-polishing-practice', kind: 'dictation', mode: 'voice_transcript' })
+      const id = await start(m), finished = m.finish()
+      m.markStopped(id); await finished
+      assert.equal(results.length, 1)
+      assert.equal(results[0].refinement.kind, 'fallback')
+      assert.equal(results[0].text, results[0].transcript)
+      assert.equal(inserted.length, beforeInserted)
+      assert.equal(rows.length, beforeRows)
+    } finally { providersFactory = previousFactory; m.setPracticeTarget(7, null) }
   })
   await test('practice Fn+Space upgrade starts only the requested mode and snapshots selected text', async () => {
     const m = new RecordingMachine(), keys = load('src/main/services/hotkeys.ts', { './recordingMachine': { recordingMachine: m } })
@@ -424,7 +462,7 @@ async function recorderChain(machine) {
       return { result: { text: 'snapshot retry' }, ogg: Buffer.alloc(0) }
     }
     await m.retry()
-    assert.deepEqual(refinementStates.at(-1), originalState)
+    assert.equal(m.getState().context.issue, null, 'unconfigured optional refinement passes through without a failure warning')
     assert.equal(m.getState().phase, 'idle')
     Object.assign(config, saved)
   })
@@ -541,6 +579,77 @@ async function recorderChain(machine) {
       assert.equal(results.length, 1); assert.equal(inserted.length, before + 1); assert.equal(inserted.at(-1), entry + ' tail')
       assert.ok(chain.tracks.every(track => track.stopped === 1)); assert.ok(chain.contexts.every(context => context.closed))
       keys.resetHotkeyState(); await chain.dispose()
+    }
+  })
+  await test('Fn toggle, Fn hold, floating and fallback insert the actual writing provider result', async () => {
+    const previousFactory = providersFactory, previousTranscribe = transcribe
+    const previousHistory = config.historyEnabled, previousStyle = config.shortcut.style
+    const requests = []
+    let expectedTranscript, expectedRefinement
+    const actualProviders = load('src/main/services/providers/index.ts', {
+      '../../../shared/providers': sharedProviders,
+      './postprocess': load('src/main/services/providers/postprocess.ts'),
+      './prompts': load('src/main/services/providers/prompts.ts'),
+      './audio': load('src/main/services/providers/audio.ts'),
+      './transport': load('src/main/services/providers/transport.ts'),
+      './chat': { completeChat: async (profile, model, messages, signal) => {
+        requests.push({ profile, model, messages, signal })
+        assert.equal(profile.id, 'refinement')
+        assert.equal(model, 'fixture-model')
+        assert.equal(signal.aborted, false)
+        assert.match(messages[0].content, /dictation post-processor/)
+        assert.equal(JSON.parse(messages[1].content).transcript, expectedTranscript)
+        return expectedRefinement
+      } }
+    })
+    try {
+      providersFactory = actualProviders.createProviders
+      config.historyEnabled = true
+      for (const entry of ['native-toggle', 'native-hold', 'floating', 'fallback']) {
+        config.shortcut.style = entry === 'native-hold' ? 'hold' : 'toggle'
+        const m = new RecordingMachine(), chain = await recorderChain(m), keys = nativeKeys(m), results = []
+        const beforeInserted = inserted.length, beforeRequests = requests.length
+        expectedTranscript = `uh ${entry} lets send the report tomorrow`
+        expectedRefinement = `${entry}: Let's send the report tomorrow.`
+        const rawTranscript = expectedTranscript, refinedText = expectedRefinement
+        m.on('result', result => results.push(result))
+        transcribe = async ({ pcm }) => {
+          assert.ok(pcm.length > 0)
+          return { result: { text: rawTranscript, detectedLanguage: 'en', provider: 'offline-asr' }, ogg: Buffer.alloc(0) }
+        }
+        try {
+          if (entry === 'floating') await chain.action('start')
+          else if (entry === 'fallback') keys.handleFallbackShortcut('Fn')
+          else if (entry === 'native-hold') keys.handleKeyEvent({ combination: 'Fn', pressed: true })
+          else keys.tap()
+          await chain.settle('recording')
+          assert.equal(m.getState().context.mode, 'voice_transcript')
+          chain.feed()
+          if (entry === 'floating') await chain.action('finish')
+          else if (entry === 'fallback') keys.handleFallbackShortcut('Fn')
+          else if (entry === 'native-hold') keys.handleKeyEvent({ combination: 'Fn', pressed: false })
+          else keys.tap()
+          await chain.settle('idle')
+          assert.equal(requests.length, beforeRequests + 1, entry + ' calls the selected writing model once')
+          assert.equal(inserted.length, beforeInserted + 1, entry + ' inserts once')
+          assert.equal(inserted.at(-1), refinedText, entry + ' inserts refined text')
+          assert.notEqual(inserted.at(-1), rawTranscript, entry + ' never inserts raw text after refinement succeeds')
+          assert.equal(results.length, 1)
+          assert.equal(results[0].transcript, rawTranscript)
+          assert.equal(results[0].refined, refinedText)
+          assert.equal(results[0].refinement.kind, 'completed')
+          assert.equal(results[0].delivery, 'insert')
+          const saved = rows.findLast(row => row.id === results[0].id && row.status === shared.HISTORY_STATUS.COMPLETED)
+          assert.ok(saved)
+          assert.equal(saved.refinedText, refinedText)
+          assert.equal(JSON.parse(saved.modeMeta).transcript, rawTranscript)
+          assert.equal(JSON.parse(saved.modeMeta).refinement.kind, 'completed')
+          assert.equal(m.getState().context.issue, null)
+        } finally { keys.resetHotkeyState(); await chain.dispose() }
+      }
+    } finally {
+      providersFactory = previousFactory; transcribe = previousTranscribe
+      config.historyEnabled = previousHistory; config.shortcut.style = previousStyle
     }
   })
   await test('native Fn upgrades during device open and recording process only the final mode in the same session', async () => {

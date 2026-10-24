@@ -6,6 +6,7 @@ import { createLogger } from '../lib/logger'
 import { paths } from '../lib/paths'
 import { HISTORY_STATUS } from '../../shared/constants'
 import { buildDictationUsage } from '../../shared/usage'
+import { readVoiceMetadata } from '../../shared/refinement'
 import type {
   HistoryListQuery,
   HistoryListResult,
@@ -108,6 +109,7 @@ export function getLatestId(): string | null {
 }
 
 function toListItem(row: any): HistoryListItem {
+  const metadata = readVoiceMetadata(row.modeMeta?.toString() ?? null)
   let focusedAppName: string | null = null
   let focusedAppBundleId: string | null = null
   let detectedLanguage: string | null = null
@@ -139,7 +141,8 @@ function toListItem(row: any): HistoryListItem {
     createdAt: row.createdAt,
     focusedAppName,
     focusedAppBundleId,
-    detectedLanguage,
+    detectedLanguage: metadata?.detectedLanguage ?? detectedLanguage,
+    ...(metadata?.refinement ? { refinement: metadata.refinement } : {}),
     audioLocalPath: row.audioLocalPath,
     hasAudio: Boolean(row.audioLocalPath && existsSync(row.audioLocalPath))
   }

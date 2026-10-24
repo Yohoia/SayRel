@@ -59,6 +59,7 @@ try {
   for (const file of fs.readdirSync(path.join(root,'src/main/db/sql')).filter(file=>file.endsWith('.sql')).sort()) raw.exec(fs.readFileSync(path.join(root,'src/main/db/sql',file),'utf8'))
   const db = drizzle(raw, {schema})
   const history = load('src/main/services/history.ts', {
+    '../../shared/refinement': load('src/shared/refinement.ts'),
     '../db': { getDb:()=>db, getRawDb:()=>raw, schema },
     '../lib/logger': { createLogger:()=>({info(){},warn(){},error(){}}) },
     '../lib/paths': { paths:{} }, '../../shared/constants':load('src/shared/constants.ts'), '../../shared/usage':usageModule
@@ -72,6 +73,7 @@ try {
   insert.run('no-date','completed',null)
   const handlers = new Map()
   load('src/main/ipc/history.ts', {
+    '../../shared/refinement': load('src/shared/refinement.ts'),
     electron:{}, '../services/recordingMachine':{}, '../services/history':history,
     '../lib/settings':{}, '../lib/paths':{}
   }).registerHistoryHandlers((channel,handler)=>handlers.set(channel,handler))

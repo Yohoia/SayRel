@@ -44,8 +44,8 @@ export async function captureAudioContext(): Promise<AudioContextSnapshot> {
     if (raw) {
       snapshot.focusedInput = {
         role: raw.role ?? null,
-        valuePreview: raw.valuePreview ?? null,
-        selectedText: raw.selectedText ?? null,
+        valuePreview: raw.isSecure ? null : raw.valuePreview ?? null,
+        selectedText: raw.isSecure ? null : raw.selectedText ?? null,
         isSecure: Boolean(raw.isSecure),
         bounds: raw.bounds ?? null
       } satisfies FocusedInputInfo
@@ -54,7 +54,7 @@ export async function captureAudioContext(): Promise<AudioContextSnapshot> {
     log.warn('focused element capture failed', err)
   }
 
-  if (config.sendScreenContext) {
+  if (config.sendScreenContext && !snapshot.focusedInput?.isSecure) {
     try {
       const raw = await context.getFocusedVisibleText()
       snapshot.visibleText = raw?.visibleText ?? null

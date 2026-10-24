@@ -6,6 +6,7 @@ import * as history from '../services/history'
 import { settings } from '../lib/settings'
 import { paths } from '../lib/paths'
 import type { Handler } from './index'
+import { readVoiceMetadata } from '../../shared/refinement'
 
 export function registerHistoryHandlers(handle: (c: string, f: Handler) => void): void {
   handle('db:get-device-id', () => settings.deviceId)
@@ -19,7 +20,8 @@ export function registerHistoryHandlers(handle: (c: string, f: Handler) => void)
   handle('db:history-usage', () => history.getDictationUsage())
   handle('db:history-retry', async (_e, id: string) => {
     await recordingMachine.retryHistory(id)
-    return history.getHistory(id)
+    const row = history.getHistory(id)
+    return row ? { ...row, refinement: readVoiceMetadata(row.modeMeta?.toString() ?? null)?.refinement } : null
   })
   handle('db:history-export-audio', async (_e, id: string) => {
     const record = history.getHistory(id)

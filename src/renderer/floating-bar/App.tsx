@@ -95,7 +95,7 @@ export function FloatingBarApp() {
       if (state.phase === 'starting') { setStatus('starting-microphone'); setErrorText(null) }
       if (state.phase === 'recording') setStatus(state.context?.handsFree ? 'hands-free' : 'recording')
       if (state.phase === 'finishing') setStatus('recording-dictating')
-      if (state.phase === 'idle') setStatus('idle-hidden')
+      if (state.phase === 'idle') setStatus(state.context.issue?.kind === 'refinement' ? 'error' : 'idle-hidden')
       if (state.phase === 'long_pressing') setStatus('long-pressing')
       if (state.phase === 'error') { setStatus('error'); setErrorText(state.context?.error || "Transcription failed. Please try again.") }
       const timeout = state.context?.recorderTimeoutState

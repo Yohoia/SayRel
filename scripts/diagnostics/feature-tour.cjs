@@ -53,7 +53,7 @@ app.whenReady().then(async()=>{
     window.__tourCalls=[];window.__tourListeners=new Map();window.__target=null;window.__captureId=0;window.__nativeCapture=true;window.__pendingCaptures=new Map();
     window.__emit=(channel,value)=>{for(const cb of window.__tourListeners.get(channel)||[])cb(value)};
     window.__phase=phase=>window.__emit('recording-machine:state',{phase,context:{sessionId:phase==='recording'?'practice-fixture':null,mode:window.__target?.mode,handsFree:true,error:null,issue:null}});
-    window.__complete=text=>{window.__phase('idle');window.__emit('feature-tour:result',{targetId:window.__target.id,transcript:'fixture spoken words',text})};
+    window.__complete=(text,transcript='fixture spoken words',refinement)=>{window.__phase('idle');window.__emit('feature-tour:result',{targetId:window.__target.id,transcript,text,...(refinement?{refinement}:{})})};
     Object.defineProperty(window,'sayrel',{configurable:true,get(){return this.__tourBridge},set(value){
       const invoke=value.invoke.bind(value),on=value.on.bind(value);
       value.on=(channel,cb)=>{const listeners=window.__tourListeners.get(channel)||new Set();listeners.add(cb);window.__tourListeners.set(channel,listeners);const off=on(channel,cb);return()=>{listeners.delete(cb);off()}};
@@ -284,10 +284,42 @@ app.whenReady().then(async()=>{
       await click('.tour-copy footer button')
       await until("document.querySelector('.tour-copy footer button').textContent==='Thinking'")
       assert.equal(await js("document.querySelector('.tour-copy footer .is-primary').disabled"),true,'cannot advance during processing')
-      await js(`window.__complete(${JSON.stringify('Provider result for '+feature+' '+example)})`)
+      if(feature==='dictate'&&example===0){
+        const raw='Um, can we move the standup to 9? Actually, no, make it 9:30.'
+        const refined='Can we move the standup to 9:30?'
+        await js(`window.__complete(${JSON.stringify(refined)},${JSON.stringify(raw)},{kind:'completed'})`)
+        await until("document.querySelector('.tour-practice').dataset.completed==='true'")
+        assert.equal(await js("document.querySelector('.tour-playground textarea').value"),refined,'the editable result uses refined text')
+        assert.equal(await js("document.querySelector('.tour-result-label').textContent"),'Refined text')
+        assert.equal(await js("document.querySelector('.tour-transcript h2').textContent"),'Original transcript')
+        assert.equal(await js("document.querySelector('.tour-transcript p').textContent"),raw,'raw text has a separate explicit label')
+        await shot('dictate-distinct-transcript-and-refinement')
+        for(const kind of ['fallback','skipped']){
+          await js("window.__phase('recording')")
+          await until("document.querySelector('.tour-practice').dataset.completed==='false'")
+          await js(`window.__complete(${JSON.stringify(raw)},${JSON.stringify(raw)},${JSON.stringify(kind==='fallback'?{kind,message:'Offline writing model failure'}:{kind})})`)
+          await until("!!document.querySelector('.tour-refinement-warning')")
+          assert.equal(await js("document.querySelector('.tour-playground textarea').value"),raw,'unrefined fallback preserves the transcript')
+          assert.equal(await js("document.querySelector('.tour-result-label').textContent"),'Original transcript (not refined)')
+          assert.equal(await js("!!document.querySelector('.tour-practice-feedback,.tour-capabilities')"),false,'unrefined text is never marked as successful practice')
+          assert.equal(await js("!!document.querySelector('.tour-transcript')"),false,'fallback does not duplicate the same unrefined text')
+          assert.equal(await js("document.querySelector('.tour-refinement-warning button').textContent"),'Open Providers')
+          assert.match(await js("document.querySelector('.tour-refinement-warning').textContent"),kind==='fallback'?/Text refinement failed/:/Text refinement was skipped/)
+          await shot('dictate-'+kind+'-warning')
+        }
+        await js(`window.__complete(${JSON.stringify(refined)},${JSON.stringify(raw)},{kind:'completed'})`)
+        console.log('PASS practice labels raw and refined text; fallback and skipped never claim completion')
+      }else await js(`window.__complete(${JSON.stringify('Provider result for '+feature+' '+example)})`)
       await until("document.querySelector('.tour-practice').dataset.completed==='true'")
-      if(feature!=='askAnything'||example===0)assert.match(await js("document.querySelector('.tour-playground textarea').value"),/Provider result/)
+      if(feature==='dictate'&&example===0)assert.equal(await js("document.querySelector('.tour-playground textarea').value"),'Can we move the standup to 9:30?')
+      else if(feature!=='askAnything'||example===0)assert.match(await js("document.querySelector('.tour-playground textarea').value"),/Provider result/)
       else assert.match(await js("document.querySelector('.tour-answer').textContent"),/Provider result/)
+      if(feature==='dictate'&&example===2){
+        const capabilities=await js("document.querySelector('.tour-capabilities').textContent")
+        assert.match(capabilities,/kept the book descriptions you provided/)
+        assert.match(capabilities,/did not guess missing details/)
+        assert.doesNotMatch(capabilities,/exact book title|own knowledge/,'practice does not promise to invent missing details')
+      }
       await shot(feature+'-result-'+(example+1))
       await next()
     }
@@ -303,6 +335,15 @@ app.whenReady().then(async()=>{
   await js("document.querySelector('.tour-feature-card>.tour-button').click()")
   await step('intro');await next();await step('shortcut');await next();await step('example')
   await shot('practice-chinese-minimum')
+  const chineseRaw='嗯，能把站会改到九点吗？呃，不对，还是九点半吧。'
+  await js(`window.__complete(${JSON.stringify(chineseRaw)},${JSON.stringify(chineseRaw)},{kind:'fallback',message:'Offline failure'})`)
+  await until("document.querySelector('.tour-result-label')?.textContent==='原始转写（未润写）'")
+  assert.equal(await js("!!document.querySelector('.tour-practice-feedback,.tour-capabilities')"),false)
+  await shot('practice-chinese-fallback-minimum')
+  await js(`window.__complete('能把站会改到九点半吗？',${JSON.stringify(chineseRaw)},{kind:'completed'})`)
+  await until("document.querySelector('.tour-result-label')?.textContent==='润写结果'")
+  assert.equal(await js("document.querySelector('.tour-transcript h2').textContent"),'原始转写')
+  await shot('practice-chinese-refined-minimum')
   await click('.tour-exit');await until("!!document.querySelector('.tour-feature-cards')")
   assert.equal(await js('window.__target'),null,'exit clears current target')
   await click('.feature-tour>.modal-backdrop>.modal-card>.modal-close')

@@ -64,6 +64,11 @@
 .feature-tour .tour-playground textarea { display:block; width:100%; min-height:180px; resize:vertical; max-height:35vh; padding:12px; border:1px solid var(--line-strong); border-radius:8px; outline:none; background:#fff; color:var(--ink); font:400 14px/1.6 Inter,MiSans,sans-serif; }
 .tour-playground textarea:focus { border-color:#8c8888; box-shadow:0 4px 4px #0000000a,0 0 1px #0009; }
 .tour-transcript { margin-top:16px; color:var(--ink-tertiary); font-size:13px; line-height:1.5; }
+.tour-result-label { display:block; margin:0 0 8px; color:var(--ink-soft); font-size:13px; font-weight:600; }
+.feature-tour .tour-transcript h2 { margin:0 0 6px; padding:0; color:var(--ink-soft); font-size:12px; font-weight:600; line-height:18px; }
+.tour-transcript p { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; }
+.tour-refinement-warning { margin:0 0 16px; padding:14px; border:1px solid var(--line); border-radius:8px; color:var(--ink-soft); font-size:13px; line-height:1.6; }
+.tour-refinement-warning p { margin:0 0 10px; }
 .tour-answer { margin-top:16px; padding:16px; border:1px solid var(--line); border-radius:8px; }
 .feature-tour .tour-answer h2 { margin:0 0 12px; padding:0; font-size:14px; line-height:20px; color:var(--ink); }
 .tour-answer>p,.tour-selected-article { color:var(--ink); font-size:14px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }

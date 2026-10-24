@@ -6,6 +6,7 @@ import type { Settings } from './settings'
 export const recordingIssueSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('provider-setup'), service: z.enum(['transcription', 'refinement']), message: z.string() }),
   z.object({ kind: z.literal('microphone'), message: z.string() }),
+  z.object({ kind: z.literal('refinement'), message: z.string(), canRetry: z.boolean() }),
   z.object({ kind: z.literal('processing'), message: z.string(), canRetry: z.boolean() })
 ])
 export type RecordingIssue = z.infer<typeof recordingIssueSchema>
@@ -22,9 +23,9 @@ export const recordingStateSchema = z.object({
   })
 })
 
-export function recordingSetupIssue(config: Settings, mode: Mode): RecordingIssue | null {
+export function recordingSetupIssue(config: Settings, mode: Mode, { requireRefinement = false }: { requireRefinement?: boolean } = {}): RecordingIssue | null {
   const services: ProviderService[] = ['transcription']
-  if (mode === 'translation' || mode === 'ask_anything') services.push('refinement')
+  if (requireRefinement || mode === 'translation' || mode === 'ask_anything') services.push('refinement')
   for (const service of services) {
     const message = service === 'transcription'
       ? 'Choose a default transcription model in Providers before recording.'

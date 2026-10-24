@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useId, useRef, useState, type Rea
 import { createPortal } from 'react-dom'
 import { TOUR_FEATURES, TOUR_STEPS, practiceResultSchema, type TourFeature, type TourStep } from '../../../shared/featureTour'
 import { recordingStateSchema } from '../../../shared/recordingFeedback'
+import type { RefinementOutcome } from '../../../shared/refinement'
 import type { SettingsTextKey } from '../../../shared/interfaceText'
 import { api, bridge } from '../../shared/utils/bridge'
 import { startShortcutCapture, type ShortcutCapture } from '../../shared/shortcutCapture'
@@ -157,6 +158,7 @@ function PracticeExample({ feature, index, onNext, onProviders }: { feature: Tou
   const [answer, setAnswer] = useState('')
   const [transcript, setTranscript] = useState('')
   const [completed, setCompleted] = useState(false)
+  const [refinement, setRefinement] = useState<RefinementOutcome | null>(null)
   const input = useRef<HTMLTextAreaElement>(null)
   const selection = useRef({ start: 0, end: example.selectedText.length })
   const currentText = useRef(text)
@@ -171,6 +173,7 @@ function PracticeExample({ feature, index, onNext, onProviders }: { feature: Tou
       setPhase(state.data.phase)
       setSetupRequired(state.data.context.issue?.kind === 'provider-setup')
       setError(state.data.phase === 'error' ? state.data.context.error ?? 'Recording error' : null)
+      if (state.data.phase === 'starting' || state.data.phase === 'recording') setCompleted(false)
     })
     const offResult = api.featureTour.onResult(raw => {
       const result = practiceResultSchema.safeParse(raw)
@@ -181,7 +184,8 @@ function PracticeExample({ feature, index, onNext, onProviders }: { feature: Tou
         const { start, end } = selection.current
         setText(currentText.current.slice(0, start) + result.data.text + currentText.current.slice(end))
       } else setText(result.data.text)
-      setCompleted(true)
+      setRefinement(result.data.refinement ?? null)
+      setCompleted(feature !== 'dictate' || !result.data.refinement || result.data.refinement.kind === 'completed')
     })
     void api.featureTour.setTarget(target.current).then(() => {
       if (disposed) return
@@ -205,6 +209,11 @@ function PracticeExample({ feature, index, onNext, onProviders }: { feature: Tou
     void api.featureTour.setTarget(target.current).catch(() => undefined)
   }
   const binding = settings[TOUR_CONTENT[feature].shortcut]
+  const refinementWarning = feature !== 'dictate' ? null : refinement?.kind === 'fallback'
+    ? 'Text refinement failed. Your original transcript is shown below. Try recording again or check your writing model in Providers.'
+    : refinement?.kind === 'skipped'
+      ? 'Text refinement was skipped because no writing model is selected. Your original transcript is shown below.'
+      : null
   return <div className="tour-split tour-practice" data-completed={completed}>
     <div className="tour-copy"><div className="tour-practice-heading"><h1>{t(TOUR_CONTENT[feature].title)}</h1><span className="tour-keycaps"><KeyCaps value={binding.accelerator} /></span></div>
       <p className="tour-lead">{t(feature === 'askAnything' ? index === 0 ? 'Speak to edit selected text.' : index === 1 ? 'Speak to ask about selected text.' : 'Speak to get quick answers or take quick actions.' : 'Dictate the message into the textbox.')}</p>
@@ -214,8 +223,10 @@ function PracticeExample({ feature, index, onNext, onProviders }: { feature: Tou
       <footer><button className="tour-button" disabled={!ready || processing || !binding.enabled} onClick={() => void start()}>{t(processing ? 'Thinking' : active ? 'Finish' : 'Start speaking')}</button><button className="tour-button is-primary" disabled={active || processing} onClick={onNext}>{t('Continue', 'onboarding__try_it__button__continue')}</button></footer>
     </div>
     <div className="tour-art"><div className="tour-playground"><div className="tour-playground-title"><TourIcon feature={feature} /><span>{t(feature === 'dictate' ? index === 1 ? 'Email' : index >= 2 ? 'Notes' : 'Message' : feature === 'translate' ? 'Translation' : 'Selected text')}</span></div>
-      {feature === 'askAnything' && index === 1 ? <div className="tour-selected-article" tabIndex={0}>{example.selectedText}</div> : feature === 'askAnything' && index === 2 ? <div className="tour-answer-placeholder"><TourIcon feature={feature} /><p>{t('Ask anything')}</p></div> : <textarea ref={input} aria-label={t('Practice text')} value={text} onChange={event => setText(event.target.value)} onSelect={updateSelection} placeholder={t('Press your shortcut and start speaking')} />}
-      {transcript && <p className="tour-transcript">{transcript}</p>}
+      {refinementWarning && <div className="tour-refinement-warning" role="alert"><p>{t(refinementWarning)}</p><button className="tour-button" onClick={onProviders}>{t('Open Providers')}</button></div>}
+      {feature === 'dictate' && transcript && <label className="tour-result-label" htmlFor={`${id}-text`}>{t(refinementWarning ? 'Original transcript (not refined)' : 'Refined text')}</label>}
+      {feature === 'askAnything' && index === 1 ? <div className="tour-selected-article" tabIndex={0}>{example.selectedText}</div> : feature === 'askAnything' && index === 2 ? <div className="tour-answer-placeholder"><TourIcon feature={feature} /><p>{t('Ask anything')}</p></div> : <textarea id={`${id}-text`} ref={input} aria-label={t('Practice text')} value={text} onChange={event => setText(event.target.value)} onSelect={updateSelection} placeholder={t('Press your shortcut and start speaking')} />}
+      {transcript && !refinementWarning && <div className="tour-transcript"><h2>{t('Original transcript')}</h2><p>{transcript}</p></div>}
       {answer && <div className="tour-answer" role="status"><h2>{t('Answer')}</h2><p>{answer}</p></div>}
       {completed && <div className="tour-practice-feedback" role="status"><Icon name="check" size={18} /><span>{t('Practice complete')}</span></div>}
       {completed && example.features.length > 0 && <ul className="tour-capabilities">{example.features.map(item => <li key={item}><Icon name="check" size={16} />{t(item)}</li>)}</ul>}

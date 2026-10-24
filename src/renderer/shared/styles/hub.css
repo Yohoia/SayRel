@@ -71,6 +71,7 @@
 .history-item:hover .history-item-actions .icon-button,.history-item:focus-within .history-item-actions .icon-button,.history-item.is-menu-open .icon-button { opacity:1; }
 .history-view-answer { border:1px solid var(--line-strong); border-radius:var(--radius-control); padding:7px 10px; color:var(--accent); font-size:14px; line-height:18px; white-space:nowrap; }
 .history-item-failed { color:var(--error); }
+.history-refinement-warning { display:block; color:var(--error); font-size:13px; line-height:21px; margin-top:6px; }
 .history-empty { flex:1; justify-content:center; padding:0 16px; }
 .history-load-more { display:flex; justify-content:center; padding:20px 0; color:var(--ink-tertiary); }
 .detail-transcript { font-size:16px; line-height:28px; white-space:pre-wrap; user-select:text; overflow:auto; max-height:50vh; }

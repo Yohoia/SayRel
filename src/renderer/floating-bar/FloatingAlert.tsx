@@ -22,6 +22,8 @@ export function FloatingAlert({ issue, busy, actionError, alertRef, onDismiss, o
     }
     : issue.kind === 'microphone'
       ? { title: 'Microphone unavailable', description: issue.message, action: 'Check microphone' }
+      : issue.kind === 'refinement'
+        ? { title: 'Original transcript used', description: issue.message, action: 'Retry refinement' }
       : { title: 'Could not finish your dictation', description: issue.message, action: issue.canRetry ? 'Retry' : 'Record again' }
   return <div className="floating-alert" role="alert" aria-labelledby="floating-alert-title" ref={alertRef} data-issue={issue.kind}>
     <div className="floating-alert-heading">

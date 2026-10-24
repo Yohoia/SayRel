@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import VisibilityOutlined from '@mui/icons-material/VisibilityOutlined'
 import VisibilityOffOutlined from '@mui/icons-material/VisibilityOffOutlined'
 import { PROVIDER_PRESETS, createProviderProfile } from '../../../shared/providerPresets'
+import { azureChatUrl, geminiUrl } from '../../../shared/providerEndpoints'
 import {
   EMPTY_SERVICE_PROVIDERS, providerProfileSchema, providerConfigurationIssue, protocolLabels, refinementProtocols,
   transcriptionProtocols, type ProviderProfile, type ProviderService, type ServiceProviders
@@ -14,6 +15,7 @@ import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { toast } from '../../shared/components/Toast'
 import { Icon } from '../../shared/components/Icons'
 import { HubSelect } from '../components/HubSelect'
+import { useAppSettings } from '../../shared/state/settings'
 import '../../shared/styles/providers.css'
 
 const services: ProviderService[] = ['transcription', 'refinement']
@@ -33,6 +35,8 @@ function requestPreview(draft: Draft, model = draft.models[0] || '{model}'): str
   const base = draft.endpoint.trim()
   if (!base || draft.protocol === 'local-whisper') return ''
   try {
+    if (draft.protocol === 'gemini') return geminiUrl(base, model).toString()
+    if (draft.protocol === 'azure-openai') return azureChatUrl(base, model, draft.apiVersion).toString()
     const url = new URL(base)
     const path = url.pathname.replace(/\/+$/, '')
     const realtimePaths: Record<string, string> = {
@@ -70,22 +74,19 @@ function requestPreview(draft: Draft, model = draft.models[0] || '{model}'): str
     const suffixes: Record<string, string> = {
       'stepfun-asr': '/audio/asr/sse', 'openai-transcription': '/audio/transcriptions',
       'openai-responses': '/responses', anthropic: '/messages', elevenlabs: '/speech-to-text',
-      gemini: `/models/${encodeURIComponent(model)}:generateContent`,
       ollama: path.endsWith('/api') ? '/chat' : '/api/chat',
-      'azure-openai': path.includes('/deployments/') ? '/chat/completions' : `${path.endsWith('/openai') ? '' : '/openai'}/deployments/${encodeURIComponent(model)}/chat/completions`,
       'openai-chat': '/chat/completions', 'audio-chat': '/chat/completions', 'mimo-asr': '/chat/completions'
     }
     const requestPath = url.pathname.replace(/\/+$/, '')
     const complete = /\/(?:chat\/completions|responses|messages|audio\/transcriptions|audio\/asr(?:\/sse)?|speech-to-text|models|tags|chat|generateContent)$/.test(requestPath) || /:generateContent$/.test(requestPath)
     url.pathname = complete ? requestPath : requestPath + (suffixes[draft.protocol] || '')
-    if (draft.protocol === 'gemini' && !path) url.pathname = `/v1beta/models/${encodeURIComponent(model)}:generateContent`
-    if (draft.protocol === 'azure-openai') url.searchParams.set('api-version', draft.apiVersion || url.searchParams.get('api-version') || '2024-10-21')
     return url.toString()
   } catch { return base }
 }
 
 export function ProvidersPage() {
   const t = useAppText()
+  const { settings } = useAppSettings()
   const [state, setState] = useState<ServiceProviders>(EMPTY_SERVICE_PROVIDERS)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -105,6 +106,7 @@ export function ProvidersPage() {
   return <div className="page providers-page">
     <header className="page-heading"><div className="page-heading-copy"><h1 className="page-title">{t("Providers")}</h1></div></header>
     {error && <div className="providers-page-error" role="alert"><span>{t(error)}</span><button className="text-button" onClick={() => void reload()}>{t("Reload")}</button></div>}
+    {!!settings.providerCredentialsUnavailable.length && <p className="providers-page-error" role="alert">{t('Some saved credentials could not be unlocked. Unlock your keychain and reload the app, or re-enter credentials for the marked providers.')}</p>}
     {loading ? <div className="hub-loading" role="status" aria-label={t("Loading providers")} /> : <>
       <div className="segmented-tabs providers-tabs" role="tablist" aria-label={t("Service type")}>{services.map(service => <button type="button" key={service} id={`provider-tab-${service}`} role="tab" aria-selected={activeService === service} aria-controls={`provider-panel-${service}`} tabIndex={activeService === service ? 0 : -1} onClick={() => setActiveService(service)} onKeyDown={event => {
         const next = event.key === 'Home' ? services[0] : event.key === 'End' ? services[services.length - 1] : event.key === 'ArrowLeft' || event.key === 'ArrowRight' ? services.find(value => value !== service) : undefined
@@ -119,11 +121,12 @@ export function ProvidersPage() {
           <div className="providers-cards">{[...presets.map(preset => ({ profile: state.profiles.find(profile => profile.id === preset.id) ?? createProviderProfile(preset), saved: state.profiles.some(profile => profile.id === preset.id) })), ...custom.map(profile => ({ profile, saved: true }))].map(({ profile, saved }) => {
             const preset = presetFor(profile)
             const selected = state[service]?.providerId === profile.id
-            const configured = saved && !providerConfigurationIssue(profile)
+            const credentialsUnavailable = settings.providerCredentialsUnavailable.includes(profile.id)
+            const configured = saved && !credentialsUnavailable && !providerConfigurationIssue(profile)
             const enabled = saved && profile.enabled
             return <button type="button" className={`provider-card ${selected ? 'is-current' : ''}`} key={profile.id} data-provider-id={profile.id} onClick={() => setDraft({ ...profile, models: [...profile.models] })}>
               <span className="provider-card-main">{preset?.logo ? <img className="provider-logo" src={preset.logo} alt="" /> : <span className="provider-avatar">{profile.name.slice(0, 1).toUpperCase()}</span>}<span className="provider-card-name">{profile.name}</span><span className={`provider-status ${enabled ? 'is-ready' : ''}`} role="img" aria-label={enabled ? t("Enabled") : saved ? t("Disabled") : t("Not configured")} title={enabled ? t("Enabled") : saved ? t("Disabled") : t("Not configured")} /></span>
-              <span className="provider-card-bottom"><span>{selected ? t(`In use · ${state[service]?.model}`) : configured ? t("Configured") : saved && !profile.enabled ? t("Disabled") : t("Click to configure")}</span><span aria-hidden="true">›</span></span>
+              <span className="provider-card-bottom"><span>{credentialsUnavailable ? t('Re-enter credentials') : selected ? t(`In use · ${state[service]?.model}`) : configured ? t("Configured") : saved && !profile.enabled ? t("Disabled") : t("Click to configure")}</span><span aria-hidden="true">›</span></span>
             </button>
           })}</div>
         </section>

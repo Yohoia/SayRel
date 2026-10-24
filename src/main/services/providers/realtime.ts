@@ -7,6 +7,7 @@ import type { ProviderProfile } from '../../../shared/providers'
 import type { TranscriptionRequest, TranscriptionResult } from '../../../shared/types'
 import { decodeHistoryAudio, pcm16, wavAudio } from './audio'
 import { bearer, parsed, ProviderError, responseJson, withProviderRequest } from './transport'
+import { transcriptionPrompt } from './prompts'
 
 type Send = (message: string | Buffer) => void
 type Update = { ready?: boolean; done?: boolean }
@@ -70,8 +71,9 @@ function qwenSession(model: string, req: TranscriptionRequest, openai: boolean):
   let language: string | null = null
   return {
     begin(send) {
+      const prompt = transcriptionPrompt(req)
       const transcription = openai
-        ? { model, ...(req.dictionary?.length && model !== 'gpt-realtime-whisper' ? { prompt: req.dictionary.join(', ') } : {}), ...(req.language ? (['gpt-live-transcribe', 'gpt-transcribe'].includes(model) ? { languages: req.languages?.length ? req.languages : [req.language] } : { language: req.language }) : {}) }
+        ? { model, ...(prompt && model !== 'gpt-realtime-whisper' ? { prompt } : {}), ...(req.language ? (['gpt-live-transcribe', 'gpt-transcribe'].includes(model) ? { languages: req.languages?.length ? req.languages : [req.language] } : { language: req.language }) : {}) }
         : { ...(req.language ? { language: req.language } : {}) }
       const session = openai
         ? { type: 'transcription', audio: { input: { format: { type: 'audio/pcm', rate: 24000 }, transcription, turn_detection: null } } }
@@ -292,6 +294,32 @@ async function runSession(options: { url: URL; headers: Record<string, string>; 
 }
 
 const flashSchema = z.object({ output: z.object({ text: z.string().optional(), output: z.object({ sentence: z.object({ text: z.string() }) }).optional() }) })
+const qwenBatchSchema = z.object({ output: z.object({ choices: z.array(z.object({
+  finish_reason: z.string(), message: z.object({ content: z.array(z.object({ text: z.string() })).min(1),
+    annotations: z.array(z.object({ type: z.string(), language: z.string().optional() })).optional() })
+})).min(1) }) })
+async function qwenBatch(profile: ProviderProfile, model: string, req: TranscriptionRequest, audio: Buffer): Promise<TranscriptionResult> {
+  const url = websocketUrl(profile.endpoint, '/api-ws/v1/realtime')
+  url.protocol = url.protocol === 'wss:' ? 'https:' : 'http:'
+  url.pathname = url.pathname.replace(/\/api-ws\/v1\/(?:realtime|inference)\/?$/, '/api/v1/services/aigc/multimodal-generation/generation')
+    .replace(/\/api\/v1\/?$/, '/api/v1/services/aigc/multimodal-generation/generation')
+  url.searchParams.delete('model')
+  const samples = new Float32Array(audio.length / 2)
+  for (let i = 0; i < samples.length; i++) samples[i] = audio.readInt16LE(i * 2) / 32768
+  const wav = wavAudio(samples, 16000)
+  return withProviderRequest(req.signal, async signal => {
+    const result = parsed(qwenBatchSchema, await responseJson(await fetch(url, { method: 'POST', headers: {
+      ...bearer(profile.apiKey), 'Content-Type': 'application/json', 'X-DashScope-SSE': 'disable'
+    }, signal, body: JSON.stringify({ model,
+      input: { messages: [{ role: 'user', content: [{ audio: `data:audio/wav;base64,${wav.toString('base64')}` }] }] },
+      parameters: { result_format: 'message', asr_options: { ...(req.language ? { language: req.language } : {}), enable_itn: false } }
+    }) })))
+    if (result.output.choices.some(choice => choice.finish_reason !== 'stop')) throw new ProviderError('The transcription provider did not finish the complete transcript. Try again or select another model.')
+    const message = result.output.choices[0].message
+    return { text: message.content.map(part => part.text).join(''),
+      detectedLanguage: message.annotations?.find(annotation => annotation.type === 'audio_info')?.language ?? req.language ?? null, provider: profile.id }
+  })
+}
 async function funFlash(profile: ProviderProfile, model: string, req: TranscriptionRequest): Promise<TranscriptionResult> {
   const audio = audioSamples(req, 16000)
   if (audio.length > 16000 * 2 * 300) throw new ProviderError("Fun-ASR Flash recordings cannot exceed 5 minutes")
@@ -314,6 +342,11 @@ async function funFlash(profile: ProviderProfile, model: string, req: Transcript
 }
 
 export async function transcribeRealtime(profile: ProviderProfile, model: string, req: TranscriptionRequest): Promise<TranscriptionResult> {
+  if (profile.protocol === 'qwen-asr' && model === 'qwen3-asr-flash') {
+    const audio = audioSamples(req, 16000)
+    // Recorded clips use the selected batch model; oversized Base64 retains the streaming transport.
+    if (4 * Math.ceil((audio.length + 44) / 3) <= 10 * 1024 * 1024) return qwenBatch(profile, model, req, audio)
+  }
   if (profile.protocol === 'qwen-asr' && /^(?:fun-asr-flash|qwen-audio-[\d.]+-asr-flash)/.test(model) && !model.includes('realtime')) return funFlash(profile, model, req)
   let url: URL, session: RealtimeSession, sampleRate = 16000, readyOnOpen = false
   const headers: Record<string, string> = {}
@@ -322,7 +355,7 @@ export async function transcribeRealtime(profile: ProviderProfile, model: string
       const fun = model.startsWith('fun-asr')
       sampleRate = fun && model.includes('8k') ? 8000 : 16000
       url = websocketUrl(profile.endpoint, '/api-ws/v1/realtime')
-      if (/\/api-ws\/v1\/(inference|realtime)\/?$/.test(url.pathname)) url.pathname = `/api-ws/v1/${fun ? 'inference' : 'realtime'}`
+      url.pathname = url.pathname.replace(/\/(?:api-ws\/v1\/(?:inference|realtime)|api\/v1(?:\/services\/aigc\/multimodal-generation\/generation)?)\/?$/, `/api-ws/v1/${fun ? 'inference' : 'realtime'}`)
       Object.assign(headers, bearer(profile.apiKey))
       if (fun) session = funSession(model, req, sampleRate)
       else {

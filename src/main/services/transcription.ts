@@ -17,6 +17,7 @@ export interface TranscribeOptions {
   mode: Mode
   config?: Settings
   signal?: AbortSignal
+  onAudioEncoded?: (ogg: Buffer) => Promise<void>
 }
 
 export async function transcribe(options: TranscribeOptions): Promise<{ result: TranscriptionResult; ogg: Buffer }> {
@@ -26,15 +27,24 @@ export async function transcribe(options: TranscribeOptions): Promise<{ result: 
   if (options.pcm?.length) {
     ogg = (await workerThreads.encodeOpus({ pcm: options.pcm, sampleRate: AUDIO.SAMPLE_RATE, channels: AUDIO.CHANNELS, bitrate: AUDIO.BITRATE_BPS })).ogg
   }
+  const encodedAt = Date.now()
   options.signal?.throwIfAborted()
+  if (ogg.length && options.onAudioEncoded) {
+    await options.onAudioEncoded(ogg)
+    options.signal?.throwIfAborted()
+  }
+  const persistedAt = Date.now()
   const config: Settings = options.config ?? (await import('../lib/settings')).settings.get()
   const audioBuffer = options.audioPath ? await readFile(options.audioPath) : ogg
+  const providerStartedAt = Date.now()
   const result = await createProviders(config.provider, config.serviceProviders).transcription.transcribe({
     audioBuffer, audioPath: options.audioPath ?? null, mimeType: 'audio/ogg', pcm: options.pcm,
     sampleRate: AUDIO.SAMPLE_RATE, signal: options.signal, durationMs: options.durationMs,
     language: options.language ?? config.transcriptionLanguage, languages: config.preferredLanguages,
     dictionary: options.dictionary, context: options.context ?? null, mode: options.mode
   })
-  log.info(`transcribed in ${Date.now() - started}ms via ${result.provider}`)
+  log.info('transcription completed', { provider: result.provider, audioDurationMs: options.durationMs,
+    durationMs: Date.now() - started, encodingMs: encodedAt - started, persistenceMs: persistedAt - encodedAt,
+    inputReadMs: providerStartedAt - persistedAt, providerMs: Date.now() - providerStartedAt, transcriptLength: result.text.length })
   return { result, ogg }
 }

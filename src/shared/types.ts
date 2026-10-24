@@ -1,4 +1,5 @@
 import type { Delivery, HistoryStatus, Mode } from './constants'
+import type { RefinementOutcome } from './refinement'
 
 export interface FocusedAppInfo {
   appName: string | null
@@ -86,6 +87,7 @@ export interface HistoryListItem {
   detectedLanguage: string | null
   audioLocalPath: string | null
   hasAudio: boolean
+  refinement?: RefinementOutcome
 }
 
 export interface HistoryListQuery {
@@ -156,6 +158,7 @@ export interface RefineRequest {
   transcript: string
   mode: Mode
   language?: string | null
+  languages?: string[]
   dictionary?: string[]
   context?: AudioContextSnapshot | null
   instructions?: string | null
@@ -176,6 +179,7 @@ export interface VoiceFlowResult {
   durationMs: number
   detectedLanguage: string | null
   error?: string | null
+  refinement?: RefinementOutcome
 }
 
 export type PermissionKind = 'microphone' | 'accessibility' | 'screenRecording'

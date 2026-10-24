@@ -72,7 +72,7 @@ await fixture((socket, req) => {
     else assert.fail('Unexpected Qwen client event')
   })
 }, async (url, frames) => {
-  const result = await transcribeRealtime(profile('qwen-asr', url), 'qwen3-asr-flash', { ...request, pcm: new Float32Array(21600).fill(0.25), sampleRate: 48000 })
+  const result = await transcribeRealtime(profile('qwen-asr', url), 'qwen3-asr-flash-realtime', { ...request, pcm: new Float32Array(21600).fill(0.25), sampleRate: 48000 })
   assert.equal(result.text, '你好')
   const audio = frames.filter(frame => json(frame.data).type === 'input_audio_buffer.append')
   const chunks = audio.map(frame => Buffer.from(z.string().parse(json(frame.data).audio), 'base64'))
@@ -194,6 +194,60 @@ await fixture((socket, req) => {
   assert.equal((await transcribeRealtime(profile('volcengine-asr', `${url}/api/v3/sauc/bigmodel_nostream`), 'bigmodel_async', request)).text, 'async result')
 }); checks++
 
+const qwenBatchRequests: { path: string; body: unknown }[] = []
+let batchFinishReason = 'stop'
+let holdBatchResponse = false
+const qwenBatchServer = createServer(async (req, res) => {
+  assert.equal(req.headers.authorization, `Bearer ${localKey}`)
+  assert.equal(req.headers['x-dashscope-sse'], 'disable')
+  const chunks: Buffer[] = []
+  for await (const chunk of req) chunks.push(Buffer.from(chunk))
+  qwenBatchRequests.push({ path: req.url ?? '', body: JSON.parse(Buffer.concat(chunks).toString()) })
+  if (holdBatchResponse) return
+  res.setHeader('content-type', 'application/json')
+  res.end(JSON.stringify({ output: { choices: [{ finish_reason: batchFinishReason, message: { content: [{ text: '批量转写' }], annotations: [{ type: 'audio_info', language: 'zh' }] } }] } }))
+})
+qwenBatchServer.listen(0, '127.0.0.1'); await once(qwenBatchServer, 'listening')
+const batchAddress = qwenBatchServer.address(); assert(batchAddress && typeof batchAddress !== 'string')
+try {
+  for (const path of ['/api-ws/v1/realtime', '/proxy/api-ws/v1/realtime?route=one', '/api/v1/services/aigc/multimodal-generation/generation']) {
+    const selected = profile('qwen-asr', `ws://127.0.0.1:${batchAddress.port}${path}`)
+    const started = performance.now()
+    const result = await transcribeRealtime(selected, 'qwen3-asr-flash', { ...request, pcm: new Float32Array(16000 * 3).fill(0.25), durationMs: 3000, signal: AbortSignal.timeout(1000) })
+    assert.equal(result.text, '批量转写'); assert.equal(result.detectedLanguage, 'zh')
+    assert(performance.now() - started < 1000, 'a prerecorded 3-second clip must not be replayed for 3 seconds')
+    const last = qwenBatchRequests.at(-1); assert(last)
+    assert.equal(last.path, path.startsWith('/proxy/') ? '/proxy/api/v1/services/aigc/multimodal-generation/generation?route=one' : '/api/v1/services/aigc/multimodal-generation/generation')
+    const body = z.object({ model: z.literal('qwen3-asr-flash'), input: z.object({ messages: z.array(z.object({ role: z.literal('user'), content: z.array(z.object({ audio: z.string() })) })) }), parameters: object }).parse(last.body)
+    const encoded = body.input.messages[0].content[0].audio
+    assert(encoded.startsWith('data:audio/wav;base64,')); assert.equal(Buffer.from(encoded.split(',')[1], 'base64').toString('ascii', 0, 4), 'RIFF')
+    assert.deepEqual(body.parameters.asr_options, { language: 'zh', enable_itn: false }); checks++
+  }
+  batchFinishReason = 'length'
+  await assert.rejects(transcribeRealtime(profile('qwen-asr', `ws://127.0.0.1:${batchAddress.port}`), 'qwen3-asr-flash', request), /complete|finish/); checks++
+  holdBatchResponse = true
+  await assert.rejects(transcribeRealtime(profile('qwen-asr', `ws://127.0.0.1:${batchAddress.port}`), 'qwen3-asr-flash', { ...request, signal: AbortSignal.timeout(30) }), /cancelled/); checks++
+} finally { qwenBatchServer.closeAllConnections(); await new Promise<void>(resolve => qwenBatchServer.close(() => resolve())) }
+
+for (const path of ['', '/api/v1', '/api/v1/services/aigc/multimodal-generation/generation', '/proxy/api/v1/services/aigc/multimodal-generation/generation?route=one', '/proxy/api-ws/v1/realtime?route=one']) {
+  const controller = new AbortController()
+  await fixture((socket, req) => {
+    const routed = new URL(req.url ?? '', 'http://fixture.invalid')
+    assert.equal(routed.pathname, `${path.startsWith('/proxy/') ? '/proxy' : ''}/api-ws/v1/realtime`)
+    assert.equal(routed.searchParams.get('model'), 'qwen3-asr-flash-realtime')
+    assert.equal(routed.searchParams.get('route'), path.includes('route=one') ? 'one' : null)
+    handleMessages(socket, data => {
+      const event = json(data)
+      if (event.type === 'session.update') send(socket, { type: 'session.updated' })
+      if (event.type === 'input_audio_buffer.append') controller.abort()
+    })
+  }, async (url, frames) => {
+    await assert.rejects(transcribeRealtime(profile('qwen-asr', `${url}${path}`), 'qwen3-asr-flash', { ...request,
+      pcm: new Float32Array(16000 * 300), durationMs: 300000, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(3000)]) }), /cancelled/)
+    assert(frames.some(frame => json(frame.data).type === 'input_audio_buffer.append'), 'five-minute clips retain the streaming route beyond the Base64 batch limit'); checks++
+  })
+}
+
 const httpServer = createServer(async (req, res) => {
   assert.equal(req.headers.authorization, `Bearer ${localKey}`)
   assert.equal(req.url, '/api/v1/services/aigc/multimodal-generation/generation')
@@ -216,7 +270,7 @@ await fixture(socket => {
     if (event.type === 'session.update') send(socket, { type: 'session.updated' })
     if (event.type === 'session.finish') send(socket, { type: 'session.finished' })
   })
-}, async url => { assert.equal((await transcribeRealtime(profile('qwen-asr', url), 'qwen3-asr-flash', request)).text, '') }); checks++
+}, async url => { assert.equal((await transcribeRealtime(profile('qwen-asr', url), 'qwen3-asr-flash-realtime', request)).text, '') }); checks++
 
 for (const mode of ['malformed', 'server-error', 'early-close', 'early-finished']) {
   await fixture(socket => {
@@ -228,7 +282,7 @@ for (const mode of ['malformed', 'server-error', 'early-close', 'early-finished'
       if (mode === 'early-finished') send(socket, { type: 'session.finished' })
     })
   }, async url => {
-    await assert.rejects(transcribeRealtime(profile('qwen-asr', url), 'qwen3-asr-flash', request), error => error instanceof Error && !error.message.includes(localKey))
+    await assert.rejects(transcribeRealtime(profile('qwen-asr', url), 'qwen3-asr-flash-realtime', request), error => error instanceof Error && !error.message.includes(localKey))
   }); checks++
 }
 
@@ -251,7 +305,7 @@ await fixture(socket => {
   handleMessages(socket, data => { if (json(data).type === 'session.update') send(socket, { type: 'session.updated' }) })
 }, async (url, frames) => {
   const controller = new AbortController()
-  const pending = transcribeRealtime(profile('qwen-asr', url), 'qwen3-asr-flash', { ...request, signal: controller.signal })
+  const pending = transcribeRealtime(profile('qwen-asr', url), 'qwen3-asr-flash-realtime', { ...request, signal: controller.signal })
   await sleep(65); controller.abort()
   await assert.rejects(pending, /cancelled/)
   const count = frames.length; await sleep(220); assert.equal(frames.length, count)
@@ -271,7 +325,7 @@ for (const mode of ['configuration-timeout', 'result-timeout']) {
   }, async url => {
     mock.timers.enable({ apis: ['setTimeout'] })
     try {
-      const pending = assert.rejects(transcribeRealtime(profile('qwen-asr', url), 'qwen3-asr-flash', { ...request, pcm: new Float32Array(3200), durationMs: 200 }), mode === 'configuration-timeout' ? /configuration was not confirmed/ : /timed out/)
+      const pending = assert.rejects(transcribeRealtime(profile('qwen-asr', url), 'qwen3-asr-flash-realtime', { ...request, pcm: new Float32Array(3200), durationMs: 200 }), mode === 'configuration-timeout' ? /configuration was not confirmed/ : /timed out/)
       await phase
       mock.timers.tick(60_000)
       await pending

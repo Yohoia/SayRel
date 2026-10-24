@@ -103,8 +103,10 @@ try {
     json({ choices: [{ message: { content: 'recognized' } }] })
     assert.equal((await transcribeProfile(profile(protocol), 'probe-model', input)).text, 'recognized')
     assert.match(last().path, /\/chat\/completions$/); assert.equal(body().stream, false)
-    const content = z.object({ messages: z.array(z.object({ content: z.array(z.object({ type: z.literal('input_audio'), input_audio: z.object({ data: z.string() }) })) })) }).parse(body()).messages[0].content[0]
-    assert.equal(content.input_audio.data, `data:audio/wav;base64,${audio.toString('base64')}`); checks++
+    const content = z.object({ messages: z.array(z.object({ role: z.string(), content: z.union([z.string(), z.array(z.union([z.object({ type: z.literal('text'), text: z.string() }), z.object({ type: z.literal('input_audio'), input_audio: z.object({ data: z.string(), format: z.string().optional() }) })]))]) })) }).parse(body()).messages.flatMap(message => typeof message.content === 'string' ? [] : message.content).find(part => part.type === 'input_audio')
+    assert(content?.type === 'input_audio')
+    if (protocol === 'audio-chat') assert.equal(content.input_audio.format, 'wav')
+    assert.equal(content.input_audio.data, protocol === 'mimo-asr' ? `data:audio/wav;base64,${audio.toString('base64')}` : audio.toString('base64')); checks++
   }
   reply = res => { res.setHeader('content-type', 'text/event-stream'); res.write('data: {"type":"transcript.text.delta","delta":"rec"}\n\n'); res.end('data: {"type":"transcript.text.done","text":"recognized"}\n\ndata: [DONE]\n\n') }
   assert.equal((await transcribeProfile(profile('stepfun-asr'), 'probe-model', input)).text, 'recognized')

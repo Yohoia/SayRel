@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { refinementOutcomeSchema } from './refinement'
 
 export const practiceTargetSchema = z.discriminatedUnion('kind', [
   z.object({ id: z.string().min(1), kind: z.literal('dictation'), mode: z.literal('voice_transcript') }),
@@ -8,7 +9,7 @@ export const practiceTargetSchema = z.discriminatedUnion('kind', [
 ])
 export type PracticeTarget = z.infer<typeof practiceTargetSchema>
 export type OwnedPracticeTarget = { ownerId: number; target: PracticeTarget }
-export const practiceResultSchema = z.object({ targetId: z.string(), transcript: z.string(), text: z.string() })
+export const practiceResultSchema = z.object({ targetId: z.string(), transcript: z.string(), text: z.string(), refinement: refinementOutcomeSchema.optional() })
 export type PracticeResult = z.infer<typeof practiceResultSchema>
 
 export const TOUR_FEATURES = ['dictate', 'translate', 'askAnything'] as const
