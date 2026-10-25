@@ -53,7 +53,8 @@ export async function transcribe(options: TranscribeOptions): Promise<{ result: 
     audioBuffer, audioPath: options.audioPath ?? null, mimeType: 'audio/ogg', pcm: options.pcm, allowEmpty: true,
     sampleRate: AUDIO.SAMPLE_RATE, signal: options.signal, durationMs: options.durationMs,
     language: options.language === undefined ? recognitionLanguage(config) : options.language, languages: config.preferredLanguages,
-    dictionary: options.dictionary, context: options.context ?? null, mode: options.mode
+    dictionary: options.dictionary, context: options.context ?? null, mode: options.mode,
+    providerPolish: options.mode === 'voice_transcript' && config.polishLevel !== 'raw'
   })
   log.info('transcription completed', { provider: result.provider, audioDurationMs: options.durationMs,
     durationMs: Date.now() - started, encodingMs: encodedAt - started, persistenceMs: persistedAt - encodedAt,

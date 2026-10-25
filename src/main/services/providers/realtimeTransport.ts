@@ -10,7 +10,7 @@ export interface RealtimeProtocol {
   audio(chunk: Buffer, last: boolean, send: SendAudio): void
   finish(send: SendAudio): void
   finishLive?(send: SendAudio): void
-  result(): Pick<TranscriptionResult, 'text' | 'detectedLanguage'>
+  result(): Pick<TranscriptionResult, 'text' | 'detectedLanguage' | 'providerPolish'>
 }
 
 export interface LiveTranscriptionSession {

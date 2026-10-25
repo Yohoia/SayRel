@@ -45,7 +45,7 @@ function load(file) {
 
 let config, writeHook = null, transcribeImpl, refineImpl, capturedContext = null, liveFactory = null
 const writes = [], insertions = [], cards = [], broadcasts = [], providerConfigs = []
-let asrCalls = 0, refinementCalls = 0, encoded = 0
+let asrCalls = 0, refinementCalls = 0, encoded = 0, insertionResult
 replace('src/main/lib/logger.ts', { createLogger: () => logger })
 replace('src/main/lib/paths.ts', { paths: { recordings: temporary } })
 replace('src/main/lib/settings.ts', { settings: { get: () => config } })
@@ -59,7 +59,7 @@ replace('src/main/services/contextCapture.ts', { captureAudioContext: async () =
 replace('src/main/services/insertion.ts', { insertText: async (text, options) => {
   assert.equal(options.isCancelled(), false)
   insertions.push(text)
-  return { ok: true }
+  return insertionResult
 } })
 replace('src/main/services/voiceActions.ts', { runVoiceAction: async () => 'offline action' })
 replace('src/main/services/providers/realtime.ts', {
@@ -119,6 +119,7 @@ async function test(name, run) {
   transcribeImpl = async () => ({ text: 'raw transcript', detectedLanguage: 'en', provider: 'offline-asr' })
   refineImpl = async () => ({ text: 'refined transcript' })
   asrCalls = 0; refinementCalls = 0; encoded = 0; writeHook = null; capturedContext = null; liveFactory = null
+  insertionResult = { ok: true, method: 'native', verification: 'verified' }
   for (const list of [writes, insertions, cards, broadcasts, providerConfigs]) list.length = 0
   raw.exec('DELETE FROM history_v2')
   for (const file of fs.readdirSync(temporary)) fs.unlinkSync(path.join(temporary, file))
@@ -202,9 +203,22 @@ async function main() {
     }
     const id = await finish(machine())
     assert.equal(metadata(id).refinement.changed, false)
-    assert.equal(metadata(id).refinement.promptVersion, 'dictation-2026-10-24.1')
+    assert.equal(metadata(id).refinement.promptVersion, 'dictation-2026-10-24.3')
     assert.equal(metadata(id).asr.model, 'fixture-model')
   })
+  for (const level of ['raw', 'light', 'strong']) {
+    await test(`native ASR cleanup respects ${level} and retains its own metadata`, async () => {
+      config.polishLevel = level
+      transcribeImpl = async request => {
+        assert.equal(request.providerPolish, level !== 'raw')
+        return { text: 'provider final text', detectedLanguage: 'zh', provider: 'offline-asr', providerPolish: request.providerPolish }
+      }
+      const id = await finish(machine())
+      assert.equal(metadata(id).asr.providerPolish, level !== 'raw')
+      assert.equal(history.listHistory().items.find(item => item.id === id).providerPolish, level !== 'raw')
+      assert.equal(metadata(id).refinement.kind, 'completed', 'a configured writing model remains a separate explicit step')
+    })
+  }
   const contextFixture = {
     focusedApp: { appName: 'Offline editor', bundleId: 'test.editor', windowTitle: 'Document', webTitle: null, webDomain: null, webUrl: null, capturedAt: 1 },
     focusedInput: { role: 'text', valuePreview: 'private input preview', selectedText: 'private selected text', isSecure: false },
@@ -520,6 +534,20 @@ async function main() {
     assert.equal(result.refinedText, 'refined transcript')
     assert.equal(result.refinement.polishLevel, 'strong')
     assert.equal(asrCalls, 0); assert.equal(refinementCalls, 1); assert.equal(insertions.length, 0)
+  })
+  await test('unknown insertion opens one result card and persists only the verification verdict', async () => {
+    insertionResult = { method: 'native', ok: false, verification: 'unknown', error: 'text-mismatch' }
+    const value = machine(), results = []
+    value.on('result', result => results.push(result))
+    const id = await finish(value)
+    assert.equal(results[0].delivery, 'card')
+    assert.equal(cards.length, 1)
+    assert.equal(cards[0].answer, 'refined transcript')
+    assert.equal(cards[0].insertion.verification, 'unknown')
+    assert.equal(metadata(id).insertion.error, 'text-mismatch')
+    assert.equal(history.listHistory().items[0].insertion.verification, 'unknown')
+    assert.equal(insertions.length, 1)
+    assert.equal('value' in metadata(id).insertion, false)
   })
   process.stdout.write(`Voice recovery: ${checks} behavioral checks passed; ${failures.length} failed.\n`)
   if (failures.length) process.exitCode = 1

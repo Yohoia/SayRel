@@ -125,7 +125,7 @@
     <div class="meta">
       <span>日期：2026-10-24</span>
       <span>对象：<code>reference/wisprflow</code>、<code>reference/typeless</code>、<code>reference/voiskey</code>、<code>reference/shandianshuo</code>、<code>reference/speakmore</code></span>
-      <span>方法：既有静态证据 + 当前源码核实（未抓包、未实测线上质量）</span>
+      <span>方法：既有静态证据 + 当前源码核实；SayRel 追加合成文本模型实测，未抓包</span>
     </div>
   </div>
 </header>
@@ -150,7 +150,7 @@
 <!-- ================= 执行摘要 ================= -->
 <section id="summary">
   <h2>执行摘要</h2>
-  <p class="lede">SayRel 已具备录音中 ASR、最终结果元数据和本地编辑学习。真实缺口主要是润写效果验收、卡顿时的兜底、上下文细化与上屏成功确认。竞品机制可作参考，但静态结构不能证明质量，也不能直接决定修改优先级。</p>
+  <p class="lede">SayRel 已具备录音中 ASR、最终结果元数据和本地编辑学习。当前重点是润写质量持续验收、卡顿兜底、上下文细化与跨应用上屏验收。竞品机制可作参考，但静态结构不能证明质量，也不能直接决定修改优先级。</p>
   <div class="callout note"><b>核实修订版 · 2026-10-24</b>：本版修正了三路竞速、协议缺失、函数调用适用范围、词典替换、partial 追加和 IME 防御等判断。详细核实记录见 <a href="research/competitor-pipeline-verification-2026-10-24.md">四款竞品对比文档核实记录</a>。本文建议不等于已确认的故障原因。</div>
   <div class="card">
     <h3>架构有不同路径，不是互斥的两类产品</h3>
@@ -162,7 +162,7 @@
     <ul class="tight">
       <li><b>润写效果：</b>“请求成功”不代表“整理达标”。应核对同一次请求的档位、prompt 版本、ASR 原文、模型正文与实际插入文字。结构化输出不能自动解决原样返回。</li>
       <li><b>转写兜底：</b>live 失败后以同一选定模型重处理完整录音；没有通用的定时竞速或跨供应商容灾。<code>batch-fallback</code> 是逻辑路径名，不保证改用 HTTP。</li>
-      <li><b>上屏确认：</b>native helper 的主路径已使用剪贴板与 Cmd+V，但发送按键后返回 0，尚未证明目标应用实际接收了文字。</li>
+      <li><b>上屏确认：</b>已增加有界读回校验：同一目标精确匹配才报告成功；无法确认时展示结果卡，不自动重复粘贴。独立 Electron 测试窗口已验证，其他应用仍需验收。</li>
       <li><b>安全扩展：</b>光标数据尚未进入润写上下文；显式替换规则、按应用风格与学习锚点可按需求补充。普通词典不能直接当作纠错替换表。</li>
     </ul>
   </div>
@@ -188,7 +188,7 @@
     <tr><td>输出验证</td><td>结构化服务结果，内部语义过程未知</td><td>润写成品字段，服务端校验未知</td><td>ASR 与润写文本分别保留</td><td>存在函数调用相关字符串；强制方式及默认范围未知</td><td>静音哨兵 <code>&lt;无人声&gt;</code>；OpenCC 繁转简；LEAKED_PREFIX；去句末句号</td><td>已有响应 schema、完成/拒绝/空值检查；没有任务级结构化正文契约</td></tr>
     <tr><td>确定性规则</td><td>词典、替换、片段、大小写等条件性处理</td><td>已见空白/零宽字符处理，未观察到完整规则层</td><td>未观察到完整规则层</td><td>有用户归一化规则和去句末句号配置；顺序未证实</td><td>静音哨兵、繁转简、去句末句号（无用户自定义规则）</td><td>仅空白、换行与尾随空格；无用户替换/片段规则</td></tr>
     <tr><td>词典学习</td><td>本地历史有 editedText 字段，完整学习策略未恢复</td><td>上传改前改后内容，由服务端返回词典项</td><td>编辑跟踪、锚点收缩、1000 字限制</td><td>词典参与识别与对话；未观察到听写后自动抽词</td><td>词典热词（按模型上限挑、每段带）；无听写后自动抽词</td><td>本地 diff、IME/安全/大幅改写过滤、用户确认与撤销</td></tr>
-    <tr><td>上屏</td><td>helper 粘贴与 PasteOutcome；支持 HTML</td><td>有普通/富文本插入接口及剪贴板标记，原生内部细节有限</td><td>AX/剪贴板相关路径及延迟字符数校验线索</td><td>injection_mode、preserve_clipboard 等配置</td><td>原生 helper 贴 + 剪贴板兜底 + 失败分类</td><td>native 内部先剪贴板 + Cmd+V，未读回确认；显式失败才提示手动粘贴</td></tr>
+    <tr><td>上屏</td><td>helper 粘贴与 PasteOutcome；支持 HTML</td><td>有普通/富文本插入接口及剪贴板标记，原生内部细节有限</td><td>AX/剪贴板相关路径及延迟字符数校验线索</td><td>injection_mode、preserve_clipboard 等配置</td><td>原生 helper 贴 + 剪贴板兜底 + 失败分类</td><td>native 先剪贴板 + Cmd+V；主进程精确读回校验，unknown 展示卡片，不自动重贴</td></tr>
     <tr><td>可观测性</td><td>origin、skip reason、字数增删、各段耗时</td><td>采集质量、分段耗时、编辑跟踪日志</td><td>会话/请求 ID、usedDictList 等</td><td>voice_input_latency、历史多层文本、原生日志</td><td>每跳记账 token/cost/latency；超时 unmetered 告警</td><td>会话/请求 ID、ASR 路径、润写档位/风格、changed 与耗时；缺稳定错误分类</td></tr>
     <tr><td>空结果</td><td>有格式化跳过原因等字段</td><td>已见错误码；未观察到统一空语音类型</td><td>有静音、峰值与断线不同判断线索</td><td>有归一化后判空日志</td><td>静音哨兵 + trim 判空；本地静音段不交模型</td><td><code>final/empty/failed</code> 判别联合已实现</td></tr>
   </table>
@@ -432,7 +432,7 @@
   <div class="card">
     <h3>上屏、编辑学习与历史</h3>
     <ul class="tight">
-      <li><code>insertion.ts</code> 默认首次尝试加两次重试，间隔 120 ms。<code>swift/InputHelper.swift:37</code> 内部已经保存剪贴板、写文本、模拟 Cmd+V 并延迟恢复，返回 0 前未读回确认。显式失败才走手动粘贴提示。</li>
+      <li><code>insertion.ts</code> 已改为一次派发并有界读回，同一目标的预期替换文本完全匹配才记为 verified。unknown/blocked 展示结果卡；明确未派发时可手动剪贴板降级。原生恢复检查 changeCount，保留多个剪贴板项目及格式。</li>
       <li><code>insertRichText</code> 接口存在但主链路未用；富文本是特定编辑器的格式能力，不是纯文本失败的通用兜底。</li>
       <li><code>dictionaryLearning.ts</code> 在上屏前取快照，250 ms 首次检查，随后每秒采样，固定总窗口 15 s；编辑稳定约 1.5 s 或 Enter 后生成候选。目标变化、secure 或 IME 会停止跟踪。</li>
       <li><code>editLearning.ts</code> 校验前后缀、目标一致、UTF-16 光标、1000 字上限、改写幅度和词形；候选上限 50、10 分钟过期。用户确认才入词典，5 s 内可撤销，仍保持本地学习。</li>
@@ -579,7 +579,7 @@
   <div class="gap p0">
     <h4><span class="pri p0">P0</span>返回成功不等于目标应用已写入</h4>
     <div class="body">
-      <div class="row"><b>现状：</b>native helper 主路径是剪贴板 + Cmd+V，发出事件后返回 0。JS 默认首次加两次重试，但未读回确认，因此目标未接收时可能被当成成功。</div>
+      <div class="row"><b>现状：</b>原先发出 Cmd+V 就报成功的风险已修复。主进程增加有界目标/文本验证并移除不确定状态下的自动重贴；原生仍返回派发状态，不冒充写入确认。跨应用覆盖尚未完成。</div>
       <div class="row"><b>证据与边界：</b>见 swift/InputHelper.swift:37 与 insertion.ts。Voiskey 有延迟校验线索；Wispr 有 PasteOutcome。它们不能证明仅比字符数就足够可靠。</div>
       <div class="row"><b>建议：</b>确认目标身份与插入区间，尽可能对比有界文本；无法验证时返回 unknown，而非假成功。仅比较字符数会漏掉等长错误。结果不明时避免自动重复粘贴，保留用户可控的手动恢复。</div>
     </div>
@@ -587,7 +587,7 @@
   <div class="gap p1">
     <h4><span class="pri p1">P1</span>剪贴板保存与恢复需要可观测结果</h4>
     <div class="body">
-      <div class="row"><b>现状：</b>helper 已保存并延迟恢复剪贴板，JS 侧没有恢复结果。</div>
+      <div class="row"><b>现状：</b>helper 已保存并延迟恢复剪贴板，新版增加 changeCount 所有权检查和多项目/格式保留；JS 侧仍未取得恢复结果。</div>
       <div class="row"><b>证据与边界：</b>现有代码可直接核对，不仅是注释宣称。异步恢复还需考虑用户或其他进程在这期间修改剪贴板。</div>
       <div class="row"><b>建议：</b>记录实际方法、写入/恢复结果与耗时；恢复前校验归属或 changeCount，避免覆盖用户新复制的内容。保留多类型、多项目数据的语义。</div>
     </div>
@@ -663,9 +663,10 @@
 <!-- ================= 证据边界 ================= -->
 <section id="evidence">
   <h2>证据边界与核实记录</h2>
+  <p class="small">后续实现及有限实测：<a href="research/refinement-evaluation-2026-10-24.md">润写真实模型对照与上屏验证</a>。旧版差距判断与后续已实现能力应区分，不能把一次小样本通过当成质量保证。</p>
   <div class="callout note">
     <ul class="tight">
-      <li><b>本次修订：</b>核对已有发布产物、恢复代码、协议和 SayRel 当前源码，没有新抓包、真实供应商调用或线上竞品质量测试。本文不包含账号、密钥、真实转写内容或令牌。</li>
+      <li><b>本次修订：</b>核对已有发布产物、恢复代码、协议和 SayRel 当前源码，没有新抓包或竞品线上质量测试。SayRel 后续完成 64 次合成文本模型调用和独立窗口原生上屏验证，见下方评测记录。本文不包含账号、密钥、真实转写内容或令牌。</li>
       <li><b>观察：</b>文件字节、已恢复函数/消费点、消息字段、符号、配置项与日志字符串。字符串只证明存在相关文字，不等于函数体、调用顺序、默认启用或真实执行。</li>
       <li><b>推断：</b>闪电说 text_correction 的具体输出路径、自定义 prompt 的关联分支，以及尚未恢复的服务端使用方式。<b>未知：</b>服务端模型/prompt、联合训练、真实质量/延迟、功能开关的线上取值、未恢复的原生控制流。</li>
       <li><b>Wispr Flow 1.6.1253：</b><code>reference/wisprflow/readable/main.index.pretty.js:142954</code> 的 gRPC/Baseten HTTP 竞速受功能开关、录音完成和时长限制；第 166817 行附近为条件性客户端处理。另见 README、analysis 与重建 proto。三路同时竞速的旧结论已撤回。</li>

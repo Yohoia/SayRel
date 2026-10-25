@@ -458,5 +458,11 @@
   "Writing result": "整理结果",
   "Refine again with current settings": "按当前设置重新整理",
   "No original transcript is available for this dictation": "这条记录没有可用的原始转写",
-  "Only saved dictations can be refined again": "只有听写记录支持重新整理"
+  "Only saved dictations can be refined again": "只有听写记录支持重新整理",
+  "Insertion could not be verified. Check the target before copying to avoid duplicate text.": "无法确认文字是否已写入。请先检查目标输入框，再决定是否复制，避免重复输入。",
+  "Automatic insertion was blocked by secure input or active text composition. Copy the result when ready.": "安全输入或正在进行的输入法组字阻止了自动写入。准备好后可复制结果。",
+  "Text is on the clipboard. Paste it manually.": "文字已放入剪贴板，请手动粘贴。",
+  "Automatic insertion is unavailable. Copy the result when ready.": "自动写入不可用，准备好后可复制结果。",
+  "Message native cleanup is off in Raw and on in Light/Deep cleanup. A configured writing model still runs separately.": "Message 在原文档关闭原生润色，在轻整理／深整理档开启；已配置的写作模型仍会独立执行后续润写。",
+  "Native ASR cleanup was enabled. This is the model output, not a verbatim transcript.": "本次开启了语音模型原生润色，这里是模型整理后的输出，并非逐字原稿。"
 }

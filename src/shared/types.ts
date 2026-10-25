@@ -1,5 +1,6 @@
 import type { Delivery, HistoryStatus, Mode } from './constants'
 import type { RefinementOutcome } from './refinement'
+import type { InsertionOutcome } from './insertion'
 import type { AsrOutcome } from './asr'
 import type { DesktopPlanView } from './desktopCommands'
 
@@ -80,6 +81,7 @@ export interface HistoryRecord {
 export interface HistoryListItem {
   id: string
   transcript?: string
+  insertion?: InsertionOutcome
   refinedText: string | null
   status: string | null
   mode: string
@@ -90,6 +92,7 @@ export interface HistoryListItem {
   detectedLanguage: string | null
   audioLocalPath: string | null
   hasAudio: boolean
+  providerPolish?: boolean
   refinement?: RefinementOutcome
 }
 
@@ -136,6 +139,7 @@ export interface DictionaryEntry {
 
 export interface TranscriptionRequest {
   allowEmpty?: boolean
+  providerPolish?: boolean
   pcm?: Float32Array
   sampleRate?: number
   signal?: AbortSignal
@@ -152,6 +156,7 @@ export interface TranscriptionRequest {
 
 export interface TranscriptionResult {
   text: string
+  providerPolish?: boolean
   detectedLanguage: string | null
   confidence?: number | null
   provider: string
@@ -187,6 +192,7 @@ export interface VoiceFlowResult {
   detectedLanguage: string | null
   error?: string | null
   refinement?: RefinementOutcome
+  insertion?: InsertionOutcome
   asr?: AsrOutcome
   desktopPlan?: DesktopPlanView
 }

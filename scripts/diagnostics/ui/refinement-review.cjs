@@ -27,6 +27,7 @@ async function page(fail = '') {
 }
 async function screenshot(name) {
   await js('document.fonts.ready')
+  await js('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
   assert.equal(await js('document.documentElement.scrollWidth > innerWidth'), false)
   writeFileSync(join(output, name + '.png'), (await win.webContents.capturePage()).toPNG())
 }
@@ -58,6 +59,11 @@ app.whenReady().then(async () => {
   await click('Refine again with current settings')
   await until("document.body.innerText.includes('Previous result kept.')")
   assert.equal(await js("document.querySelector('.history-text-comparison').innerText"), before)
-  console.log('PASS refinement UI: skipped/unchanged states, original comparison, current-settings rewrite without audio, refreshed metadata, Chinese labels, failed rewrite preserves output')
+  await win.loadFile(join(root, '.build/ui-review/interactive-card.html'), { query: { 'insertion-review': '1' } })
+  await until("document.querySelector('.secondary-card-shell')?.style.opacity === '1'")
+  assert.equal(await js("document.querySelector('.secondary-card-shell .secondary-insertion-warning').innerText.includes('Check the target before copying')"), true)
+  assert.equal(await js("document.querySelector('.secondary-card-shell .secondary-answer-content').innerText"), 'Writing preserved for manual review.')
+  await screenshot('insertion-unknown')
+  console.log('PASS refinement UI: skipped/unchanged states, original comparison, current-settings rewrite without audio, refreshed metadata, Chinese labels, failed rewrite preserves output, visible unverified-insertion warning')
 }).then(() => { win?.destroy(); app.exit(0) }).catch(error => { console.error(error); win?.destroy(); app.exit(1) })
 app.on('quit', () => rmSync(profile, { recursive: true, force: true }))

@@ -4,6 +4,7 @@ import VisibilityOutlined from '@mui/icons-material/VisibilityOutlined'
 import VisibilityOffOutlined from '@mui/icons-material/VisibilityOffOutlined'
 import { PROVIDER_PRESETS, createProviderProfile } from '../../../shared/providerPresets'
 import { azureChatUrl, geminiUrl } from '../../../shared/providerEndpoints'
+import { qwenAsrRoute } from '../../../shared/qwenAsr'
 import {
   EMPTY_SERVICE_PROVIDERS, providerProfileSchema, providerConfigurationIssue, protocolLabels, refinementProtocols,
   supportsDeepSeekThinking, transcriptionProtocols, type ProviderProfile, type ProviderService, type ServiceProviders, type ThinkingMode
@@ -48,15 +49,16 @@ function requestPreview(draft: Draft, model = draft.models[0] || '{model}'): str
       if (!path) url.pathname = realtimePaths[draft.protocol] || '/v1/speech-to-text/realtime'
       if (draft.protocol === 'openai-realtime') url.searchParams.set('intent', 'transcription')
       if (draft.protocol === 'qwen-asr') {
-        const flash = /^(?:fun-asr-flash|qwen-audio-[\d.]+-asr-flash)/.test(model) && !model.includes('realtime')
+        const route = qwenAsrRoute(model), flash = route === 'batch'
         if (flash) {
           url.protocol = url.protocol === 'wss:' ? 'https:' : 'http:'
           if (/^\/api-ws\/v1\/(realtime|inference)\/?$/.test(url.pathname)) url.pathname = '/api/v1/services/aigc/multimodal-generation/generation'
           url.searchParams.delete('model')
         } else {
-          const fun = model.startsWith('fun-asr')
+          const fun = ['task', 'message', 'streaming'].includes(route)
           if (/^\/api-ws\/v1\/(realtime|inference)\/?$/.test(url.pathname)) url.pathname = `/api-ws/v1/${fun ? 'inference' : 'realtime'}`
-          if (!fun) url.searchParams.set('model', model === 'qwen3-asr-flash' ? 'qwen3-asr-flash-realtime' : model)
+          if (fun) url.searchParams.delete('model')
+          else url.searchParams.set('model', model === 'qwen3-asr-flash' ? 'qwen3-asr-flash-realtime' : model)
         }
       }
       if (draft.protocol === 'volcengine-asr' && /\/api\/v3\/(?:plan\/)?sauc\/bigmodel(?:_nostream|_async)?\/?$/.test(url.pathname)) url.pathname = url.pathname.replace(/bigmodel(?:_nostream|_async)?\/?$/, model)
@@ -287,6 +289,8 @@ function ProviderEditor({ initial, saved, selection, onClose, onUpdated }: {
           <p className="provider-help" id={`provider-${draft.id}-thinking-help`}>{t((draft.thinkingMode ?? 'auto') === 'enabled' ? "Thinking is on for this provider. Uses the model’s standard reasoning effort and may take longer or use more tokens." : draft.thinkingMode === 'disabled' ? "Thinking is off for this provider. Usually faster; complex corrections may be less reliable." : "Auto uses low reasoning effort for dictation refinement and the model default for other writing tasks.")}</p>
         </div>}
         <section className="provider-model-section" aria-label={t("Model list")}><div className="provider-model-heading"><h3>{local ? t("Local model file path") : draft.protocol === 'azure-openai' ? t("Model deployment name") : t("Models")}</h3><div className="provider-model-heading-actions">{canDiscover(draft.protocol) && <button type="button" className="text-button" disabled={!!busy || !!testing} onClick={() => void discover()}>{busy === 'models' ? t("Fetching…") : t("Fetch models")}</button>}{preset?.docsUrl && <button type="button" className="provider-inline-link" onClick={() => void api.page.openUrl(preset.docsUrl)}>{t("Model docs ↗")}</button>}</div></div>
+          {preset?.models.some(model => !draft.models.includes(model)) && <div className="provider-preset-models">{preset.models.filter(model => !draft.models.includes(model)).map(model => <button type="button" className="text-button" key={model} disabled={!!busy || !!testing || draft.models.length >= 200} onClick={() => edit({ models: [...draft.models, model] })}>{t("Add model")}: {model}</button>)}</div>}
+          {draft.protocol === 'qwen-asr' && qwenAsrRoute(selectedModel) === 'message' && <p className="provider-help">{t("Message native cleanup is off in Raw and on in Light/Deep cleanup. A configured writing model still runs separately.")}</p>}
           <div className="provider-model-list" role="radiogroup" aria-label={t("Current model")}>{draft.models.map(model => {
             const current = selectedModel === model
             return <div className={`provider-model ${current ? 'is-current' : ''}`} key={model}>

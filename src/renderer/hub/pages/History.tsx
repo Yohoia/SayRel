@@ -12,6 +12,7 @@ import { HubSelect } from '../components/HubSelect'
 
 import type { HistoryListItem as Item } from '../../../shared/types'
 import { refinementOutcomeSchema, refinementStatusText } from '../../../shared/refinement'
+import { insertionStatusText } from '../../../shared/insertion'
 type Confirmation = { type: 'item'; item: Item } | { type: 'all' } | { type: 'retention'; days: number }
 const FILTERS = [{ id: 'all', label: "All" }, { id: 'dictations', label: "Dictations" }, { id: 'ask_anything', label: "Ask anything" }]
 const RETENTION = [{ value: 'never', label: "Never" }, { value: '1', label: "24 hours" }, { value: '7', label: "1 week" }, { value: '30', label: "1 month" }, { value: '365', label: "1 year" }, { value: '0', label: "Forever" }]
@@ -159,6 +160,7 @@ export function HistoryPage() {
     {!loading && items.length < total && <div ref={sentinel} className="history-load-more"><button className="text-button" disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore ? t("Loading…") : t("Load more")}</button></div>}
     {selected && <Modal title={t(selected.mode === 'ask_anything' ? 'Answer' : 'Transcription details')} onClose={() => setSelected(null)}>
       {selected.mode === 'ask_anything' ? <div className="detail-transcript">{selected.refinedText}</div> : <>
+        {insertionStatusText(selected.insertion) && <p className="history-refinement-warning" role="status">{t(insertionStatusText(selected.insertion) ?? '')}</p>}
         {refinementStatusText(selected.refinement) && <p className="detail-meta" role="status">{t(refinementStatusText(selected.refinement) ?? '')}</p>}
         {selected.refinement && selected.refinement.kind !== 'skipped' && <p className="detail-meta">
           {selected.refinement.polishLevel && <span>{t('Cleanup level')}: {t(selected.refinement.polishLevel === 'strong' ? 'Deep cleanup' : selected.refinement.polishLevel === 'light' ? 'Light cleanup' : 'Original wording')}</span>}
@@ -166,7 +168,7 @@ export function HistoryPage() {
           {selected.refinement.promptVersion && <span> · {selected.refinement.promptVersion}</span>}
         </p>}
         <div className="history-text-comparison">
-          <section><h3>{t('Original transcript')}</h3><div className="detail-transcript">{selected.transcript ?? t('No original transcript is available for this dictation')}</div></section>
+          <section><h3>{t('Original transcript')}</h3>{selected.providerPolish && <p className="history-refinement-status">{t('Native ASR cleanup was enabled. This is the model output, not a verbatim transcript.')}</p>}<div className="detail-transcript">{selected.transcript ?? t('No original transcript is available for this dictation')}</div></section>
           <section><h3>{t('Writing result')}</h3><div className="detail-transcript">{selected.refinedText}</div></section>
         </div>
       </>}

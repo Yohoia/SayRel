@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { asrOutcomeSchema } from './asr'
+import { insertionOutcomeSchema } from './insertion'
 
 const writingDetails = {
   providerId: z.string().optional(), model: z.string().optional(), promptVersion: z.string().optional(),
@@ -28,7 +29,8 @@ const voiceMetadataSchema = z.object({
   transcript: z.string(),
   detectedLanguage: z.string().nullable().optional(),
   refinement: refinementOutcomeSchema.optional(),
-  asr: asrOutcomeSchema.optional()
+  asr: asrOutcomeSchema.optional(),
+  insertion: insertionOutcomeSchema.optional()
 })
 
 export function readVoiceMetadata(json: string | null): z.infer<typeof voiceMetadataSchema> | null {

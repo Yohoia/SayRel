@@ -26,6 +26,7 @@ import { recordingSetupIssue, type RecordingIssue } from '../../shared/recording
 import type { OwnedPracticeTarget, PracticeTarget } from '../../shared/featureTour'
 import { providerConfigurationIssue, selectedProvider } from '../../shared/providers'
 import { readVoiceMetadata, type RefinementOutcome } from '../../shared/refinement'
+import type { InsertionOutcome } from '../../shared/insertion'
 
 const log = createLogger('recording-machine')
 export type RecorderPhase = 'idle' | 'long_pressing' | 'starting' | 'recording' | 'finishing' | 'error'
@@ -149,7 +150,8 @@ export class RecordingMachine extends EventEmitter {
       session.live = startLiveTranscription(selected.profile, selected.model, {
         sampleRate: AUDIO.SAMPLE_RATE, durationMs: 0, mode: session.mode,
         language: recognitionLanguage(session.config), languages: session.config.preferredLanguages,
-        dictionary: session.dictionary, signal: session.controller.signal
+        dictionary: session.dictionary, signal: session.controller.signal,
+        providerPolish: session.mode === 'voice_transcript' && session.config.polishLevel !== 'raw'
       }, text => {
         if (!this.active(session) || session.stopped) return
         if (text.trim()) session.firstPartialAt ??= Date.now()
@@ -374,7 +376,7 @@ export class RecordingMachine extends EventEmitter {
         userPrompt: result.transcript,
         question: result.transcript, selectedText: input.context?.focusedInput?.selectedText ?? null,
         answer: result.refined, refinement: result.mode === 'voice_transcript' || result.mode === 'voice_command' ? result.refinement : undefined,
-        desktopPlan: result.desktopPlan, createdAt: Date.now() })
+        insertion: result.insertion, desktopPlan: result.desktopPlan, createdAt: Date.now() })
       interactiveCardWindow.createWindow()
       interactiveCardWindow.show()
     }
@@ -526,7 +528,7 @@ export class RecordingMachine extends EventEmitter {
       startedAt: session.startedAt, completedAt: session.live && !session.liveFailure ? session.asrFinalAt ?? Date.now() : Date.now(), stoppedAt: session.stoppedAt,
       connectionReadyAt: session.connectionReadyAt, firstPartialAt: session.firstPartialAt, streamFailure: session.liveFailure }
     session.asr = input.kind === 'transcript' && input.asr ? input.asr : result.text.trim() ? { ...identity, kind: 'final', asrText: result.text,
-      detectedLanguage: result.detectedLanguage, confidence: result.confidence } : { ...identity, kind: 'empty', asrText: '' }
+      detectedLanguage: result.detectedLanguage, confidence: result.confidence, providerPolish: result.providerPolish } : { ...identity, kind: 'empty', asrText: '' }
     if (session.historyWritten && input.kind === 'audio') history.upsertHistory({ id: session.id, refinedText: result.text,
       modeMeta: JSON.stringify({ transcript: result.text, detectedLanguage: result.detectedLanguage, asr: session.asr }) })
     if (session.asr.kind === 'empty') throw new Error('No speech was detected. Check the microphone and try again.')
@@ -575,6 +577,7 @@ export class RecordingMachine extends EventEmitter {
     this.requireActive(session)
     let delivery: VoiceFlowResult['delivery'] = 'card'
     let insertionMs = 0
+    let insertion: InsertionOutcome | undefined
     if (!session.practice && input.mode !== 'ask_anything' && !session.historyRetry && !session.refinementRetry) {
       const learning = config.dictionaryLearning && input.mode === 'voice_transcript' && session.asr.kind === 'final'
         ? await import('./dictionaryLearning') : null
@@ -583,8 +586,9 @@ export class RecordingMachine extends EventEmitter {
       if (learning) this.stopLearningTracking = learning.stopDictionaryTracking
       const insertionStartedAt = Date.now()
       const outcome = await insertText(refined, { addTrailingSpace: config.addTrailingSpace, isCancelled: () => !this.active(session) })
+      insertion = outcome
       insertionMs = Date.now() - insertionStartedAt
-      delivery = outcome.ok ? 'insert' : 'clipboard'
+      delivery = outcome.ok ? 'insert' : outcome.method === 'clipboard' ? 'clipboard' : 'card'
       if (outcome.ok && before && learning && this.active(session)) learning.trackInsertedDictation({
         requestId: session.asrRequestId, historyId: config.historyEnabled ? session.id : null, before,
         inserted: refined, asrText: result.text
@@ -594,13 +598,13 @@ export class RecordingMachine extends EventEmitter {
     if (session.historyRefinement && !history.getHistory(session.id)) throw new Error('This recording is no longer available')
     if (config.historyEnabled || session.historyRetry) history.upsertHistory({ id: session.id, status: HISTORY_STATUS.COMPLETED, refinedText: refined,
       modeMeta: JSON.stringify({ transcript: result.text, detectedLanguage: result.detectedLanguage, asr: session.asr, refinement,
-        deliveryTiming: { insertionMs, completedAt: Date.now() }, aiResult: { text: refined, delivery } }) })
+        insertion, deliveryTiming: { insertionMs, completedAt: Date.now() }, aiResult: { text: refined, delivery } }) })
     log.info('voice flow completed', { sessionId: session.id, requestId: session.asrRequestId, path: session.asr.path,
       firstPartialMs: session.firstPartialAt ? session.firstPartialAt - session.startedAt : null,
-      connectionMs: session.connectionReadyAt ? session.connectionReadyAt - session.startedAt : null, insertionMs,
+      connectionMs: session.connectionReadyAt ? session.connectionReadyAt - session.startedAt : null, insertionMs, insertionVerification: insertion?.verification,
       stopToFinalMs: session.stoppedAt ? session.asr.completedAt - session.stoppedAt : null,
       stopToDeliveryMs: session.stoppedAt ? Date.now() - session.stoppedAt : null })
-    return { id: session.id, transcript: result.text, refined, delivery, mode: input.mode, durationMs: input.durationMs, detectedLanguage: result.detectedLanguage, refinement, asr: session.asr }
+    return { id: session.id, transcript: result.text, refined, delivery, mode: input.mode, durationMs: input.durationMs, detectedLanguage: result.detectedLanguage, refinement, insertion, asr: session.asr }
   }
   private stopCountdown(): void { if (this.countdown) clearInterval(this.countdown); this.countdown = null }
 }

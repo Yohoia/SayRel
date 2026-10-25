@@ -136,6 +136,7 @@ function toListItem(row: any): HistoryListItem {
     id: row.id,
     refinedText: row.refinedText,
     ...(metadata ? { transcript: metadata.transcript } : {}),
+    ...(metadata?.insertion ? { insertion: metadata.insertion } : {}),
     status: row.status,
     mode: row.mode ?? 'voice_transcript',
     duration: row.duration,
@@ -144,6 +145,7 @@ function toListItem(row: any): HistoryListItem {
     focusedAppBundleId,
     detectedLanguage: metadata?.detectedLanguage ?? detectedLanguage,
     ...(metadata?.refinement ? { refinement: metadata.refinement } : {}),
+    ...(metadata?.asr?.kind === 'final' ? { providerPolish: metadata.asr.providerPolish } : {}),
     audioLocalPath: row.audioLocalPath,
     hasAudio: Boolean(row.audioLocalPath && existsSync(row.audioLocalPath))
   }

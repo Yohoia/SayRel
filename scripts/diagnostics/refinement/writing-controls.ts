@@ -15,6 +15,7 @@ for (const level of ['raw', 'light', 'strong'] as const) {
   assert.match(prompt, /Do not add punctuation/)
   assert.match(prompt, /professional tone/)
   assert.equal(prompt.includes('actively recast'), level === 'strong')
+  assert.equal(prompt.includes('Final STRONG writing check'), level === 'strong')
   if (level === 'raw') assert(!prompt.includes('Explicit dictation edits take precedence'))
   assert.equal(JSON.parse(buildRefinementUserPrompt({ ...request, polishLevel: level })).transcript, request.transcript)
 }
@@ -24,5 +25,5 @@ assert.equal(writingPreferencesSchema.safeParse({ dictionaryLearning: 'true' }).
 assert.equal(writingPreferencesSchema.safeParse({ transcriptionLanguage: 'zh-CN' }).success, true)
 assert.equal(writingPreferencesSchema.safeParse({ transcriptionLanguage: 'not a language' }).success, false)
 assert(asrOutcomeSchema.safeParse({ kind: 'partial', asrText: 'Open Safari' }).success === false)
-assert.equal(REFINEMENT_PROMPT_VERSION, 'dictation-2026-10-24.1')
+assert.equal(REFINEMENT_PROMPT_VERSION, 'dictation-2026-10-24.3')
 console.log('PASS Writing controls: edit budgets, style, punctuation, settings validation and prompt version contracts')

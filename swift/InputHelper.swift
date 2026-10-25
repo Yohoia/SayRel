@@ -29,29 +29,31 @@ public func checkAccessibilityPermission(_ prompt: Int32) -> Int32 {
 
 /// Inserts plain text into the currently focused element.
 ///
-/// Strategy mirrors the reference implementation: prefer the pasteboard-backed
-/// paste path (works in Electron, browsers and most native editors), and fall
-/// back to per-character Unicode key events when the paste shortcut is
-/// swallowed.
+/// Zero means the paste shortcut was dispatched, not that the target accepted it.
+/// The caller verifies the target text before reporting success.
 @_cdecl("insertText")
 public func insertText(_ textPointer: UnsafeMutablePointer<CChar>?) -> Int32 {
     guard let textPointer else { return -1 }
     let text = String(cString: textPointer)
     guard !text.isEmpty else { return 0 }
+    let blocked = insertionBlockCode()
+    guard blocked == 0 else { return blocked }
 
     let pasteboard = NSPasteboard.general
     let saved = savePasteboard(pasteboard)
     pasteboard.clearContents()
     pasteboard.setString(text, forType: .string)
+    let ownedChangeCount = pasteboard.changeCount
 
     let pasted = simulatePasteCommand()
     if !pasted {
-        typeUnicode(text)
+        restorePasteboard(pasteboard, from: saved, ifUnchangedSince: ownedChangeCount)
+        return -2
     }
 
     // Restore the user's clipboard after the paste has had time to land.
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-        restorePasteboard(pasteboard, from: saved)
+        restorePasteboard(pasteboard, from: saved, ifUnchangedSince: ownedChangeCount)
     }
     return 0
 }
@@ -64,6 +66,8 @@ public func insertRichText(
     guard let textPointer else { return -1 }
     let text = String(cString: textPointer)
     let html = htmlPointer.map { String(cString: $0) }
+    let blocked = insertionBlockCode()
+    guard blocked == 0 else { return blocked }
 
     let pasteboard = NSPasteboard.general
     let saved = savePasteboard(pasteboard)
@@ -72,10 +76,14 @@ public func insertRichText(
     if let html {
         pasteboard.setString(html, forType: .html)
     }
+    let ownedChangeCount = pasteboard.changeCount
     let pasted = simulatePasteCommand()
-    if !pasted { typeUnicode(text) }
+    if !pasted {
+        restorePasteboard(pasteboard, from: saved, ifUnchangedSince: ownedChangeCount)
+        return -2
+    }
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-        restorePasteboard(pasteboard, from: saved)
+        restorePasteboard(pasteboard, from: saved, ifUnchangedSince: ownedChangeCount)
     }
     return 0
 }
@@ -170,27 +178,52 @@ public func getCurrentInputState(_ timeoutMs: Int32) -> UnsafeMutablePointer<CCh
 
 // MARK: - Private
 
-private struct ArchivedItem {
+private struct ArchivedRepresentation {
     let type: NSPasteboard.PasteboardType
     let data: Data
 }
 
+private struct ArchivedItem {
+    let representations: [ArchivedRepresentation]
+}
+
 private func savePasteboard(_ pasteboard: NSPasteboard) -> [ArchivedItem] {
-    (pasteboard.pasteboardItems ?? []).flatMap { item in
-        item.types.compactMap { type in
-            item.data(forType: type).map { ArchivedItem(type: type, data: $0) }
-        }
+    (pasteboard.pasteboardItems ?? []).map { item in
+        ArchivedItem(representations: item.types.compactMap { type in
+            item.data(forType: type).map { ArchivedRepresentation(type: type, data: $0) }
+        })
     }
 }
 
-private func restorePasteboard(_ pasteboard: NSPasteboard, from items: [ArchivedItem]) {
+private func restorePasteboard(_ pasteboard: NSPasteboard, from items: [ArchivedItem], ifUnchangedSince changeCount: Int? = nil) {
+    if let changeCount, pasteboard.changeCount != changeCount { return }
     pasteboard.clearContents()
     guard !items.isEmpty else { return }
-    let item = NSPasteboardItem()
-    for archived in items {
-        item.setData(archived.data, forType: archived.type)
+    let restored = items.map { archived in
+        let item = NSPasteboardItem()
+        for representation in archived.representations {
+            item.setData(representation.data, forType: representation.type)
+        }
+        return item
     }
-    pasteboard.writeObjects([item])
+    pasteboard.writeObjects(restored)
+}
+
+private func insertionBlockCode() -> Int32 {
+    if IsSecureEventInputEnabled() { return -3 }
+    guard AXIsProcessTrusted() else { return -2 }
+    if let element = focusedElement() {
+        AXUIElementSetMessagingTimeout(element, 0.08)
+        var subrole: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subrole)
+        if subrole as? String == "AXSecureTextField" { return -3 }
+        var marked: CFTypeRef?
+        var range = CFRange()
+        if AXUIElementCopyAttributeValue(element, "AXMarkedTextRange" as CFString, &marked) == .success,
+           let marked, CFGetTypeID(marked) == AXValueGetTypeID(),
+           AXValueGetValue(marked as! AXValue, .cfRange, &range), range.length > 0 { return -4 }
+    }
+    return 0
 }
 
 @discardableResult
@@ -206,18 +239,6 @@ private func simulatePasteCommand() -> Bool {
     down.post(tap: .cgAnnotatedSessionEventTap)
     up.post(tap: .cgAnnotatedSessionEventTap)
     return true
-}
-
-private func typeUnicode(_ text: String) {
-    let source = CGEventSource(stateID: .combinedSessionState)
-    for scalar in text.unicodeScalars {
-        var unit = UniChar(scalar.value & 0xFFFF)
-        for isDown in [true, false] {
-            guard let event = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: isDown) else { continue }
-            event.keyboardSetUnicodeString(stringLength: 1, unicodeString: &unit)
-            event.post(tap: .cgAnnotatedSessionEventTap)
-        }
-    }
 }
 
 private func focusedElement() -> AXUIElement? {

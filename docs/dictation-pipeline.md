@@ -65,13 +65,21 @@ Controls are in **Settings > Personalization**. Defaults are `polishLevel=light`
 
 With automatic language detection disabled, recognition uses the selected transcription language, then the first preferred language, then English. Fixed language hints take precedence over the broader preferred-language list where supported by the adapter.
 
-The prompt version is `dictation-2026-10-24.1`. Completed refinement metadata includes this version, the provider/model, the actual cleanup level, writing style, punctuation setting, whether the output changed, and duration. Failure metadata retains the request settings; skipping an unconfigured writing model records `reason=no-default-provider`. Older metadata without these fields remains readable. The existing deep-rewrite quality fixtures explicitly request `strong`; they do not silently test the new `light` default against deep-rewrite examples.
+The prompt version is `dictation-2026-10-24.3`. Completed refinement metadata includes this version, the provider/model, the actual cleanup level, writing style, punctuation setting, whether the output changed, and duration. Failure metadata retains the request settings; skipping an unconfigured writing model records `reason=no-default-provider`. Older metadata without these fields remains readable. The existing deep-rewrite quality fixtures explicitly request `strong`; they do not silently test the new `light` default against deep-rewrite examples.
+
+Strong cleanup no longer encourages parenthetical task annotations. Valid reasons become ordinary prose; superseded choices and editing narration are omitted. Literal or explicitly dictated parentheses remain intact. This changes the writing policy, not a post-processing regex that deletes bracketed text.
 
 History distinguishes skipped refinement, provider failure, completed unchanged text, and changed text. **View details** shows the original transcript and writing result, with the available model, cleanup level, and prompt version. These states describe execution, not writing quality.
 
 **Refine again with current settings** uses the saved original transcript and current writing settings, without ASR or saved audio. It applies only to normal dictations, opens the result in a card, and never automatically reinserts it. If the request fails or is cancelled, the previous result stays intact. Deleting the history entry during a request prevents it from being recreated by the late result. The floating-bar refinement retry also reads current writing controls, rather than retaining the original cleanup level.
 
-Prompt-contract tests establish request construction and constraints. Assessing actual writing quality still requires real-model output and human review.
+Prompt-contract tests establish request construction and constraints. A limited real-model comparison of synthetic cases was run on 2026-10-24; see `docs/research/refinement-evaluation-2026-10-24.md` for outputs, observed failures and sampling limits. Passing the minimum checks is not proof of fluent writing or general quality.
+
+## Insertion verification
+
+A native return code of zero means dispatch, not confirmed delivery. The main process reads bounded local snapshots before and after one paste, and verifies the exact replacement in the same target. Secure input and marked IME text block dispatch. Unreadable input, target changes, mismatched text and uncertain native errors produce an `unknown` result card, not an automatic second paste. Explicit pre-dispatch unavailability can fall back to manual clipboard delivery.
+
+`modeMeta.insertion` and result cards retain only the delivery verdict, never the temporary field snapshots. The native helper restores all clipboard items/formats only while its `changeCount` still matches, so later copies are not overwritten. Verification does not require dictionary learning or enable context upload. AX-unreadable editors may receive text but still show an unverified result; check the target before copying it again.
 
 ## Learning from edits
 

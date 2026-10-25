@@ -159,6 +159,11 @@ const bridge = {
     if (channel === 'keyboard:begin-shortcut-capture') return { native: false, sessionId: ++shortcutCaptureSessionId }
     if (channel === 'audio:get-devices-async') return [{ deviceId: 'default', label: 'MacBook Pro Microphone', isDefault: true }]
     if (channel === 'troubleshooting:get-system-info') return { appVersion: '1.0.0', platform: 'darwin', arch: 'arm64' }
+    if (channel === 'page:get-interactive-card-payload' && params.has('insertion-review')) return {
+      title: 'Original dictation', answer: 'Writing preserved for manual review.',
+      refinement: { kind: 'completed', changed: true, polishLevel: 'strong' },
+      insertion: { verification: 'unknown', method: 'native', ok: false, error: 'text-mismatch' }
+    }
     if (channel === 'page:get-interactive-card-payload') return params.has('desktop-command')
       ? { title: 'Open Safari', answer: 'Open Safari', desktopPlan: { id: '22222222-2222-4222-8222-222222222222', summary: 'Open Safari', expiresAt: Date.now() + 120000 } }
       : { title:'Help me organize this idea', answer:'Clear writing starts with one simple sentence.\n\nSpeak naturally and let the words take shape as you think.', createdAt:Date.now() }

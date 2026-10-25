@@ -12,10 +12,11 @@ import { toast } from '../shared/components/Toast'
 import '../shared/styles/secondary.css'
 import { desktopPlanViewSchema } from '../../shared/desktopCommands'
 import { refinementOutcomeSchema, refinementStatusText } from '../../shared/refinement'
+import { insertionOutcomeSchema, insertionStatusText } from '../../shared/insertion'
 
 const payloadSchema = z.object({
   title: z.string().nullish(), userPrompt: z.string().nullish(),
-  selectedText: z.string().nullish(), answer: z.string(), desktopPlan: desktopPlanViewSchema.optional(), refinement: refinementOutcomeSchema.optional()
+  selectedText: z.string().nullish(), answer: z.string(), desktopPlan: desktopPlanViewSchema.optional(), refinement: refinementOutcomeSchema.optional(), insertion: insertionOutcomeSchema.optional()
 })
 type Payload = z.infer<typeof payloadSchema>
 
@@ -126,6 +127,7 @@ export function CardApp() {
             {collapsible && expanded && <button className="secondary-prompt-toggle" onClick={() => setExpanded(false)}>{t('Show less')}</button>}
           </section>}
           <article className="secondary-answer">
+            {insertionStatusText(payload.insertion) && <p className="secondary-insertion-warning" role="status">{t(insertionStatusText(payload.insertion) ?? '')}</p>}
             <header><h1><AnswerIcon />{t(payload.refinement ? "Writing result" : "Answer")}</h1><button className={`secondary-icon-button ${copied ? 'is-copied' : ''}`} aria-label={copied ? t("Copied") : t("Copy answer")} title={copied ? t("Copied") : t("Copy answer")} onClick={copy}>{copied ? <CheckRounded /> : <CopyIcon />}</button></header>
             {payload.refinement && <p className="secondary-refinement-status" role="status">{t(refinementStatusText(payload.refinement) ?? '')}{payload.refinement.kind !== 'skipped' && payload.refinement.polishLevel && <> · {t(payload.refinement.polishLevel === 'strong' ? 'Deep cleanup' : payload.refinement.polishLevel === 'light' ? 'Light cleanup' : 'Original wording')}</>}</p>}
             <div className="secondary-answer-content" ref={measure ? undefined : answerRef}><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ href, children }) => <a href={href} onClick={event => { event.preventDefault(); if (href) void api.page.openUrl(href) }}>{children}</a> }}>{payload.answer}</ReactMarkdown></div>

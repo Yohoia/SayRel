@@ -20,6 +20,7 @@ mocks['./providers'] = load('src/shared/providers.ts')
 const sharedProviders = mocks['./providers']
 mocks['../../shared/providers'] = sharedProviders
 mocks['./asr'] = load('src/shared/asr.ts')
+mocks['./insertion'] = load('src/shared/insertion.ts')
 mocks['./prompts'] = load('src/main/services/providers/prompts.ts')
 mocks['./providers/refinementPrompt'] = load('src/main/services/providers/refinementPrompt.ts')
 mocks['./refinementPrompt'] = mocks['./providers/refinementPrompt']
@@ -49,7 +50,7 @@ Object.assign(mocks, {
   '../../shared/ipc': { IPC: {} }, './history': { upsertHistory: row => rows.push(row), getHistory: id => ({ id, mode: 'voice_transcript', audioLocalPath: '/fixture.ogg', duration: 1200 }) },
   './dictionary': { listDictionary: () => [] }, './voiceActions': { runVoiceAction: async () => 'answer' },
   './desktopCommands': { cancelDesktopPlan() {} },
-  './insertion': { insertText: async text => { inserted.push(text); return { ok: true } } },
+  './insertion': { insertText: async text => { inserted.push(text); return { ok: true, method: 'native', verification: 'verified' } } },
   './transcription': { transcribe: (...args) => transcribe(...args), recognitionLanguage: config => config.autoDetectLanguage ? null : config.transcriptionLanguage ?? 'en' },
   './providers/realtime': { supportsLiveTranscription: () => false },
   './providers': { createProviders: (legacy, state) => { refinementStates.push(state); return providersFactory(legacy, state) } },

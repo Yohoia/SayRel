@@ -346,6 +346,8 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     "protocol": "qwen-asr",
     "endpoint": "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
     "models": [
+      "qwen-audio-3.1-asr-flash-message",
+      "qwen-audio-3.1-asr-flash-streaming",
       "fun-asr-realtime",
       "qwen3-asr-flash",
       "fun-asr-flash-2026-06-15"

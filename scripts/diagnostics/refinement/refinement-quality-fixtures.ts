@@ -24,41 +24,42 @@ export const refinementQualityFixtures = [
   {
     id: 'tour-todo-zh-actionable-not-narrated', group: 'readability',
     request: { mode: 'voice_transcript', polishLevel: 'strong', languages: ['zh-CN'], transcript: tourExample('dictate', 3, true).prompt },
-    example: '周五前的待办事项：\n1. 预订机场停车位（便宜的车位容易订满）。\n2. 网上值机。\n3. 收拾登机箱（只住两晚，登机箱足够）。',
+    example: '周五前的待办事项：\n1. 优先预订机场停车位，便宜的车位容易订满。\n2. 网上值机。\n3. 收拾登机箱，两晚行程用登机箱足够。',
     required: [
       { pattern: '(?:^|\\n)\\s*(?:[-*•]|\\d+[.、)])\\s*(?:先|优先|首先)?\\s*(?:预订|预定|订|预约).*停车', reason: '停车应是实际清单中的动作条目' },
       { pattern: '(?:^|\\n)\\s*(?:[-*•]|\\d+[.、)])\\s*(?:网上值机|在线值机|办理.*值机)', reason: '网上值机应是独立的动作条目' },
       { pattern: '(?:^|\\n)\\s*(?:[-*•]|\\d+[.、)])\\s*(?:收拾|准备|打包|整理|带上|携带|带).*登机箱', reason: '把“行李箱的话”整理为直接的登机箱待办事项' },
-      { pattern: '周五', reason: '保留完成期限' }, { pattern: '便宜|低价', reason: '保留优先停车的价格理由' }, { pattern: '两晚|2\\s*晚', reason: '保留登机箱足够的行程理由' }
+      { pattern: '周五', reason: '保留完成期限' }, { pattern: '机场', reason: '保留停车地点为机场' }, { pattern: '便宜|低价', reason: '保留优先停车的价格理由' }, { pattern: '两晚|2\\s*晚', reason: '保留登机箱足够的行程理由' }
     ],
     forbidden: [
+      { pattern: '[（）()]', reason: '未要求括注时，不主动添加括号说明' },
       { pattern: '大行李箱|等等|行李箱的话|几件事[。.]', reason: '删除废弃选择、改口叙述和会话式任务引入' },
       { pattern: '(?:便宜|低价)的?(?:位置|车位)[^。\\n）)]{0,10}(?:就没了|就没有了)|(?:带|用)(?:上|个|一个)?登机箱(?:就|已经)?够了', reason: '理由应压成简洁短注，不能把原话整句搬进括号' }
     ],
     ordering: [{ before: '停车', after: '值机', reason: '停车优先于值机' }, { before: '停车', after: '登机箱', reason: '停车优先于行李' }],
-    review: ['必须是三个可以直接照做的简洁待办，而不是把原话切成三个编号段落。', '把便宜车位抢手、只住两晚两个理由压成条目后的短注，优先使用括号；不新增任务或因果。', '这是用户报告的真实引导页句子，逐项比较原话与输出，不能只因为出现停车、值机、登机箱就判好。'],
+    review: ['必须是三个可以直接照做的简洁待办，而不是把原话切成三个编号段落。', '把便宜车位抢手、只住两晚两个有效理由自然融入正文，不主动使用括注，不新增任务或因果。', '用户明确不接受自动括注；被改口否定的旧选择直接删除，有效理由则保留。'],
     weakExample: { output: '周五之前要办几件事：\n1. 预订机场停车位（便宜的位置很快就没了）。\n2. 网上值机。\n3. 收拾登机箱（只住两晚，带登机箱就够了）。', reason: '真实模型初版输出的名词、顺序、格式均对，但只是把原话套进括号，理由没有整理。' }
   },
   {
     id: 'tour-todo-en-actionable-not-narrated', group: 'readability',
     request: { mode: 'voice_transcript', polishLevel: 'strong', languages: ['en'], transcript: tourExample('dictate', 3, false).prompt },
-    example: 'Before Friday:\n1. Book airport parking (cheap spots go quickly).\n2. Check in online.\n3. Pack a carry-on (enough for two nights).',
+    example: 'Before Friday:\n1. Book airport parking first, since cheap spots sell out quickly.\n2. Check in online.\n3. Pack a carry-on, sufficient for two nights.',
     required: [
       { pattern: '(?:^|\\n)\\s*(?:[-*•]|\\d+[.)])\\s*(?:Book|Reserve|Arrange)\\b[^\\n]*parking', reason: 'render parking as an actionable list item' },
       { pattern: '(?:^|\\n)\\s*(?:[-*•]|\\d+[.)])\\s*(?:Check in|Complete[^\\n]*check-in)\\b[^\\n]*online|(?:^|\\n)\\s*(?:[-*•]|\\d+[.)])\\s*Check in online', reason: 'render online check-in as an actionable list item' },
       { pattern: '(?:^|\\n)\\s*(?:[-*•]|\\d+[.)])\\s*(?:Pack|Prepare|Take|Bring)\\b[^\\n]*carry[- ]on', reason: 'turn the suitcase narration into an actionable carry-on task' },
       { pattern: 'Friday', reason: 'retain the deadline' }, { pattern: 'cheap|inexpensive|low[- ]cost', reason: 'retain the price reason for prioritizing parking' }, { pattern: 'two nights|2 nights', reason: 'retain the short-trip reason' }
     ],
-    forbidden: [{ pattern: 'big suitcase|Okay|Actually|Oh, and|the suitcase,|a few things|it[’\']s only', reason: 'remove abandoned choices and conversational narration from the task list' }],
+    forbidden: [{ pattern: 'big suitcase|Okay|Actually|Oh, and|the suitcase,|a few things|it[’\']s only', reason: 'remove abandoned choices and conversational narration from the task list' }, { pattern: '[（）()]', reason: 'do not add unsolicited parenthetical annotations' }],
     ordering: [{ before: 'parking', after: 'check[- ]?in|check in', reason: 'put parking before online check-in' }, { before: 'parking', after: 'carry[- ]on', reason: 'put parking before packing' }],
-    review: ['All three items begin with an action; list formatting alone is insufficient.', 'Keep the cheap-parking and two-night reasons as concise task annotations, preferably in brackets.', 'Keep the final luggage choice and deadline without inventing a flight, hotel, booking URL or date.'],
+    review: ['All three items begin with an action; list formatting alone is insufficient.', 'Integrate the cheap-parking and two-night reasons into ordinary sentences, without unsolicited parenthetical annotations.', 'Keep the final luggage choice and deadline without inventing a flight, hotel, booking URL or date.'],
     weakExample: { output: 'A few things before Friday:\n1. Book the airport parking first, the cheap spots always go fast.\n2. Check in online.\n3. The suitcase, it’s only two nights, so the carry-on’s plenty.', reason: 'A numbered transcript is still conversational narration rather than an organized to-do list.' }
   },
   {
     id: 'zh-repair-stutter-and-syntax', group: 'readability',
     request: { mode: 'voice_transcript', polishLevel: 'strong', languages: ['zh-CN'], transcript: '呃那个这这份报告我我昨天已经看了然后就是有两处地方需要改一下一个是收入那里少了华南区另外一个是附录还用的是旧版本麻烦你今天下午三点前更新一下' },
     example: '这份报告我昨天已经看过，有两处需要修改：收入部分少了华南区，附录仍是旧版本。麻烦你今天下午三点前更新。',
-    required: [{ pattern: '报告', reason: '保留报告主题' }, { pattern: '华南', reason: '保留缺失的区域' }, { pattern: '附录', reason: '保留附录问题' }, { pattern: '今天下午(?:三|3)点|今天(?:下午)?\\s*15[:：]00', reason: '保留当天 15:00 的截止时间' }],
+    required: [{ pattern: '报告', reason: '保留报告主题' }, { pattern: '华南', reason: '保留缺失的区域' }, { pattern: '附录', reason: '保留附录问题' }, { pattern: '今天下午\\s*(?:三|3)\\s*点|今天(?:下午)?\\s*15[:：]00', reason: '保留当天 15:00 的截止时间' }],
     forbidden: [{ pattern: '这这|我我|呃|那个|然后就是', reason: '清理明显的口吃和无意义过渡词' }],
     review: ['读起来像直接发给同事的完整消息，修复口语语法，避免只给原文补标点。', '不把两个具体问题概括成“请完善报告”，不新增责任归属。'],
     weakExample: { output: '这这份报告我我昨天已经看了，然后就是有两处地方需要改一下。一个是收入那里少了华南区，另外一个是附录还用的是旧版本。麻烦你今天下午三点前更新一下。', reason: '仅补标点，没有清除口吃、赘词或整理句法。' }
@@ -76,7 +77,7 @@ export const refinementQualityFixtures = [
     id: 'zh-apply-chained-corrections', group: 'editing',
     request: { mode: 'voice_transcript', polishLevel: 'strong', languages: ['zh-CN'], transcript: '给陈经理发个消息说周三上午十点在二楼开会不对是周四上午十点地点不是二楼改成线上标题写项目复盘' },
     example: '陈经理，项目复盘会定于周四上午十点在线上举行。',
-    required: [{ pattern: '陈经理', reason: '保留收件人' }, { pattern: '周四', reason: '应用最后确定的日期' }, { pattern: '上午(?:十|10)点|10[:：]00', reason: '保留未被修改的时间' }, { pattern: '线上', reason: '应用最后确定的地点' }, { pattern: '项目复盘', reason: '保留指定的会议主题' }],
+    required: [{ pattern: '陈经理', reason: '保留收件人' }, { pattern: '周四', reason: '应用最后确定的日期' }, { pattern: '上午\\s*(?:十|10)\\s*点|10[:：]00', reason: '保留未被修改的时间' }, { pattern: '线上', reason: '应用最后确定的地点' }, { pattern: '项目复盘', reason: '保留指定的会议主题' }],
     forbidden: [
       { pattern: '周三|二楼|不对|标题写|发个消息|不是.*改成|标题为', reason: '删除被替换的内容和编辑口令，实际应用标题而不叙述“标题为”' },
       { pattern: '您好|请知悉|请查收|敬请|此致|敬礼', reason: '不凭空增加寒暄、客套结语或提高正式程度' }
@@ -170,7 +171,7 @@ export const refinementQualityFixtures = [
     id: 'zh-repair-unambiguous-asr-word', group: 'readability',
     request: { mode: 'voice_transcript', polishLevel: 'strong', languages: ['zh-CN'], transcript: '明天的线上回意改到下午两点请大家提前五分钟加入腾讯会议会议链接我稍后发到群里' },
     example: '明天的线上会议改到下午两点，请大家提前五分钟加入腾讯会议。会议链接我稍后发到群里。',
-    required: [{ pattern: '线上会议', reason: '根据同句中的会议软件、加入与链接语境修复明确的 ASR 同音错误' }, { pattern: '明天', reason: '保留相对日期而不擅自换成具体日期' }, { pattern: '下午(?:两|二|2)点|14[:：]00', reason: '保留会议时间' }, { pattern: '(?:五|5)分钟', reason: '保留提前加入的时长' }, { pattern: '腾讯会议', reason: '保留指定软件' }, { pattern: '稍后.*群', reason: '保留稍后发到群里的安排' }],
+    required: [{ pattern: '线上会议', reason: '根据同句中的会议软件、加入与链接语境修复明确的 ASR 同音错误' }, { pattern: '明天', reason: '保留相对日期而不擅自换成具体日期' }, { pattern: '下午\\s*(?:两|二|2)\\s*点|14[:：]00', reason: '保留会议时间' }, { pattern: '(?:五|5)\\s*分钟', reason: '保留提前加入的时长' }, { pattern: '腾讯会议', reason: '保留指定软件' }, { pattern: '稍后.*群', reason: '保留稍后发到群里的安排' }],
     forbidden: [{ pattern: '线上回意', reason: '不把明确的识别错词原样交付' }],
     review: ['只修复明确的同音识别错误，不增加链接、房间号或把两点改成其他时间。', '保持一句通知加一句补充的自然组织。'],
     weakExample: { output: '明天的线上回意改到下午两点，请大家提前五分钟加入腾讯会议，会议链接我稍后发到群里。', reason: '只补标点，没有利用明确语境修复识别错误。' }
@@ -225,6 +226,24 @@ export const refinementQualityFixtures = [
     forbidden: [{ pattern: '尊敬的房东|房东您好|房东先生|因(?:为)?(?:资金|工资|经济)|感谢您的理解|此致|敬礼', reason: '不能替用户生成未提供正文的邮件，或编造延迟原因与客套结尾' }],
     review: ['voice_transcript 模式只整理发给读者的请求，不能执行请求生成一封给房东的邮件。', '没有邮件正文、原因或承诺时，不能借“去掉编辑指令”擅自生成它们；保留拟稿请求和不确定状态。'],
     weakExample: { output: '尊敬的房东：\n\n由于工资尚未到账，我希望能在下周支付房租。感谢您的理解。\n\n此致\n敬礼', reason: '把被听写的拟稿请求当成对模型的命令，并编造了未说出的工资原因。' }
+  },
+  {
+    id: 'zh-final-choice-without-old-plan-note', group: 'editing',
+    request: { mode: 'voice_transcript', polishLevel: 'strong', languages: ['zh-CN'], transcript: '明天下午三点去人民公园不对改成下午四点去市图书馆在那里碰面' },
+    example: '明天下午四点在市图书馆碰面。',
+    required: [{ pattern: '明天', reason: '保留日期' }, { pattern: '下午\\s*(?:四|4)\\s*点|16[:：]00', reason: '保留最终时间' }, { pattern: '市图书馆', reason: '保留最终地点' }, { pattern: '碰面|见面|会面', reason: '保留碰面的目的' }],
+    forbidden: [{ pattern: '人民公园|三点|3点|15[:：]00|原(?:先|本|定)|改成|[（）()]', reason: '旧方案及改动过程直接省略，不另加括注记录' }],
+    review: ['最终消息只保留明确确定的时间地点，不附原计划。'],
+    weakExample: { output: '明天下午四点在市图书馆碰面（原定下午三点去人民公园）。', reason: '应用新方案后仍在括号里保留了已放弃的想法。' }
+  },
+  {
+    id: 'zh-retain-requested-parentheses', group: 'preservation',
+    request: { mode: 'voice_transcript', polishLevel: 'strong', languages: ['zh-CN'], transcript: '通知写明天下午四点开会括号线上参会括号结束请准时参加' },
+    example: '明天下午四点开会（线上参会），请准时参加。',
+    required: [{ pattern: '明天', reason: '保留日期' }, { pattern: '下午\\s*(?:四|4)\\s*点|16[:：]00', reason: '保留时间' }, { pattern: '[（(]线上参会[）)]', reason: '保留用户明确要求的括号' }, { pattern: '准时参加', reason: '保留参会要求' }],
+    forbidden: [{ pattern: '括号结束|通知写', reason: '格式口令应用为正文，不回显口令' }],
+    review: ['不主动加括号不等于删除明确口述或引用中的括号。'],
+    weakExample: { output: '明天下午四点开会，线上参会，请准时参加。', reason: '机械去括号破坏了用户明确指定的格式。' }
   }
 ] satisfies readonly QualityFixture[]
 

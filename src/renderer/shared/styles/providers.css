@@ -85,3 +85,5 @@
 .provider-editor-footer .secondary-button,.provider-editor-footer .primary-button { display:inline-flex; align-items:center; justify-content:center; height:38px; min-height:38px; padding:0 16px; border-radius:var(--radius-control); font-size:13px; line-height:20px; font-weight:500; white-space:nowrap; }
 .provider-logo { background:#fff; padding:3px; border-radius:var(--radius-control); }
 @media(max-width:760px) { .provider-field-pair { grid-template-columns:minmax(0,1fr); } .provider-editor-footer { flex-wrap:wrap; } .provider-model-heading-actions { gap:10px; } }
+.provider-preset-models { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 12px; }
+.provider-preset-models button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; }

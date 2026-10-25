@@ -9,7 +9,7 @@ const identity = {
 }
 
 export const asrOutcomeSchema = z.discriminatedUnion('kind', [
-  z.object({ ...identity, kind: z.literal('final'), asrText: z.string().min(1), detectedLanguage: z.string().nullable(), confidence: z.number().nullable().optional() }),
+  z.object({ ...identity, kind: z.literal('final'), asrText: z.string().min(1), detectedLanguage: z.string().nullable(), confidence: z.number().nullable().optional(), providerPolish: z.boolean().optional() }),
   z.object({ ...identity, kind: z.literal('empty'), asrText: z.literal('') }),
   z.object({ ...identity, kind: z.literal('failed'), reason: z.enum(['timeout', 'network', 'provider', 'cancelled']), message: z.string() })
 ])

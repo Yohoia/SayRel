@@ -137,6 +137,7 @@ html[data-sayrel-surface='interactive-card'],html[data-sayrel-surface='interacti
 .secondary-answer>header .secondary-icon-button svg { width:14px; height:14px; flex-shrink:0; }
 .secondary-answer-content { padding:12px 16px; font-size:17px; line-height:28px; font-weight:400; white-space:normal; overflow-wrap:anywhere; user-select:text; }
 .secondary-refinement-status { margin:0; padding:10px 16px 0; font-size:13px; line-height:20px; color:var(--ink-tertiary); }
+.secondary-insertion-warning { margin:0; padding:12px 16px; font-size:13px; line-height:20px; color:var(--error); border-bottom:1px solid var(--line); }
 .secondary-answer-content p,.secondary-answer-content ul,.secondary-answer-content ol,.secondary-answer-content pre,.secondary-answer-content blockquote,.secondary-answer-content table { margin:0 0 16px; }
 .secondary-answer-content>:last-child { margin-bottom:0; }
 .secondary-answer-content :is(h1,h2,h3,h4,h5,h6) { display:block; margin:16px 0 8px; font:700 20px/24px 'SF Pro',var(--font-chinese),-apple-system,BlinkMacSystemFont,Arial,sans-serif; color:inherit; }
