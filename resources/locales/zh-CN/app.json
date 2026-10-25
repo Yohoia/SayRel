@@ -444,6 +444,8 @@
   "Could not dismiss the suggestion.": "无法忽略此候选词。",
   "The undo window has expired": "撤销时间已过",
   "Live transcript preview": "实时转写预览",
+  "Show live transcript": "显示实时转写",
+  "Only changes the floating preview, not recognition, refinement, or insertion.": "仅控制悬浮条文字预览，不影响识别、润写和自动写入。",
   "Review the action before confirming. This command expires after two minutes.": "请确认动作内容后再执行。此命令将在两分钟后失效。",
   "Confirm action": "确认执行",
   "Working…": "执行中…",

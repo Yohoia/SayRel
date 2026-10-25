@@ -15,7 +15,8 @@ const preferences = writingPreferencesSchema.extend({
   language: z.string().nullable().optional(),
   appearancePreference: z.enum(['light', 'dark', 'system']).optional(),
   launchAtLogin: z.boolean().optional(),
-  showInDock: z.boolean().optional()
+  showInDock: z.boolean().optional(),
+  showLiveTranscript: z.boolean().optional()
 })
 
 export async function patchSettings(partial: DeepPartial<Settings>): Promise<Settings> {

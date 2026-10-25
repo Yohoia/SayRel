@@ -1,7 +1,7 @@
 import { useAppText } from '../shared/i18n/useAppText'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { z } from 'zod'
-import { DEFAULT_SETTINGS, type Settings } from '../../shared/settings'
+import { useAppSettings } from '../shared/state/settings'
 import { recordingIssueSchema, recordingStateSchema, type RecordingIssue } from '../../shared/recordingFeedback'
 import { api } from '../shared/utils/bridge'
 import { Waveform } from './Waveform'
@@ -14,6 +14,7 @@ import { recordingBarAppearance, handsFreeBarAppearance, cancelRecordingActionAp
 import { FloatingAlert } from './FloatingAlert'
 import { FloatingAction } from './FloatingAction'
 import { ModeIndicator } from './ModeIndicator'
+import { LiveTranscript } from './LiveTranscript'
 import { useMicrophoneVolume } from '../shared/audio/useMicrophoneVolume'
 import { useProcessingAnimation } from './useProcessingAnimation'
 import './styles.css'
@@ -57,15 +58,9 @@ export function FloatingBarApp() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [showHoverTip, setShowHoverTip] = useState(false)
   const alertRef = useRef<HTMLDivElement>(null)
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+  const { settings } = useAppSettings()
   const languageChoicesRef = useRef<HTMLDivElement>(null)
   const modeIndicatorRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    let live = true
-    const off = window.sayrel?.on('store:changed', (next: Settings) => { if (live) setSettings(next) })
-    void api.settings.get().then((next: Settings) => { if (live && next) setSettings(next) })
-    return () => { live = false; off?.() }
-  }, [])
   const [mode, setMode] = useState('voice_transcript')
   const [partialText, setPartialText] = useState('')
   const activeSessionId = useRef<string | null>(null)
@@ -90,7 +85,7 @@ export function FloatingBarApp() {
       const parsed = recordingStateSchema.safeParse(value)
       if (disposed || !parsed.success) return
       const state = parsed.data
-      if (activeSessionId.current !== state.context.sessionId || !['starting', 'recording'].includes(state.phase)) setPartialText('')
+      if (activeSessionId.current !== state.context.sessionId || !['starting', 'recording', 'finishing'].includes(state.phase)) setPartialText('')
       activeSessionId.current = state.context.sessionId
       controller.sync(state)
       setIssue(state.context.issue ?? null)
@@ -111,7 +106,7 @@ export function FloatingBarApp() {
     const off = window.sayrel?.on?.('recording-machine:state', (state: unknown) => { receivedState = true; update(state) })
     const offPartial = window.sayrel?.on?.('recording-machine:partial', (raw: unknown) => {
       const event = z.object({ sessionId: z.string(), text: z.string() }).safeParse(raw)
-      if (!disposed && event.success && event.data.sessionId === activeSessionId.current) setPartialText(event.data.text.slice(-160))
+      if (!disposed && event.success && event.data.sessionId === activeSessionId.current) setPartialText(Array.from(event.data.text).slice(-240).join(''))
     })
     void api.recording.state().then((state: unknown) => { if (!receivedState) update(state) }).catch(() => undefined)
     return () => { disposed = true; off?.(); offPartial?.(); void controller.dispose() }
@@ -240,7 +235,9 @@ export function FloatingBarApp() {
       <style>{`@keyframes loadingMove { 0% { transform: translateX(-27px); } 100% { transform: translateX(54px); } }`}</style>
       {visibleStatus === 'error' && visibleIssue && <FloatingAlert issue={visibleIssue} busy={actionBusy} actionError={actionError} alertRef={alertRef} onDismiss={dismissAlert} onAction={() => void actOnIssue()} />}
       {visibleStatus === 'long-pressing' && <div role="status" style={errorBubbleStyle}>{t("Tap to start. Tap again to finish recording.")}</div>}
-      {!preview && partialText && ['recording', 'hands-free'].includes(visibleStatus) && <div className="floating-partial" aria-label={t('Live transcript preview')} role="status">{partialText}</div>}
+      {!preview && settings.showLiveTranscript && partialText.trim() && ['recording', 'hands-free', 'recording-dictating'].includes(visibleStatus) && <LiveTranscript
+        text={partialText} phase={refining ? 'processing' : 'recording'}
+        raised={modeActive && ['translation', 'ask_anything', 'voice_command', 'desktop_command'].includes(visibleMode)} />}
       <div
         ref={pillRef}
         data-testid="floating-bar"

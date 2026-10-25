@@ -62,6 +62,7 @@ export type HistoryStatus = (typeof HISTORY_STATUS)[keyof typeof HISTORY_STATUS]
 /** How an AI result reaches the user. */
 export const DELIVERY = {
   INSERT: 'insert',
+  UNVERIFIED: 'unverified',
   CLIPBOARD: 'clipboard',
   EXTERNAL: 'external',
   CARD: 'card'

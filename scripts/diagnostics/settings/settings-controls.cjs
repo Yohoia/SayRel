@@ -25,6 +25,12 @@ const { DEFAULT_SETTINGS, mergeSettings } = load('src/shared/settings.ts')
 const { bindingsFor, normalizeTranslationTargets, validateShortcut } = load('src/shared/settingsControls.ts')
 const { refreshShortcutRegistrations } = load('src/main/services/shortcutRegistration.ts')
 config = structuredClone(DEFAULT_SETTINGS)
+test('live transcript preview defaults on, preserves off and rejects malformed saved values', () => {
+  assert.equal(DEFAULT_SETTINGS.showLiveTranscript, true)
+  assert.equal(mergeSettings({}).showLiveTranscript, true)
+  assert.equal(mergeSettings({ showLiveTranscript: false }).showLiveTranscript, false)
+  assert.equal(mergeSettings({ showLiveTranscript: 'false' }).showLiveTranscript, true)
+})
 test('saved single translation language is preserved and gets a candidate list', () => {
   const settings = mergeSettings({ translationTargetLanguage: 'ja' })
   assert.equal(settings.translationTargetLanguages.join(','), 'ja')

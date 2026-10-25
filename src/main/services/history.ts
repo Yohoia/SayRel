@@ -17,6 +17,7 @@ import { join } from 'node:path'
 
 const log = createLogger('history')
 const table = schema.historyV2
+const notEmptyAsr = sql`case when json_valid(${table.modeMeta}) then json_extract(${table.modeMeta}, '$.asr.kind') is not 'empty' else 1 end`
 
 export interface UpsertHistoryInput {
   id: string
@@ -190,14 +191,14 @@ export function listHistory(query: HistoryListQuery = {}): HistoryListResult {
 export function getHistoryActivity() {
   const date = sql<string>`date(${table.createdAt}, 'localtime')`
   const days = getDb().select({ date, count: count() }).from(table)
-    .where(and(eq(table.status, HISTORY_STATUS.COMPLETED), lt(table.createdAt, new Date().toISOString()), isNotNull(date)))
+    .where(and(eq(table.status, HISTORY_STATUS.COMPLETED), notEmptyAsr, lt(table.createdAt, new Date().toISOString()), isNotNull(date)))
     .groupBy(date).orderBy(date).all()
   return { days }
 }
 
 export function getDictationUsage() {
   const records = getDb().select({ refinedText: table.refinedText, duration: table.duration }).from(table)
-    .where(and(eq(table.status, HISTORY_STATUS.COMPLETED), sql`coalesce(${table.mode}, 'voice_transcript') != 'ask_anything'`,
+    .where(and(eq(table.status, HISTORY_STATUS.COMPLETED), notEmptyAsr, sql`coalesce(${table.mode}, 'voice_transcript') != 'ask_anything'`,
       lt(table.createdAt, new Date().toISOString()), sql`datetime(${table.createdAt}) is not null`)).all()
   return buildDictationUsage(records)
 }

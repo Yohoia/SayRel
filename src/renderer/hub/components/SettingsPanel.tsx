@@ -161,6 +161,7 @@ function AudioSection({ autoOpen }: { autoOpen: boolean }) {
     <Row label="Microphone" hint="Choose your preferred microphone for Sayrel to capture your voice."><MicrophonePicker autoOpen={autoOpen} /></Row>
     <Row label="Interaction sounds" hint="Play sounds for key actions like start/stop."><Toggle value={settings.playSoundOnRecord} onChange={value => { void patch({ playSoundOnRecord: value }).catch(() => undefined) }} /></Row>
     <Row label="Mute when dictating" hint="Automatically silence other active audio during dictation."><Toggle value={settings.muteWhileDictating} onChange={value => { void patch({ muteWhileDictating: value }).catch(() => undefined) }} /></Row>
+    <Row label="Show live transcript" hint="Only changes the floating preview, not recognition, refinement, or insertion."><Toggle label="Show live transcript" value={settings.showLiveTranscript} onChange={value => { void patch({ showLiveTranscript: value }).catch(() => undefined) }} /></Row>
   </>
 }
 
@@ -227,8 +228,9 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   return <div className="settings-row"><div className="settings-row-copy"><p className="settings-row-label">{t(label)}</p>{hint && <p className="settings-row-hint">{t(hint)}</p>}</div><div className="settings-row-control">{children}</div></div>
 }
 
-function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
-  return <button type="button" onClick={() => onChange(!value)} role="switch" aria-checked={value} className={`settings-toggle ${value ? 'is-on' : ''}`}><span /></button>
+function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: boolean) => void; label?: string }) {
+  const t = useSettingsText()
+  return <button type="button" onClick={() => onChange(!value)} role="switch" aria-label={label ? t(label) : undefined} aria-checked={value} className={`settings-toggle ${value ? 'is-on' : ''}`}><span /></button>
 }
 
 function Choice({ value, options, onChange }: { value: string; options: { value: string; label: string }[]; onChange: (v: string) => void }) {

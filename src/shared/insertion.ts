@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { Delivery } from './constants'
 
 export const insertionOutcomeSchema = z.discriminatedUnion('verification', [
   z.object({ verification: z.literal('verified'), method: z.literal('native'), ok: z.literal(true) }),
@@ -11,6 +12,13 @@ export const insertionOutcomeSchema = z.discriminatedUnion('verification', [
     error: z.enum(['cancelled', 'native-insert-unavailable', 'clipboard-unavailable']) })
 ])
 export type InsertionOutcome = z.infer<typeof insertionOutcomeSchema>
+
+export function insertionDelivery(outcome: InsertionOutcome): Delivery {
+  if (outcome.ok) return 'insert'
+  if (outcome.method === 'clipboard') return 'clipboard'
+  if (outcome.verification === 'unknown' && outcome.error !== 'native-dispatch-error' && outcome.error !== 'cancelled') return 'unverified'
+  return 'card'
+}
 
 export function insertionStatusText(outcome?: InsertionOutcome): string | null {
   if (outcome?.verification === 'unknown') return 'Insertion could not be verified. Check the target before copying to avoid duplicate text.'

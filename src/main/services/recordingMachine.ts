@@ -26,7 +26,7 @@ import { recordingSetupIssue, type RecordingIssue } from '../../shared/recording
 import type { OwnedPracticeTarget, PracticeTarget } from '../../shared/featureTour'
 import { providerConfigurationIssue, selectedProvider } from '../../shared/providers'
 import { readVoiceMetadata, type RefinementOutcome } from '../../shared/refinement'
-import type { InsertionOutcome } from '../../shared/insertion'
+import { insertionDelivery, type InsertionOutcome } from '../../shared/insertion'
 
 const log = createLogger('recording-machine')
 export type RecorderPhase = 'idle' | 'long_pressing' | 'starting' | 'recording' | 'finishing' | 'error'
@@ -357,6 +357,16 @@ export class RecordingMachine extends EventEmitter {
   private async complete(session: Session, input: ProcessingInput): Promise<void> {
     const result = await this.process(session, input)
     this.requireActive(session)
+    if (result === null) {
+      this.releaseSession()
+      this.shortcut = null
+      this.retryInput = null
+      this.refinementRetry = null
+      this.transition('idle', { sessionId: null, recorderState: { isStartingMicrophone: false }, handsFree: false,
+        recorderTimeoutState: null, error: null, issue: null })
+      if (session.historyWritten) broadcast('history:changed')
+      return
+    }
     this.session = null
     this.retryInput = null
     const fallback = result.refinement?.kind === 'fallback'
@@ -494,7 +504,7 @@ export class RecordingMachine extends EventEmitter {
       throw err
     }
   }
-  private async process(session: Session, input: ProcessingInput): Promise<VoiceFlowResult> {
+  private async process(session: Session, input: ProcessingInput): Promise<VoiceFlowResult | null> {
     const config = session.config
     const dictionary = session.dictionary
     this.requireActive(session)
@@ -531,7 +541,11 @@ export class RecordingMachine extends EventEmitter {
       detectedLanguage: result.detectedLanguage, confidence: result.confidence, providerPolish: result.providerPolish } : { ...identity, kind: 'empty', asrText: '' }
     if (session.historyWritten && input.kind === 'audio') history.upsertHistory({ id: session.id, refinedText: result.text,
       modeMeta: JSON.stringify({ transcript: result.text, detectedLanguage: result.detectedLanguage, asr: session.asr }) })
-    if (session.asr.kind === 'empty') throw new Error('No speech was detected. Check the microphone and try again.')
+    if (session.asr.kind === 'empty') {
+      if (session.historyWritten) history.upsertHistory({ id: session.id, status: HISTORY_STATUS.COMPLETED, refinedText: '',
+        debugInfo: '', modeMeta: JSON.stringify({ transcript: '', detectedLanguage: result.detectedLanguage, asr: session.asr }) })
+      return null
+    }
     if (input.mode === 'desktop_command') {
       if (session.asr.kind !== 'final' || session.historyRetry || session.refinementRetry) throw new Error('Record a new complete desktop command before executing an action')
       const command = prepareDesktopPlan(session.asr, input.context, config.historyEnabled ? session.id : null)
@@ -588,7 +602,7 @@ export class RecordingMachine extends EventEmitter {
       const outcome = await insertText(refined, { addTrailingSpace: config.addTrailingSpace, isCancelled: () => !this.active(session) })
       insertion = outcome
       insertionMs = Date.now() - insertionStartedAt
-      delivery = outcome.ok ? 'insert' : outcome.method === 'clipboard' ? 'clipboard' : 'card'
+      delivery = insertionDelivery(outcome)
       if (outcome.ok && before && learning && this.active(session)) learning.trackInsertedDictation({
         requestId: session.asrRequestId, historyId: config.historyEnabled ? session.id : null, before,
         inserted: refined, asrText: result.text

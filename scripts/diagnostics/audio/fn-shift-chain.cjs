@@ -21,6 +21,7 @@ const sharedProviders = mocks['./providers']
 mocks['../../shared/providers'] = sharedProviders
 mocks['./asr'] = load('src/shared/asr.ts')
 mocks['./insertion'] = load('src/shared/insertion.ts')
+mocks['../../shared/insertion'] = mocks['./insertion']
 mocks['./prompts'] = load('src/main/services/providers/prompts.ts')
 mocks['./providers/refinementPrompt'] = load('src/main/services/providers/refinementPrompt.ts')
 mocks['./refinementPrompt'] = mocks['./providers/refinementPrompt']

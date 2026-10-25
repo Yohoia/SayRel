@@ -45,7 +45,7 @@ function load(file) {
 
 let config, writeHook = null, transcribeImpl, refineImpl, capturedContext = null, liveFactory = null
 const writes = [], insertions = [], cards = [], broadcasts = [], providerConfigs = []
-let asrCalls = 0, refinementCalls = 0, encoded = 0, insertionResult
+let asrCalls = 0, refinementCalls = 0, actionCalls = 0, learningCalls = 0, encoded = 0, insertionResult
 replace('src/main/lib/logger.ts', { createLogger: () => logger })
 replace('src/main/lib/paths.ts', { paths: { recordings: temporary } })
 replace('src/main/lib/settings.ts', { settings: { get: () => config } })
@@ -61,7 +61,11 @@ replace('src/main/services/insertion.ts', { insertText: async (text, options) =>
   insertions.push(text)
   return insertionResult
 } })
-replace('src/main/services/voiceActions.ts', { runVoiceAction: async () => 'offline action' })
+replace('src/main/services/voiceActions.ts', { runVoiceAction: async () => { actionCalls++; return 'offline action' } })
+replace('src/main/services/dictionaryLearning.ts', {
+  captureLearningSnapshot: () => { learningCalls++; return {} },
+  trackInsertedDictation: () => { learningCalls++ }, stopDictionaryTracking() {}
+})
 replace('src/main/services/providers/realtime.ts', {
   supportsLiveTranscription: profile => profile.protocol === 'openai-realtime',
   startLiveTranscription: (...args) => liveFactory(...args)
@@ -118,7 +122,7 @@ async function test(name, run) {
   config = { ...structuredClone(DEFAULT_SETTINGS), serviceProviders: structuredClone(readyProviders), historyEnabled: true, saveAudio: true }
   transcribeImpl = async () => ({ text: 'raw transcript', detectedLanguage: 'en', provider: 'offline-asr' })
   refineImpl = async () => ({ text: 'refined transcript' })
-  asrCalls = 0; refinementCalls = 0; encoded = 0; writeHook = null; capturedContext = null; liveFactory = null
+  asrCalls = 0; refinementCalls = 0; actionCalls = 0; learningCalls = 0; encoded = 0; writeHook = null; capturedContext = null; liveFactory = null
   insertionResult = { ok: true, method: 'native', verification: 'verified' }
   for (const list of [writes, insertions, cards, broadcasts, providerConfigs]) list.length = 0
   raw.exec('DELETE FROM history_v2')
@@ -190,10 +194,161 @@ async function main() {
     assert.equal(value.getState().context.sessionId, nextId); assert.equal(broadcasts.length, count)
     assert.equal(insertions.length, 0)
   })
-  await test('empty ASR is distinguished from provider failure and never sent to refinement or insertion', async () => {
+  // Static Typeless 2.8.3 evidence, renderer/static/js/juYOhWy9.mjs character offsets:
+  // @137400/@137652/@138239 guard delivery with refinedText.trim().length > 0;
+  // @153706 emits an empty completion for a short-audio case; @182354 returns idle.
+  // These extracted client branches do not prove live server behavior for silence.
+  function observeQuiet(value) {
+    const results = [], cancellations = [], phases = []
+    value.on('result', result => results.push(result))
+    value.on('practice-result', result => results.push(result))
+    value.on('cancel', () => cancellations.push(true))
+    value.on('state', state => phases.push(state.phase))
+    return () => {
+      const { phase, context } = value.getState()
+      assert.equal(phase, 'idle')
+      assert.equal(context.sessionId, null); assert.equal(context.error, null); assert.equal(context.issue, null)
+      assert.equal(context.handsFree, false); assert.equal(context.recorderState.isStartingMicrophone, false)
+      assert.equal(context.recorderTimeoutState, null)
+      assert.equal(phases.includes('error'), false)
+      assert.equal(results.length, 0); assert.equal(cards.length, 0)
+      assert.equal(refinementCalls, 0); assert.equal(actionCalls, 0)
+      assert.equal(insertions.length, 0); assert.equal(learningCalls, 0)
+      assert.equal(broadcasts.some(([channel, event]) => channel === 'page:floating-bar-click' && ['done', 'error'].includes(event)), false)
+      return cancellations
+    }
+  }
+  for (const mode of ['voice_transcript', 'voice_command', 'ask_anything', 'translation', 'desktop_command']) {
+    for (const text of ['', ' \t\n ']) {
+      await test(`successful ${JSON.stringify(text)} ASR quietly completes ${mode}`, async () => {
+        config.dictationMode = mode; config.dictionaryLearning = true; config.desktopCommandsEnabled = true
+        transcribeImpl = async () => ({ text, detectedLanguage: null, provider: 'fixture' })
+        const value = machine(), quiet = observeQuiet(value), id = await finish(value)
+        assert.equal(quiet().length, 0)
+        const row = history.getHistory(id)
+        assert.equal(row.status, HISTORY_STATUS.COMPLETED); assert.equal(row.debugInfo, '')
+        assert.equal(row.refinedText, ''); assert.equal(metadata(id).asr.kind, 'empty')
+        assert.equal(metadata(id).asr.path, 'batch')
+        assert.equal(history.listHistory().items[0].hasAudio, true)
+        assert.equal('aiResult' in JSON.parse(row.modeMeta), false)
+        assert.equal(asrCalls, 1)
+      })
+    }
+  }
+  await test('Fn start and stop quietly completes empty ordinary typing without a writing model', async () => {
+    config.serviceProviders.refinement = { providerId: '', model: '' }
     transcribeImpl = async () => ({ text: '', detectedLanguage: null, provider: 'fixture' })
-    const id = await finish(machine())
-    assert.equal(metadata(id).asr.kind, 'empty'); assert.equal(refinementCalls, 0); assert.equal(insertions.length, 0)
+    const value = machine(), quiet = observeQuiet(value)
+    const startGesture = Symbol('start')
+    await value.dispatch({ type: 'SHORTCUT_PRESS', gestureId: startGesture, mode: 'voice_transcript' })
+    const id = value.getState().context.sessionId
+    value.markStreaming(id); value.pushPcm(new Float32Array([0, 0]), id)
+    await value.dispatch({ type: 'SHORTCUT_RELEASE', gestureId: startGesture, action: 'hands-free' })
+    assert.equal(value.getState().context.handsFree, true)
+    await value.dispatch({ type: 'SHORTCUT_PRESS', gestureId: Symbol('stop'), mode: 'voice_transcript' })
+    const finishing = value.finish(); value.markStopped(id); await finishing
+    quiet()
+    await value.retry()
+    assert.equal(value.getState().phase, 'starting')
+    assert.notEqual(value.getState().context.sessionId, id)
+    assert.equal(asrCalls, 1)
+  })
+  for (const [historyEnabled, saveAudio] of [[true, false], [false, true]]) {
+    await test(`empty ASR respects history=${historyEnabled}, audio=${saveAudio}`, async () => {
+      config.historyEnabled = historyEnabled; config.saveAudio = saveAudio
+      transcribeImpl = async () => ({ text: '', detectedLanguage: null, provider: 'fixture' })
+      const value = machine(), quiet = observeQuiet(value), id = await finish(value)
+      quiet()
+      assert.equal(writes.length, 0); assert.equal(fs.readdirSync(temporary).length, 0)
+      if (historyEnabled) {
+        assert.equal(history.getHistory(id).status, HISTORY_STATUS.COMPLETED)
+        assert.equal(metadata(id).asr.kind, 'empty')
+      } else assert.equal(history.getHistory(id), null)
+    })
+  }
+  await test('successful empty live ASR skips batch fallback and delivery', async () => {
+    config.serviceProviders.profiles[0].protocol = 'openai-realtime'; config.saveAudio = false
+    const completed = Promise.resolve({ text: ' \n ', detectedLanguage: null, provider: 'fixture' })
+    liveFactory = () => ({ result: completed, pushPcm() {}, finish: () => completed, abort() {} })
+    const value = machine(), quiet = observeQuiet(value), id = await finish(value)
+    quiet()
+    assert.equal(asrCalls, 0); assert.equal(encoded, 0)
+    assert.equal(metadata(id).asr.kind, 'empty'); assert.equal(metadata(id).asr.path, 'live')
+  })
+  await test('live failure followed by successful empty batch ASR quietly completes', async () => {
+    config.serviceProviders.profiles[0].protocol = 'openai-realtime'
+    const failed = Promise.reject(new Error('offline network failure')); void failed.catch(() => {})
+    liveFactory = () => ({ result: failed, pushPcm() {}, finish: () => failed, abort() {} })
+    transcribeImpl = async () => ({ text: '', detectedLanguage: null, provider: 'fixture' })
+    const value = machine(), quiet = observeQuiet(value), id = await finish(value)
+    quiet()
+    assert.equal(asrCalls, 1); assert.equal(metadata(id).asr.kind, 'empty')
+    assert.equal(metadata(id).asr.path, 'batch-fallback')
+  })
+  for (const live of [false, true]) {
+    await test(`${live ? 'live and batch' : 'batch'} provider failure remains a retryable error`, async () => {
+      if (live) {
+        config.serviceProviders.profiles[0].protocol = 'openai-realtime'
+        const failed = Promise.reject(new Error('offline network failure')); void failed.catch(() => {})
+        liveFactory = () => ({ result: failed, pushPcm() {}, finish: () => failed, abort() {} })
+      }
+      // Even a provider error mentioning silence is a failure, not successful empty ASR.
+      transcribeImpl = async () => { throw new Error('No speech detected: offline network failure') }
+      const value = machine(), id = await finish(value)
+      assert.equal(value.getState().phase, 'error'); assert.equal(value.getState().context.issue.canRetry, true)
+      assert.equal(history.getHistory(id).status, HISTORY_STATUS.FAILED)
+      assert.equal(metadata(id).asr.kind, 'failed'); assert.equal(metadata(id).asr.reason, 'network')
+      assert.equal(refinementCalls, 0); assert.equal(actionCalls, 0); assert.equal(insertions.length, 0)
+    })
+  }
+  await test('late empty batch completion cannot reset a new session or replace cancellation history', async () => {
+    const entered = deferred(), gate = deferred(), value = machine()
+    transcribeImpl = async () => { entered.resolve(); return gate.promise }
+    const pending = finish(value)
+    await entered.promise
+    const oldId = value.getState().context.sessionId
+    value.cancel(); await value.start()
+    const nextId = value.getState().context.sessionId, count = broadcasts.length
+    gate.resolve({ text: '', detectedLanguage: null, provider: 'fixture' }); await pending
+    assert.equal(value.getState().context.sessionId, nextId); assert.equal(value.getState().phase, 'starting')
+    assert.equal(broadcasts.length, count); assert.equal(history.getHistory(oldId).status, HISTORY_STATUS.CANCELLED)
+    assert.equal(history.getHistory(nextId), null); assert.equal(refinementCalls, 0); assert.equal(insertions.length, 0)
+  })
+  await test('late empty live completion cannot reset a new session or deliver', async () => {
+    config.serviceProviders.profiles[0].protocol = 'openai-realtime'; config.saveAudio = false
+    const completed = deferred(), value = machine(), entered = deferred()
+    let emitPartial
+    liveFactory = (_profile, _model, _request, onPartial) => {
+      emitPartial = onPartial
+      return { result: completed.promise, pushPcm() {}, finish: () => { entered.resolve(); return completed.promise }, abort() {} }
+    }
+    const pending = finish(value)
+    await entered.promise; await flush()
+    value.cancel(); await value.start()
+    const nextId = value.getState().context.sessionId, count = broadcasts.length
+    emitPartial('stale partial'); completed.resolve({ text: '', detectedLanguage: null, provider: 'fixture' }); await pending
+    assert.equal(value.getState().context.sessionId, nextId); assert.equal(value.getState().phase, 'starting')
+    assert.equal(broadcasts.length, count); assert.equal(insertions.length, 0); assert.equal(cards.length, 0)
+    assert.equal(asrCalls, 0); assert.equal(refinementCalls, 0)
+  })
+  await test('stopping before any PCM quietly returns idle without calling ASR', async () => {
+    const value = machine(), quiet = observeQuiet(value)
+    await value.start(); const id = value.getState().context.sessionId
+    const pending = value.finish(); value.markStopped(id); await pending
+    quiet()
+    assert.equal(asrCalls, 0); assert.equal(history.getHistory(id), null); assert.equal(writes.length, 0)
+  })
+  await test('history audio retry with empty ASR completes the same row without delivery', async () => {
+    transcribeImpl = async () => { throw new Error('offline ASR failure') }
+    const value = machine(), id = await finish(value)
+    broadcasts.length = 0
+    const quiet = observeQuiet(value)
+    transcribeImpl = async () => ({ text: '', detectedLanguage: null, provider: 'fixture' })
+    await value.retryHistory(id)
+    quiet()
+    assert.equal(history.getLatest().length, 1); assert.equal(history.getHistory(id).status, HISTORY_STATUS.COMPLETED)
+    assert.equal(metadata(id).asr.kind, 'empty')
+    assert.equal(history.getHistory(id).debugInfo, '')
   })
   await test('new writing controls reach the refinement provider and prompt version reaches history', async () => {
     config.polishLevel = 'raw'; config.writingStyle = 'formal'; config.autoPunctuation = false
@@ -535,19 +690,35 @@ async function main() {
     assert.equal(result.refinement.polishLevel, 'strong')
     assert.equal(asrCalls, 0); assert.equal(refinementCalls, 1); assert.equal(insertions.length, 0)
   })
-  await test('unknown insertion opens one result card and persists only the verification verdict', async () => {
+  await test('unverified automatic insertion stays quiet and persists only the verification verdict', async () => {
     insertionResult = { method: 'native', ok: false, verification: 'unknown', error: 'text-mismatch' }
     const value = machine(), results = []
     value.on('result', result => results.push(result))
     const id = await finish(value)
-    assert.equal(results[0].delivery, 'card')
-    assert.equal(cards.length, 1)
-    assert.equal(cards[0].answer, 'refined transcript')
-    assert.equal(cards[0].insertion.verification, 'unknown')
+    assert.equal(results[0].delivery, 'unverified')
+    assert.equal(cards.length, 0, 'a readback limitation must not open a result window')
     assert.equal(metadata(id).insertion.error, 'text-mismatch')
     assert.equal(history.listHistory().items[0].insertion.verification, 'unknown')
     assert.equal(insertions.length, 1)
     assert.equal('value' in metadata(id).insertion, false)
+  })
+  await test('unreadable editors do not open a result card after automatic dictation', async () => {
+    insertionResult = { method: 'native', ok: false, verification: 'unknown', error: 'unreadable-input' }
+    const value = machine(), results = []
+    value.on('result', result => results.push(result))
+    await finish(value)
+    assert.equal(results[0].delivery, 'unverified'); assert.equal(cards.length, 0)
+    assert.equal(insertions.length, 1); assert.equal(learningCalls, 0)
+  })
+  for (const outcome of [
+    {method:'native',ok:false,verification:'blocked',error:'secure-input'},
+    {method:'native',ok:false,verification:'unknown',error:'native-dispatch-error'}
+  ]) await test(`real ${outcome.error} still exposes recoverable text`, async () => {
+    insertionResult = outcome
+    const value = machine()
+    await finish(value)
+    assert.equal(cards.length, 1); assert.equal(cards[0].answer, 'refined transcript')
+    assert.equal(insertions.length, 1)
   })
   process.stdout.write(`Voice recovery: ${checks} behavioral checks passed; ${failures.length} failed.\n`)
   if (failures.length) process.exitCode = 1

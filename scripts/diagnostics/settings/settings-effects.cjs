@@ -117,6 +117,21 @@ function fixture({ platform = 'darwin' } = {}) {
 }
 async function test(name, run) { await run(); console.log('PASS ' + name) }
 async function main() {
+  await test('live transcript preview is saved and broadcast without changing recording settings', async () => {
+    const f = fixture()
+    const before = await f.invoke('store:use', 'get')
+    assert.equal(before.showLiveTranscript, true)
+    const saved = await f.invoke('store:use', 'patch', { showLiveTranscript: false })
+    assert.equal(saved.showLiveTranscript, false)
+    assert.equal(f.disk.settings.showLiveTranscript, false)
+    assert.equal(f.events.some(event => event.channel === 'store:changed' && event.value.showLiveTranscript === false), true)
+    assert.equal(JSON.stringify(saved.serviceProviders), JSON.stringify(before.serviceProviders))
+    assert.equal(saved.polishLevel, before.polishLevel)
+    assert.equal(saved.muteWhileDictating, before.muteWhileDictating)
+    await assert.rejects(f.invoke('store:use', 'patch', { showLiveTranscript: 'false' }))
+    assert.equal((await f.invoke('store:use', 'get')).showLiveTranscript, false)
+    assert.equal((await f.invoke('store:use', 'reset')).showLiveTranscript, true)
+  })
   await test('fallback-only publication cannot hide a missing updater after the native backend starts', async () => {
     const f = fixture()
     f.nativeRunning = false

@@ -77,9 +77,9 @@ Prompt-contract tests establish request construction and constraints. A limited 
 
 ## Insertion verification
 
-A native return code of zero means dispatch, not confirmed delivery. The main process reads bounded local snapshots before and after one paste, and verifies the exact replacement in the same target. Secure input and marked IME text block dispatch. Unreadable input, target changes, mismatched text and uncertain native errors produce an `unknown` result card, not an automatic second paste. Explicit pre-dispatch unavailability can fall back to manual clipboard delivery.
+A native return code of zero means dispatch, not confirmed delivery. The main process reads bounded local snapshots before and after one paste, and verifies the exact replacement in the same target. Secure input and marked IME text block dispatch. Unreadable input, target changes and mismatched text retain an `unknown` verification verdict with `delivery=unverified`. They do not open a result card or trigger another paste. Native dispatch exceptions and blocked insertion still expose the result for recovery. Explicit pre-dispatch unavailability can fall back to manual clipboard delivery.
 
-`modeMeta.insertion` and result cards retain only the delivery verdict, never the temporary field snapshots. The native helper restores all clipboard items/formats only while its `changeCount` still matches, so later copies are not overwritten. Verification does not require dictionary learning or enable context upload. AX-unreadable editors may receive text but still show an unverified result; check the target before copying it again.
+`modeMeta.insertion` and recovery cards retain only the delivery verdict, never the temporary field snapshots. The native helper restores all clipboard items/formats only while its `changeCount` still matches, so later copies are not overwritten. Verification does not require dictionary learning or enable context upload. An unverified write is not confirmed success; its text and verdict remain in enabled history. Check the target before copying it again. Explicit history refinement and question-answering retain their intentional result cards.
 
 ## Learning from edits
 

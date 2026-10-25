@@ -17,6 +17,9 @@ function load(file, imports = {}) {
 }
 const { buildActivity, historyActivitySchema, localDateKey } = load('src/shared/activity.ts')
 const usageModule = load('src/shared/usage.ts')
+const refinementModule = load('src/shared/refinement.ts', {
+  './asr':load('src/shared/asr.ts'), './insertion':load('src/shared/insertion.ts')
+})
 const { buildDictationUsage, dictationUsageSchema } = usageModule
 const englishUsage = buildDictationUsage([{refinedText:Array(80).fill('word').join(' '),duration:60000}])
 assert.deepEqual(englishUsage,{dictationCount:1,durationMs:60000,words:80,wordsPerMinute:80,savedTimeMs:60000})
@@ -59,7 +62,7 @@ try {
   for (const file of fs.readdirSync(path.join(root,'resources/db')).filter(file=>file.endsWith('.sql')).sort()) raw.exec(fs.readFileSync(path.join(root,'resources/db',file),'utf8'))
   const db = drizzle(raw, {schema})
   const history = load('src/main/services/history.ts', {
-    '../../shared/refinement': load('src/shared/refinement.ts'),
+    '../../shared/refinement': refinementModule,
     '../db': { getDb:()=>db, getRawDb:()=>raw, schema },
     '../lib/logger': { createLogger:()=>({info(){},warn(){},error(){}}) },
     '../lib/paths': { paths:{} }, '../../shared/constants':load('src/shared/constants.ts'), '../../shared/usage':usageModule
@@ -73,7 +76,7 @@ try {
   insert.run('no-date','completed',null)
   const handlers = new Map()
   load('src/main/ipc/history.ts', {
-    '../../shared/refinement': load('src/shared/refinement.ts'),
+    '../../shared/refinement': refinementModule,
     electron:{}, '../services/recordingMachine':{}, '../services/history':history,
     '../lib/settings':{}, '../lib/paths':{}
   }).registerHistoryHandlers((channel,handler)=>handlers.set(channel,handler))
@@ -90,4 +93,32 @@ try {
   assert.deepEqual(stats,{dictationCount:603,durationMs:120000,words:122,wordsPerMinute:61,savedTimeMs:0})
   assert.equal('refinedText' in stats,false,'usage IPC returns only numeric aggregates')
   console.log('PASS real usage IPC and SQLite: all 600+ retained records, translations included, answers and failures excluded')
+  raw.exec('DELETE FROM history_v2')
+  const insertAggregate = raw.prepare('INSERT INTO history_v2 (id,status,mode,refined_text,duration,created_at,mode_meta) VALUES (?,?,?,?,?,?,?)')
+  const countedMetadata = [
+    null, '', 'malformed JSON', '{"asr":', 'null', '[]', '{}',
+    '{"asr":null}', '{"asr":{"kind":"final"}}', '{"asr":{"kind":"failed"}}',
+    '{"refinement":{"kind":"empty"}}', '{"asr":{"kind":null}}',
+    Buffer.from('{"asr":{"kind":"final"}}'), Buffer.from('malformed JSON')
+  ]
+  countedMetadata.forEach((metadata,index) => insertAggregate.run(
+    `counted-${index}`, 'completed', index % 2 ? 'voice_transcript' : null, 'one two', 60000, '2026-03-08T07:30:00Z', metadata
+  ))
+  for (const [index,metadata] of [
+    '{"transcript":"","asr":{"kind":"empty"}}',
+    Buffer.from('{"transcript":"","asr":{"kind":"empty"}}')
+  ].entries()) insertAggregate.run(
+    `empty-${index}`, 'completed', index ? 'translation' : 'voice_transcript', 'must not count', 600000, '2026-03-09T07:30:00Z', metadata
+  )
+  const retained = raw.prepare('SELECT * FROM history_v2 ORDER BY id').all()
+  assert.deepEqual({
+    activity: historyActivitySchema.parse(handlers.get('db:history-activity')()),
+    usage: dictationUsageSchema.parse(handlers.get('db:history-usage')())
+  }, {
+    activity: { days:[{date:'2026-03-08',count:countedMetadata.length}] },
+    usage: { dictationCount:countedMetadata.length, durationMs:countedMetadata.length * 60000,
+      words:countedMetadata.length * 2, wordsPerMinute:2, savedTimeMs:0 }
+  }, 'completed empty ASR must not inflate either aggregate; legacy, malformed and nonempty metadata still count')
+  assert.deepEqual(raw.prepare('SELECT * FROM history_v2 ORDER BY id').all(),retained,'aggregation retains all rows and their diagnostics unchanged')
+  console.log('PASS empty ASR text/blob metadata excluded from both aggregates; null, malformed, legacy and nonempty rows preserved')
 } finally { raw.close() }

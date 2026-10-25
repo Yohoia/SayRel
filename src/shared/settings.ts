@@ -53,6 +53,7 @@ export interface Settings {
   translationTargetLanguages: string[]
   translationTargetLanguage: string
   muteWhileDictating: boolean
+  showLiveTranscript: boolean
   micDevice: string | null
   autoPunctuation: boolean
   addTrailingSpace: boolean
@@ -119,6 +120,7 @@ export const DEFAULT_SETTINGS: Settings = {
   translationTargetLanguages: ['en'],
   translationTargetLanguage: 'en',
   muteWhileDictating: true,
+  showLiveTranscript: true,
   micDevice: null,
   autoPunctuation: true,
   addTrailingSpace: true,
@@ -193,6 +195,7 @@ export function mergeSettings(persisted: Partial<Settings> | undefined): Setting
   return {
     ...DEFAULT_SETTINGS,
     ...Object.fromEntries(Object.entries(persisted ?? {}).filter(([key]) => key in DEFAULT_SETTINGS)),
+    showLiveTranscript: z.boolean().catch(true).parse(persisted?.showLiveTranscript),
     polishLevel: z.enum(['raw', 'light', 'strong']).catch('light').parse(persisted?.polishLevel),
     writingStyle: z.enum(['neutral', 'formal', 'casual', 'concise']).catch('neutral').parse(persisted?.writingStyle),
     dictionaryLearning: persisted?.dictionaryLearning === true,

@@ -202,7 +202,8 @@ app.whenReady().then(async () => {
 
   for (const { label, key, initial, next } of [
     { label: 'Launch at startup', key: 'launchAtLogin', initial: false, next: true },
-    { label: 'Show app in dock', key: 'showInDock', initial: true, next: false }
+    { label: 'Show app in dock', key: 'showInDock', initial: true, next: false },
+    { label: 'Show live transcript', key: 'showLiveTranscript', initial: true, next: false }
   ]) {
     await openSettings()
     await js('window.__settingsFaults.save = true')
